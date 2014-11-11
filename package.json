@@ -1,0 +1,29 @@
+{
+  "name": "paas",
+  "version": "0.0.1",
+  "description": "FlunkyBox PaaS platform",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git@bitbucket.org:nodatacenter/paas.git"
+  },
+  "keywords": [
+    "paas",
+    "flunkybox"
+  ],
+  "author": "Thomas Delaet <thomas@delaet.org>",
+  "license": "Commercial",
+  "dependencies": {
+    "backbone": "^1.1.2",
+    "backbone-brace": "git+https://bitbucket.org/atlassian/backbone-brace.git",
+    "debug": "^2.1.0",
+    "js-base64": "^2.1.5",
+    "js-nacl": "^0.6.0",
+    "lodash": "^2.4.1",
+    "paas-directory": "git+https://bitbucket.org/nodatacenter/paas-directory.git"
+  }
+}
