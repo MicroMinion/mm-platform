@@ -20,6 +20,15 @@ var Domain = Brace.Model.extend({
         devices: ["string"],
     },
 
+    publicJSON: function() {
+        return {
+            publicKey: this.getPublicKey(),
+            name: this.getName(),
+            description: this.getDescription(),
+            ownerEmail: this.getOwnerEmail(),
+            devices: this.getDevices()
+        };
+    },
 
     generate: function(domainName, description, ownerEmail) {
         var keypair = nacl.crypto_box_keypair();

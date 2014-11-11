@@ -20,6 +20,14 @@ var Device = Brace.Model.extend({
         ipv6: ["string"]
     },
 
+    publicJSON: function() {
+        return {
+            publicKey: this.getPublicKey(),
+            ipv4: this.getIpv4(),
+            ipv6: this.getIpv6()
+        };
+    },
+
     initialize: function() {
         this.setIpv4(this.get_ipv4_addresses());
         this.setIpv6(this.get_ipv6_addresses());

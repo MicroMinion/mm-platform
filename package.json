@@ -20,10 +20,12 @@
   "dependencies": {
     "backbone": "^1.1.2",
     "backbone-brace": "git+https://bitbucket.org/atlassian/backbone-brace.git",
+    "backbone.localstorage": "^1.1.14",
     "debug": "^2.1.0",
     "js-base64": "^2.1.5",
     "js-nacl": "^0.6.0",
     "lodash": "^2.4.1",
+    "node-localstorage": "^0.3.4",
     "paas-directory": "git+https://bitbucket.org/nodatacenter/paas-directory.git"
   }
 }
