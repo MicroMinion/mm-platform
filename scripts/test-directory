@@ -1,0 +1,5 @@
+#!/usr/bin/nodejs
+
+var platform = require("../index.js");
+
+var client = new platform();
