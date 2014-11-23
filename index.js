@@ -19,7 +19,7 @@ if (typeof localStorage == "undefined" || localStorage == null) {
 };
 
 var Settings = require('./src/settings.js');
-var Directory = require('paas-directory');
+var Directory = require('paas-directory').Client;
 
 inherits(FlunkyPaaS, EventEmitter);
 
@@ -45,4 +45,20 @@ FlunkyPaaS.prototype._configLoaded = function() {
 
 FlunkyPaaS.prototype._setupDirectory = function() {
     this._directory = new Directory(this._config);
+};
+
+FlunkyPaaS.prototype.create_domain = function(name, description, owner) {
+
+};
+
+FlunkyPaas.prototype.discover_local_domains = function(callback) {
+
+};
+
+FlunkyPaaS.prototype.subscribe_to_domain_requests = function(callback) {
+
+};
+
+FlunkyPaaS.prototype.add_instance_to_domain = function(publicKey, callback) {
+
 };
