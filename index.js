@@ -48,17 +48,40 @@ FlunkyPaaS.prototype._setupDirectory = function() {
 };
 
 FlunkyPaaS.prototype.create_domain = function(name, description, owner) {
-
+    this._config.createNewDomain(name, description, owner);
 };
 
+/*
+ * Put out a request to discover domains on the local network
+ */
 FlunkyPaas.prototype.discover_local_domains = function(callback) {
-
+    this._directory.get("domain", "local", callback);
 };
 
+/*
+ * Request to be notified whenever somebody wants to join our domain so that we can add the instance to the domain if we want to
+ */
 FlunkyPaaS.prototype.subscribe_to_domain_requests = function(callback) {
 
 };
 
+/*
+ * Subscribe to domain confirmation request
+ */
+FlunkyPaaS.prototype.subscribe_to_domain_confirmation = function(callback) {
+
+};
+
+/*
+ * Sends out a request to join a domain
+ */
+FlunkyPaaS.prototype.send_domain_request = function(domain) {
+    
+};
+
+/*
+ * Confirm adding a new instance to the domain
+ */
 FlunkyPaaS.prototype.add_instance_to_domain = function(publicKey, callback) {
 
 };

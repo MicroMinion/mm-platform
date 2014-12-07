@@ -23,6 +23,12 @@ var Settings = Brace.Model.extend({
         this.setDevice(device);
     },
 
+    createNewDomain: function(name, description, owner) {
+        var domain = new Domain();
+        domain.generate(name, description, owner);
+        this.setDomain(domain);
+    },
+
     initialize: function() {
         this.listenTo(this, "change: domain", function() {
             this.listenTo(this.getDomain(), "change", function() {
