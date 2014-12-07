@@ -20,6 +20,7 @@ if (typeof localStorage == "undefined" || localStorage == null) {
 
 var Settings = require('./src/settings.js');
 var Directory = require('paas-directory').Client;
+var MessageBroker = require('paas-connectivity');
 
 inherits(FlunkyPaaS, EventEmitter);
 
@@ -41,10 +42,15 @@ FlunkyPaaS.prototype._loadConfig = function() {
 
 FlunkyPaaS.prototype._configLoaded = function() {
     this._setupDirectory();
+    this._setupBroker();
 };
 
 FlunkyPaaS.prototype._setupDirectory = function() {
     this._directory = new Directory(this._config);
+};
+
+FlunkyPaaS.prototype._setupBroker = function() {
+    this._broker = new MessageBroker();
 };
 
 FlunkyPaaS.prototype.create_domain = function(name, description, owner) {
@@ -54,7 +60,7 @@ FlunkyPaaS.prototype.create_domain = function(name, description, owner) {
 /*
  * Put out a request to discover domains on the local network
  */
-FlunkyPaas.prototype.discover_local_domains = function(callback) {
+FlunkyPaaS.prototype.discover_local_domains = function(callback) {
     this._directory.get("domain", "local", callback);
 };
 
@@ -62,14 +68,19 @@ FlunkyPaas.prototype.discover_local_domains = function(callback) {
  * Request to be notified whenever somebody wants to join our domain so that we can add the instance to the domain if we want to
  */
 FlunkyPaaS.prototype.subscribe_to_domain_requests = function(callback) {
-
+    setTimeout(function() { 
+        callback({
+            publicKey: "abadfadfafdafd",
+            name: "Thomas' Nexus Tablet"
+        })
+    }, 3000);
 };
 
 /*
  * Subscribe to domain confirmation request
  */
 FlunkyPaaS.prototype.subscribe_to_domain_confirmation = function(callback) {
-
+        
 };
 
 /*
