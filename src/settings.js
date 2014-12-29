@@ -33,11 +33,13 @@ var Settings = Brace.Model.extend({
         this.listenTo(this, "change: domain", function() {
             this.listenTo(this.getDomain(), "change", function() {
                 this.trigger("change");
+                this.save();
             });
         });
         this.listenTo(this, "change: device", function() {
             this.listenTo(this.getDevice(), "change", function() {
                 this.trigger("change");
+                this.save();
             });
         });
     },

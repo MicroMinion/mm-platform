@@ -50,7 +50,7 @@ FlunkyPaaS.prototype._setupDirectory = function() {
 };
 
 FlunkyPaaS.prototype._setupBroker = function() {
-    this._broker = new MessageBroker();
+    this._broker = new MessageBroker(this._config);
 };
 
 FlunkyPaaS.prototype.create_domain = function(name, description, owner) {

@@ -26,7 +26,8 @@
     "js-nacl": "^0.6.0",
     "lodash": "^2.4.1",
     "node-localstorage": "^0.3.4",
+    "paas-connectivity": "git+https://bitbucket.org/nodatacenter/paas-connectivity.git",
     "paas-directory": "git+https://bitbucket.org/nodatacenter/paas-directory.git",
-    "paas-connectivity": "git+https://bitbucket.org/nodatacenter/paas-connectivity.git"
+    "random-port": "^0.1.0"
   }
 }
