@@ -1,7 +1,7 @@
 var Backbone = require("backbone");
 var Brace = require("backbone-brace");
 var Device = require("./device.js");
-var Domain = require("./domain.js");
+var User = require("./user.js");
 Backbone.LocalStorage = require("backbone.localstorage");
 
 var Settings = Brace.Model.extend({
@@ -14,7 +14,7 @@ var Settings = Brace.Model.extend({
 
     namedAttributes: {
         device: Device,
-        domain: Domain
+        user: User
     },
 
     createNewConfig: function() {
@@ -23,15 +23,15 @@ var Settings = Brace.Model.extend({
         this.setDevice(device);
     },
 
-    createNewDomain: function(name, description, owner) {
-        var domain = new Domain();
-        domain.generate(name, description, owner);
-        this.setDomain(domain);
+    createNewUser: function(name, description, email) {
+        var user = new User();
+        user.generate(name, description, email);
+        this.setUser(user);
     },
 
     initialize: function() {
-        this.listenTo(this, "change: domain", function() {
-            this.listenTo(this.getDomain(), "change", function() {
+        this.listenTo(this, "change: user", function() {
+            this.listenTo(this.getUser(), "change", function() {
                 this.trigger("change");
                 this.save();
             });

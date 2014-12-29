@@ -1,3 +1,3 @@
-var FlunkyPaaS = require("./index.js");
+var FlunkyPlatform = require("./index.js");
 
-paas = new FlunkyPaaS();
+platform = new FlunkyPlatform();

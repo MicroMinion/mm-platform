@@ -5,7 +5,7 @@ var nacl = nacl_factory.instantiate();
 var _ = require('lodash');
 var Base64 = require('js-base64').Base64;
 
-var Domain = Brace.Model.extend({
+var User = Brace.Model.extend({
 
     idAttribute: "publicKey",
 
@@ -16,7 +16,7 @@ var Domain = Brace.Model.extend({
         privateKey: "string",
         name: "string",
         description: "string",
-        ownerEmail: "string",
+        email: "string",
         devices: ["string"],
     },
 
@@ -25,18 +25,18 @@ var Domain = Brace.Model.extend({
             publicKey: this.getPublicKey(),
             name: this.getName(),
             description: this.getDescription(),
-            ownerEmail: this.getOwnerEmail(),
+            email: this.getOwnerEmail(),
             devices: this.getDevices()
         };
     },
 
-    generate: function(domainName, description, ownerEmail) {
+    generate: function(userName, description, email) {
         var keypair = nacl.crypto_box_keypair();
         this.publicKey = Base64.toBase64(nacl.decode_latin1(keypair.boxPk));
         this.privateKey = Base64.toBase64(nacl.decode_latin1(keypair.boxSk));
-        this.domainName = domainName;
+        this.name = userName;
         this.description = description;
-        this.ownerEmail = ownerEmail;
+        this.email = email;
     },
 
     clear: function() {
@@ -44,4 +44,4 @@ var Domain = Brace.Model.extend({
     }
 });
 
-module.exports = Domain;
+module.exports = User;
