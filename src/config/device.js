@@ -5,13 +5,13 @@ var nacl = nacl_factory.instantiate();
 var _ = require('lodash');
 var Base64 = require('js-base64').Base64;
 var os = require('os');
-var random_port = require("random-port");
 
 var Device = Brace.Model.extend({
 
     idAttribute: "publicKey",
 
     defaults: {
+        port: 9345
     },
 
     namedAttributes: {
@@ -19,8 +19,7 @@ var Device = Brace.Model.extend({
         privateKey: "string",
         ipv4: ["string"],
         ipv6: ["string"],
-        public_interface: null,
-        private_interface: null
+        port: Number
     },
 
     publicJSON: function() {
@@ -28,17 +27,13 @@ var Device = Brace.Model.extend({
             publicKey: this.getPublicKey(),
             ipv4: this.getIpv4(),
             ipv6: this.getIpv6(),
-            public_interface: this.getPublic_interface(),
-            private_interface: this.getPrivate_interface()
+            port: this.getPort()
         };
     },
 
     initialize: function() {
         this.setIpv4(this.get_ipv4_addresses());
         this.setIpv6(this.get_ipv6_addresses());
-        if(!this.has("public_interface") || !this.has("private_interface")) {
-            this.generate_ports();
-        };
     },
 
     getBinaryPrivateKey: function() {
@@ -54,29 +49,10 @@ var Device = Brace.Model.extend({
         var keypair = nacl.crypto_box_keypair();
         this.setPublicKey(Base64.toBase64(nacl.decode_latin1(keypair.boxPk)));
         this.setPrivateKey(Base64.toBase64(nacl.decode_latin1(keypair.boxSk)));
-        this.generate_ports();
-    },
-
-    getRandom: function(length) {
-        return Math.floor(Math.pow(10, length - 1) + Math.random() * 9 * Math.pow(10, length - 1));
     },
 
     clear: function() {
         this.destroy();
-    },
-
-
-    generate_ports: function() {
-        random_port({from: 10000, range: 200}, this.public_port_received.bind(this));
-        random_port({from: 10200, range: 200}, this.private_port_received.bind(this));
-    },
-
-    public_port_received: function(port) {
-        this.setPublic_interface({'tcp': port});
-    },
-
-    private_port_received: function(port) {
-        this.setPrivate_interface({'tcp': port});
     },
 
     get_ipv4_addresses: function() {
