@@ -6,8 +6,9 @@ var inherits = require("inherits");
 var extend = require("extend.js");
 var _ = require("lodash");
 
-var AuthenticationService = require("./services/authentication.js");
-var DiscoveryService = require("./services/discovery.js");
+//FIXME: Not yet implemented
+//var AuthenticationService = require("./services/authentication.js");
+//var DiscoveryService = require("./services/discovery.js");
 
 inherits(ServiceManager, EventEmitter);
 

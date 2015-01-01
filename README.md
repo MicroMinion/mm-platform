@@ -1,4 +1,4 @@
-# FlunkyPaaS
+# Flunky Platform
 
 This is the module that binds together all Flunky platform components
 

@@ -1,61 +1,11 @@
-module.exports = FlunkyPlatform;
+var FlunkyPlatform = require("./platform.js");
+var Settings = require("./src/config/settings.js");
+var Device = require("./src/config/device.js");
+var User = require("./src/config/user.js");
 
-var debug = require('debug')('flunky-platform');
-var EventEmitter = require('events').EventEmitter;
-var inherits = require('inherits');
-var os = require("os");
-var path = require("path");
-
-if (typeof localStorage == "undefined" || localStorage == null) {
-    GLOBAL.window = GLOBAL;
-    var LocalStorage = require("node-localstorage").LocalStorage;
-    var directory;
-    if(process.env.FLUNKY_DATA) {
-        directory = process.env.FLUNKY_DATA;
-    } else {
-        directory = path.join(os.tmpdir(),"flunkyPlatform"); 
-    };
-    localStorage = new LocalStorage(directory);
+module.exports = {
+    FlunkyPlatform: FlunkyPlatform,
+    Settings: Settings,
+    Device: Device,
+    User: User
 };
-
-var Settings = require('./src/config/settings.js');
-var Directory = require('flunky-directory').Client;
-var ConnectionManager = require('flunky-connectivity');
-var ServiceManager = require('./src/service-manager.js');
-
-inherits(FlunkyPlatform, EventEmitter);
-
-function FlunkyPlatform() {
-    EventEmitter.call(this);
-    this._loadConfig();
-};
-
-FlunkyPlatform.prototype._loadConfig = function() {
-    this._config = new Settings();
-    this._config.fetch();
-    var publicKey = this._config.getDeviceID();
-    if(publicKey == undefined || publicKey == "") {
-        this._config.createNewConfig();
-        this._config.save();
-    };
-    this._configLoaded();
-};
-
-FlunkyPlatform.prototype._configLoaded = function() {
-    this._setupDirectory();
-    this._setupServices();
-    this._setupConnectivity();
-};
-
-FlunkyPlatform.prototype._setupDirectory = function() {
-    this._directory = new Directory(this._config);
-};
-
-FlunkyPlatform.prototype._setupServices = function() {
-    this._service_manager = new ServiceManager();
-};
-
-FlunkyPlatform.prototype._setupConnectivity = function() {
-    this._broker = new ConnectivityManager();
-};
-

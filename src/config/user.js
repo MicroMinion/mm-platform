@@ -25,18 +25,18 @@ var User = Brace.Model.extend({
             publicKey: this.getPublicKey(),
             name: this.getName(),
             description: this.getDescription(),
-            email: this.getOwnerEmail(),
+            email: this.getEmail(),
             devices: this.getDevices()
         };
     },
 
     generate: function(userName, description, email) {
         var keypair = nacl.crypto_box_keypair();
-        this.publicKey = Base64.toBase64(nacl.decode_latin1(keypair.boxPk));
-        this.privateKey = Base64.toBase64(nacl.decode_latin1(keypair.boxSk));
-        this.name = userName;
-        this.description = description;
-        this.email = email;
+        this.setPublicKey(Base64.toBase64(nacl.decode_latin1(keypair.boxPk)));
+        this.setPrivateKey(Base64.toBase64(nacl.decode_latin1(keypair.boxSk)));
+        this.setName(userName);
+        this.setEmail(email);
+        this.setDescription(description);
     },
 
     clear: function() {

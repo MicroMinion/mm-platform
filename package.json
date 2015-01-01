@@ -1,5 +1,5 @@
 {
-  "name": "paas",
+  "name": "flunky-platform",
   "version": "0.0.1",
   "description": "FlunkyBox PaaS platform",
   "main": "index.js",
@@ -22,6 +22,7 @@
     "backbone-brace": "git+https://bitbucket.org/atlassian/backbone-brace.git",
     "backbone.localstorage": "^1.1.14",
     "debug": "^2.1.0",
+    "extend.js": "0.0.2",
     "flunky-connectivity": "git+https://bitbucket.org/nodatacenter/flunky-connectivity.git",
     "flunky-directory": "git+https://bitbucket.org/nodatacenter/flunky-directory.git",
     "flunky-service-metadata": "git+https://bitbucket.org/nodatacenter/flunky-service-metadata.git",
