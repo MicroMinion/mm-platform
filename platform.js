@@ -21,7 +21,7 @@ if (typeof localStorage == "undefined" || localStorage == null) {
 var Settings = require('./src/settings.js');
 var Directory = require('flunky-directory').Client;
 var ConnectionManager = require('flunky-connectivity');
-var ServiceManager = require('./src/service-manager.js');
+var ComponentManager = require('./src/component-manager.js');
 
 inherits(FlunkyPlatform, EventEmitter);
 
@@ -43,7 +43,7 @@ FlunkyPlatform.prototype._loadConfig = function() {
 
 FlunkyPlatform.prototype._configLoaded = function() {
     this._setupDirectory();
-    this._setupServices();
+    this._setupComponents();
     this._setupConnectivity();
 };
 
@@ -54,8 +54,8 @@ FlunkyPlatform.prototype._setupDirectory = function() {
     });
 };
 
-FlunkyPlatform.prototype._setupServices = function() {
-    this._service_manager = new ServiceManager({
+FlunkyPlatform.prototype._setupComponents = function() {
+    this._componentManager = new ComponentManager({
         config: this._config,
         directory: this._directory,
     });
@@ -67,6 +67,10 @@ FlunkyPlatform.prototype._setupConnectivity = function() {
         user: this._config.getUser(),
         device: this._config.getDevice()
     });
-    this._service_manager.setConnectionManager(this._connectionManager);
+    this._componentManager.setConnectionManager(this._connectionManager);
+    this._connectionManager.on("addPeer", this._componentManager.addPeer.bind(this._componentManager));
+    this._connectionManager.on("removePeer", this._componentManager.removePeer.bind(this._componentManager));
+    this._componentManager.pipe(this._connectionManager);
+    this._connectionManager.pipe(this._componentManager);
 };
 
