@@ -1,7 +1,7 @@
 var Backbone = require("backbone");
 var Brace = require("backbone-brace");
-var Device = require("./device.js");
-var User = require("./user.js");
+var Device = require("flunky-utils").Device;
+var User = require("flunky-utils").User;
 Backbone.LocalStorage = require("backbone.localstorage");
 
 var Settings = Brace.Model.extend({

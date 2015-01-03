@@ -18,7 +18,7 @@ if (typeof localStorage == "undefined" || localStorage == null) {
     localStorage = new LocalStorage(directory);
 };
 
-var Settings = require('./src/config/settings.js');
+var Settings = require('./src/settings.js');
 var Directory = require('flunky-directory').Client;
 var ConnectionManager = require('flunky-connectivity');
 var ServiceManager = require('./src/service-manager.js');
