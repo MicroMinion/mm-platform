@@ -29,6 +29,12 @@ var Settings = Brace.Model.extend({
         this.setUser(user);
     },
 
+    addUser: function(user) {
+        var user = new User();
+        user.set(user);
+        this.setUser(user);
+    },
+
     initialize: function() {
         this.listenTo(this, "change: user", function() {
             this.listenTo(this.getUser(), "change", function() {

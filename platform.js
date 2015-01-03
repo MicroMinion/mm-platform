@@ -48,14 +48,25 @@ FlunkyPlatform.prototype._configLoaded = function() {
 };
 
 FlunkyPlatform.prototype._setupDirectory = function() {
-    this._directory = new Directory(this._config);
+    this._directory = new Directory({
+        user: this._config.getUser(),
+        device: this._config.getDevice()
+    });
 };
 
 FlunkyPlatform.prototype._setupServices = function() {
-    this._service_manager = new ServiceManager();
+    this._service_manager = new ServiceManager({
+        config: this._config,
+        directory: this._directory,
+    });
 };
 
 FlunkyPlatform.prototype._setupConnectivity = function() {
-    this._broker = new ConnectivityManager();
+    this._connectionManager = new ConnectionManager({
+        directory: this._directory,
+        user: this._config.getUser(),
+        device: this._config.getDevice()
+    });
+    this._service_manager.setConnectionManager(this._connectionManager);
 };
 
