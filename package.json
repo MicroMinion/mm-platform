@@ -24,6 +24,7 @@
     "debug": "^2.1.0",
     "extend.js": "0.0.2",
     "flunky-component": "git+https://bitbucket.org/nodatacenter/flunky-component.git",
+    "flunky-component-metadata": "git+https://bitbucket.org/nodatacenter/flunky-component-metadata.git",
     "flunky-connectivity": "git+https://bitbucket.org/nodatacenter/flunky-connectivity.git",
     "flunky-directory": "git+https://bitbucket.org/nodatacenter/flunky-directory.git",
     "flunky-utils": "git+https://bitbucket.org/nodatacenter/flunky-utils.git",

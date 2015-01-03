@@ -1,6 +1,6 @@
 module.exports = AuthenticationComponent;
 
-var debug = require("debug")("flunky-component-authentication");
+var debug = require("debug")("flunky-component:authentication");
 var FlunkyComponent = require("flunky-component");
 var inherits = require("inherits");
 var random_port = require("random-port");
@@ -15,6 +15,7 @@ function AuthenticationComponent(opts) {
     debug("initializing authentication component");
     FlunkyComponent.call(this, opts);
     this.localProvides = ["authentication"];
+    this.provides = ["authentication"];
     this._deviceHistory = new mmds.DocumentDatabase({
         db: new Backbone.Collection([], {
             model: mmds.Document
@@ -221,4 +222,32 @@ AuthenticationComponent.prototype.addDeviceToUser = function(publicKey) {
         "device": publicKey
     });
     this._contactDeviceWithJoinConfirmation(publicKey);
+};
+
+/*
+ * Synchronization logic
+ */
+
+AuthenticationComponent.prototype.setup = function(peerID) {
+    this.peers[peerID] = mmds.SyncStream({
+        own_id: "authentication",
+        db: this._deviceHistory});
+    this.peers[peerID].on("data", function(chunk) {
+        this.push({
+            to: peerID,
+            service: "authentication",
+            payload: chunk
+        });
+    });
+};
+
+AuthenticationComponent.prototype.tearDown = function(peerID) {
+    if(_.has(this.peers, peerID)) {
+        delete this.peers[peerID];
+    };
+};
+
+AuthenticationComponent.prototype._write = function(chunk, encoding, done) {
+    this.peers[chunk.from].write(chunk.payload);
+    done();
 };

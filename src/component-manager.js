@@ -8,6 +8,7 @@ var _ = require("lodash");
 
 var AuthenticationComponent = require("./components/authentication.js");
 var DiscoveryComponent = require("./components/discovery.js");
+var MetadataComponent = require("flunky-component-metadata");
 
 inherits(ComponentManager, Duplex); 
 
@@ -20,6 +21,7 @@ function ComponentManager(opts) {
     }, opts);
     this._setupAuthenticationComponent();
     this._setupDiscoveryComponent();
+    this._setupMetadataComponent();
     this._collectServiceDefinitions();
     var componentManager = this;
     _.each(this.components, function(component) {
@@ -80,7 +82,17 @@ ComponentManager.prototype._setupAuthenticationComponent = function() {
 };
 
 ComponentManager.prototype._setupDiscoveryComponent = function() {
+    this.discoveryComponent = new DiscoveryComponent({
+        componentManager: this
+    });
+    this.components.push(this.discoveryComponent);
+};
 
+ComponentManager.prototype._setupMetadataComponent = function() {
+    this.videoDB = new MetadataComponent({
+        name: "homevideos"
+    });
+    this.components.push(this.videoDB);
 };
 
 ComponentManager.prototype._collectServiceDefinitions = function() {
