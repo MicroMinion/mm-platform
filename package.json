@@ -20,7 +20,7 @@
   "dependencies": {
     "backbone": "^1.1.2",
     "backbone-brace": "git+https://bitbucket.org/atlassian/backbone-brace.git",
-    "backbone.localstorage": "^1.1.14",
+    "curve-protocol": "git+https://bitbucket.org/nodatacenter/curve-protocol.git",
     "debug": "^2.1.0",
     "extend.js": "0.0.2",
     "flunky-component": "git+https://bitbucket.org/nodatacenter/flunky-component.git",
@@ -28,11 +28,10 @@
     "flunky-connectivity": "git+https://bitbucket.org/nodatacenter/flunky-connectivity.git",
     "flunky-directory": "git+https://bitbucket.org/nodatacenter/flunky-directory.git",
     "flunky-utils": "git+https://bitbucket.org/nodatacenter/flunky-utils.git",
-    "curve-protocol": "git+https://bitbucket.org/nodatacenter/curve-protocol.git",
-    "mmds": "git+https://bitbucket.org/nodatacenter/mmds.git",
     "inherits": "^2.0.1",
     "lodash": "^2.4.1",
-    "node-localstorage": "^0.3.4",
+    "mmds": "git+https://bitbucket.org/nodatacenter/mmds.git",
+    "node-localstorage": "^0.3.6",
     "random-port": "^0.1.0"
   }
 }
