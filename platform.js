@@ -9,12 +9,13 @@ var ConnectionManager = require('flunky-connectivity');
 var ComponentManager = require('./src/component-manager.js');
 var createStore = require("flunky-utils").createStore;
 
-inherits(FlunkyPlatform, EventEmitter);
 
 function FlunkyPlatform() {
     EventEmitter.call(this);
     this._loadConfig();
 };
+
+inherits(FlunkyPlatform, EventEmitter);
 
 FlunkyPlatform.prototype._loadConfig = function() {
     this._config = new Settings();

@@ -8,6 +8,7 @@ var net = require("net");
 var CurveCPStream = require("curve-protocol");
 var mmds = require("mmds");
 var Backbone = require("backbone");
+var crypto = require("flunky-utils").crypto;
 
 inherits(AuthenticationComponent, FlunkyComponent);
 
@@ -86,8 +87,8 @@ AuthenticationComponent.prototype._setupServerConnection = function(connection) 
     var curveStream = new CurveCPStream({
         stream: connection,
         is_server: true,
-        serverPublicKey: this.config.getDevice().getBinaryPublicKey(),
-        serverPrivateKey: this.config.getDevice().getBinaryPrivateKey(),
+        serverPublicKey: crypto.fromBase64(this.config.getDevice().getPublicKey()),
+        serverPrivateKey: crypto.fromBase64(this.config.getDevice().getPrivateKey())
     });
     curveStream.on("close", function() {
         curveStream.stream.end();
@@ -162,8 +163,8 @@ AuthenticationComponent.prototype._setupClientConnection = function(connection, 
         stream: connection,
         is_server: false,
         serverPublicKey: nacl.encode_latin1(Base64.fromBase64(publicKey)),
-        clientPublicKey: this.config.getDevice().getBinaryPublicKey(),
-        clientPrivateKey: this.config.getDevice().getBinaryPrivateKey()
+        clientPublicKey: crypto.fromBase64(this.config.getDevice().getPublicKey()),
+        clientPrivateKey: crypto.fromBase64(this.config.getDevice().getPrivateKey())
     });
     curveStream.on("close", function() {
         curveStream.stream.end();

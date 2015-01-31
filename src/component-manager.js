@@ -1,3 +1,5 @@
+
+var ComponentManager;
 module.exports = ComponentManager;
 
 var debug = require("debug")("flunky-platform:component-manager");
@@ -10,7 +12,6 @@ var AuthenticationComponent = require("./components/authentication.js");
 var DiscoveryComponent = require("./components/discovery.js");
 var MetadataComponent = require("flunky-component-metadata");
 
-inherits(ComponentManager, Duplex); 
 
 function ComponentManager(opts) {
     if(!opts) opts = {};
@@ -28,6 +29,8 @@ function ComponentManager(opts) {
         component.on("data",  componentManager.sendMessage.bind(this));
     }, this);
 };
+
+inherits(ComponentManager, Duplex); 
 
 ComponentManager.prototype.setConnectionManager = function(connectionManager) {
     this.authenticationComponent.setConnectionManager(connectionManager);
