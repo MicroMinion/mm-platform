@@ -18,8 +18,6 @@
   "author": "Thomas Delaet <thomas@delaet.org>",
   "license": "Commercial",
   "dependencies": {
-    "backbone": "^1.1.2",
-    "backbone-brace": "git+https://bitbucket.org/atlassian/backbone-brace.git",
     "curve-protocol": "git+https://bitbucket.org/nodatacenter/curve-protocol.git",
     "debug": "^2.1.0",
     "extend.js": "0.0.2",
@@ -31,7 +29,6 @@
     "inherits": "^2.0.1",
     "lodash": "^2.4.1",
     "mmds": "git+https://bitbucket.org/nodatacenter/mmds.git",
-    "node-localstorage": "^0.3.6",
     "random-port": "^0.1.0"
   }
 }

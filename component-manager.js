@@ -8,9 +8,9 @@ var inherits = require("inherits");
 var extend = require("extend.js");
 var _ = require("lodash");
 
-var AuthenticationComponent = require("./components/authentication.js");
-var DiscoveryComponent = require("./components/discovery.js");
-var MetadataComponent = require("flunky-component-metadata");
+var AuthenticationComponent = require("./authentication.js");
+var DiscoveryComponent = require("./discovery.js");
+//var MetadataComponent = require("flunky-component-metadata");
 
 
 function ComponentManager(opts) {
@@ -92,10 +92,10 @@ ComponentManager.prototype._setupDiscoveryComponent = function() {
 };
 
 ComponentManager.prototype._setupMetadataComponent = function() {
-    this.videoDB = new MetadataComponent({
-        name: "homevideos"
-    });
-    this.components.push(this.videoDB);
+    //this.videoDB = new MetadataComponent({
+    //    name: "homevideos"
+    //});
+    //this.components.push(this.videoDB);
 };
 
 ComponentManager.prototype._collectServiceDefinitions = function() {

@@ -7,7 +7,6 @@ var random_port = require("random-port");
 var net = require("net");
 var CurveCPStream = require("curve-protocol");
 var mmds = require("mmds");
-var Backbone = require("backbone");
 var crypto = require("flunky-utils").crypto;
 
 inherits(AuthenticationComponent, FlunkyComponent);
@@ -17,18 +16,13 @@ function AuthenticationComponent(opts) {
     FlunkyComponent.call(this, opts);
     this.localProvides = ["authentication"];
     this.provides = ["authentication"];
-    this._deviceHistory = new mmds.DocumentDatabase({
-        db: new Backbone.Collection([], {
-            model: mmds.Document
-        }),
-        eventLog: new Backbone.Collection([])
-    });
+    this._deviceHistory = new mmds.Collection({resource: "deviceHistory"});
     var config = this.config;
     var auth = this;
-    this._deviceHistory.db.on("add", function(model) {
-        if (!_.has(config.getUser().getDevices(), model.get("device"))) {
-            config.getUser().addDevice(model.get("device"));
-            auth.emit("deviceAdded", model.get("device"));
+    this._deviceHistory.on("newEvent", function(event) {
+        if (!_.has(config.user.devices, event.document.device)) {
+            config.user.addDevice(event.document.device);
+            auth.emit("deviceAdded", event.document.device);
         };
     });
     this._setupListeningSocket();
@@ -45,7 +39,7 @@ AuthenticationComponent.prototype.setConnectionManager = function(connectionMana
 AuthenticationComponent.prototype._setupListeningSocket = function() {
     debug("setting up listening socket");
     var manager = this;
-    var port = this.config.getDevice().getAuthPort();
+    var port = this.config.device.authPort;
     if (port == undefined) {
         this.generate_port();
         return;
@@ -61,7 +55,7 @@ AuthenticationComponent.prototype._setupListeningSocket = function() {
             manager.server.close();
         };
     });
-    debug("starting to listen on port %s (device %s)", port, this.config.getDevice().getPublicKey());
+    debug("starting to listen on port %s (device %s)", port, this.config.device.publicKey;
     this.server.listen(port);
 };
 
@@ -75,20 +69,19 @@ AuthenticationComponent.prototype.generate_port = function() {
 
 AuthenticationComponent.prototype._port_received = function(port) {
     debug("processing result of random port generation");
-    this.config.getDevice().setAuthPort(port);
-    this.config.save();
+    this.config.device.authPort = port;
     this._setupListeningSocket();
 };
 
 AuthenticationComponent.prototype._setupServerConnection = function(connection) {
     debug("setting up server connection stream");
-    var device = this.config.getDevice();
+    var device = this.config.device;
     var authenticationComponent = this;
     var curveStream = new CurveCPStream({
         stream: connection,
         is_server: true,
-        serverPublicKey: crypto.fromBase64(this.config.getDevice().getPublicKey()),
-        serverPrivateKey: crypto.fromBase64(this.config.getDevice().getPrivateKey())
+        serverPublicKey: crypto.fromBase64(this.config.device.publicKey),
+        serverPrivateKey: crypto.fromBase64(this.config.device.privateKey)
     });
     curveStream.on("close", function() {
         curveStream.stream.end();
@@ -99,19 +92,19 @@ AuthenticationComponent.prototype._setupServerConnection = function(connection) 
     curveStream.on("data", function(chunk) {
         var json = JSON.parse(chunk);
         if (json.payload.type == "joinRequest") {
-            if (this.config.getUser()) {
+            if (this.config.user) {
                 this.emit("joinRequest", json.payload.device);
             };
         } else if (json.payload.type == "joinConfirmation") {
-            if (!this.config.getUser() && this.joinRequestSend) {
+            if (!this.config.user.publicKey && this.joinRequestSend) {
                 this.joinRequestSend = false;
                 this.emit("joinConfirmation", json.payload.user);
                 this.directory.get(user_public_key, "local", function(user) {
-                    if (_.has(user.devices, device.getPublicKey())) {
+                    if (_.has(user.devices, device.publicKey)) {
                         var config = authenticationComponent.config;
                         config.addUser(user);
-                        authenticationComponent.directory.setUser(config.getUser());
-                        authenticationComponent.connectionManager.setUser(config.getUser());
+                        authenticationComponent.directory.setUser(config.user);
+                        authenticationComponent.connectionManager.setUser(config.user);
                     };
                 });
             };
@@ -125,7 +118,7 @@ AuthenticationComponent.prototype._setupServerConnection = function(connection) 
 
 AuthenticationComponent.prototype._contactDeviceWithJoinRequest = function(device) {
     this.joinRequestSend = true;
-    var device = this.config.getDevice().publicJSON();
+    var device = this.config.device.publicJSON();
     this._connectToDevice(device, JSON.stringify({
         'service': 'authentication',
         'payload': {
@@ -136,7 +129,7 @@ AuthenticationComponent.prototype._contactDeviceWithJoinRequest = function(devic
 };
 
 AuthenticationComponent.prototype._contactDeviceWithJoinConfirmation = function(device) {
-    var user = this.config.getUser().publicJSON();
+    var user = this.config.user.publicJSON();
     this._connectToDevice(device, JSON.stringify({
         'service': 'authentication',
         'payload': {
@@ -147,7 +140,7 @@ AuthenticationComponent.prototype._contactDeviceWithJoinConfirmation = function(
 };
 
 AuthenticationComponent.prototype._connectToDevice = function(publicKey, message) {
-    debug("establishing connection to device %s from device %s", publicKey, this.device.getPublicKey());
+    debug("establishing connection to device %s from device %s", publicKey, this.device.publicKey);
     var authenticationComponent = this;
     _.each(this._contactedDevices[publicKey].ipv4, function(address) {
         var connection = net.connect(this._contactedDevices[publicKey].authPort, address, function() {
@@ -163,8 +156,8 @@ AuthenticationComponent.prototype._setupClientConnection = function(connection, 
         stream: connection,
         is_server: false,
         serverPublicKey: nacl.encode_latin1(Base64.fromBase64(publicKey)),
-        clientPublicKey: crypto.fromBase64(this.config.getDevice().getPublicKey()),
-        clientPrivateKey: crypto.fromBase64(this.config.getDevice().getPrivateKey())
+        clientPublicKey: crypto.fromBase64(this.config.device.publicKey),
+        clientPrivateKey: crypto.fromBase64(this.config.device.privateKey)
     });
     curveStream.on("close", function() {
         curveStream.stream.end();
@@ -188,8 +181,8 @@ AuthenticationComponent.prototype._setupClientConnection = function(connection, 
 
 AuthenticationComponent.prototype.createUser = function(name, description, email) {
     this.config.createNewUser(name, description, email);
-    this.directory.setUser(this.config.getUser());
-    this.connectionManager.setUser(this.config.getUser());
+    this.directory.setUser(this.config.user);
+    this.connectionManager.setUser(this.config.user);
 };
 
 //Put out a request to discover users on the local network
@@ -218,7 +211,7 @@ AuthenticationComponent.prototype.sendRequestToJoinUser = function(user_public_k
 //Confirm adding a new instance to the user 
 AuthenticationComponent.prototype.addDeviceToUser = function(publicKey) {
     //Add to database which will automatically ensure propagation to 1) other devices and 2) config file
-    this._deviceHistory.db.add({
+    this._deviceHistory.create({
         "operation": "deviceAdded",
         "device": publicKey
     });

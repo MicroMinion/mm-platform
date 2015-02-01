@@ -3,12 +3,11 @@ module.exports = FlunkyPlatform;
 var debug = require('debug')('flunky-platform');
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('inherits');
-var Settings = require('./src/settings.js');
 var Directory = require('flunky-directory').Client;
 var ConnectionManager = require('flunky-connectivity');
-var ComponentManager = require('./src/component-manager.js');
+var ComponentManager = require('./component-manager.js');
 var createStore = require("flunky-utils").createStore;
-
+var Settings = require("flunky-utils").Settings;
 
 function FlunkyPlatform() {
     EventEmitter.call(this);
@@ -20,12 +19,11 @@ inherits(FlunkyPlatform, EventEmitter);
 FlunkyPlatform.prototype._loadConfig = function() {
     this._config = new Settings();
     var platform = this;
-    createStore(this._config, "Settings");
-    this._config.fetch();
+    createStore(this._config.store);
+    this._config.store.filter();
     var publicKey = this._config.getDeviceID();
     if (publicKey == undefined || publicKey == "") {
-        this._config.createNewConfig();
-        this._config.save();
+        this._config.device.createNewConfig();
     };
     this._configLoaded();
 };
@@ -38,8 +36,7 @@ FlunkyPlatform.prototype._configLoaded = function() {
 
 FlunkyPlatform.prototype._setupDirectory = function() {
     this._directory = new Directory({
-        user: this._config.getUser(),
-        device: this._config.getDevice()
+        config: this._config
     });
 };
 
@@ -53,8 +50,7 @@ FlunkyPlatform.prototype._setupComponents = function() {
 FlunkyPlatform.prototype._setupConnectivity = function() {
     this._connectionManager = new ConnectionManager({
         directory: this._directory,
-        user: this._config.getUser(),
-        device: this._config.getDevice()
+        config: this._config
     });
     this._componentManager.setConnectionManager(this._connectionManager);
     this._connectionManager.on("addPeer", this._componentManager.addPeer.bind(this._componentManager));
