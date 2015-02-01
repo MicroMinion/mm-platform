@@ -55,7 +55,7 @@ AuthenticationComponent.prototype._setupListeningSocket = function() {
             manager.server.close();
         };
     });
-    debug("starting to listen on port %s (device %s)", port, this.config.device.publicKey;
+    debug("starting to listen on port %s (device %s)", port, this.config.device.publicKey);
     this.server.listen(port);
 };
 

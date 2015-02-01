@@ -20,10 +20,11 @@ FlunkyPlatform.prototype._loadConfig = function() {
     this._config = new Settings();
     var platform = this;
     createStore(this._config.store);
-    this._config.store.filter();
+    this._config.store.filter("Device");
+    this._config.store.filter("User");
     var publicKey = this._config.getDeviceID();
     if (publicKey == undefined || publicKey == "") {
-        this._config.device.createNewConfig();
+        this._config.createNewConfig();
     };
     this._configLoaded();
 };
