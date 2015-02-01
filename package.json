@@ -27,8 +27,7 @@
     "flunky-directory": "git+https://bitbucket.org/nodatacenter/flunky-directory.git",
     "flunky-utils": "git+https://bitbucket.org/nodatacenter/flunky-utils.git",
     "inherits": "^2.0.1",
-    "lodash": "^2.4.1",
-    "mmds": "git+https://bitbucket.org/nodatacenter/mmds.git",
-    "random-port": "^0.1.0"
+    "lodash": "^3.0.1",
+    "mmds": "git+https://bitbucket.org/nodatacenter/mmds.git"
   }
 }

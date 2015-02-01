@@ -1,13 +1,15 @@
 module.exports = FlunkyPlatform;
 
+var utils = require("flunky-utils");
+
 var debug = require('debug')('flunky-platform');
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('inherits');
 var Directory = require('flunky-directory').Client;
 var ConnectionManager = require('flunky-connectivity');
 var ComponentManager = require('./component-manager.js');
-var createStore = require("flunky-utils").createStore;
-var Settings = require("flunky-utils").Settings;
+var createStore = utils.createStore;
+var Settings = utils.Settings;
 
 function FlunkyPlatform() {
     EventEmitter.call(this);
