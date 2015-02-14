@@ -237,6 +237,7 @@ AuthenticationComponent.prototype.tearDown = function(peerID) {
 };
 
 AuthenticationComponent.prototype._write = function(chunk, encoding, done) {
+    debug("receiving message %s", JSON.stringify(chunk));
     this.peers[chunk.from].write(chunk.payload);
     done();
 };

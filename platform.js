@@ -21,7 +21,6 @@ inherits(FlunkyPlatform, EventEmitter);
 FlunkyPlatform.prototype._loadConfig = function() {
     this._config = new Settings();
     var platform = this;
-    createStore(this._config.store);
     var publicKey = this._config.getDeviceID();
     if (publicKey == undefined || publicKey == "") {
         this._config.createNewConfig();

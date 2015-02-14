@@ -42,12 +42,14 @@ ComponentManager.prototype.sendMessage = function(message) {
 
 //Accept message from connectionManager and dispatch to services
 ComponentManager.prototype._write = function(chunk, encoding, done) {
+    debug("receive message %s", JSON.stringify(chunk));
     var service = chunk.service;
     _.each(this.components, function(component) {
-        if(_.has(component.getProvidedServices(), service)) {
+        if(_.includes(component.getProvidedServices(), service)) {
            component.write(chunk); 
         };
     });
+    done();
 };
 
 ComponentManager.prototype.addPeer = function(peerID) {

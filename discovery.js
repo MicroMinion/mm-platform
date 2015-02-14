@@ -3,6 +3,7 @@ module.exports = ServiceDiscoveryComponent;
 var debug = require("debug")("flunky-component:discovery");
 var FlunkyComponent = require("flunky-component");
 var inherits = require("inherits");
+var _ = require("lodash");
 
 inherits(ServiceDiscoveryComponent, FlunkyComponent);
 
