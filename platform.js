@@ -22,8 +22,6 @@ FlunkyPlatform.prototype._loadConfig = function() {
     this._config = new Settings();
     var platform = this;
     createStore(this._config.store);
-    this._config.store.filter("Device");
-    this._config.store.filter("User");
     var publicKey = this._config.getDeviceID();
     if (publicKey == undefined || publicKey == "") {
         this._config.createNewConfig();
@@ -55,9 +53,12 @@ FlunkyPlatform.prototype._setupConnectivity = function() {
         directory: this._directory,
         config: this._config
     });
-    this._componentManager.setConnectionManager(this._connectionManager);
     this._connectionManager.on("addPeer", this._componentManager.addPeer.bind(this._componentManager));
     this._connectionManager.on("removePeer", this._componentManager.removePeer.bind(this._componentManager));
     this._componentManager.pipe(this._connectionManager);
     this._connectionManager.pipe(this._componentManager);
+};
+
+FlunkyPlatform.prototype.getComponent = function(name) {
+    return this._componentManager.components[name];
 };

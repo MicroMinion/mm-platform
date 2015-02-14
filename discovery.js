@@ -18,8 +18,8 @@ ServiceDiscoveryComponent.prototype.setup = function(peerID) {
         to: peerID,
         service: "discovery",
         payload: {
-            needs: null,
-            provides: null
+            needs: [],
+            provides: []
         }
     });
 };

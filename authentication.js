@@ -6,7 +6,8 @@ var inherits = require("inherits");
 var random_port = require("flunky-utils").network.random_port;
 var CurveCPStream = require("curve-protocol");
 var mmds = require("mmds");
-var crypto = require("flunky-utils").crypto;
+var keys = require("flunky-utils").keys;
+var _ = require("lodash");
 
 inherits(AuthenticationComponent, FlunkyComponent);
 
@@ -15,7 +16,10 @@ function AuthenticationComponent(opts) {
     FlunkyComponent.call(this, opts);
     this.localProvides = ["authentication"];
     this.provides = ["authentication"];
-    this._deviceHistory = new mmds.Collection({resource: "deviceHistory"});
+    this.peers = {};
+    this._deviceHistory = new mmds.Collection({
+        resource: "deviceHistory"
+    });
     var config = this.config;
     var auth = this;
     this._deviceHistory.on("newEvent", function(event) {
@@ -25,11 +29,7 @@ function AuthenticationComponent(opts) {
         };
     });
     this._setupListeningSocket();
-    this._devicesContacted = {};
-};
-
-AuthenticationComponent.prototype.setConnectionManager = function(connectionManager) {
-    this.connectionManager = connectionManager;
+    this._contactedDevices = {};
 };
 
 /*
@@ -79,8 +79,8 @@ AuthenticationComponent.prototype._setupServerConnection = function(connection) 
     var curveStream = new CurveCPStream({
         stream: connection,
         is_server: true,
-        serverPublicKey: crypto.fromBase64(this.config.device.publicKey),
-        serverPrivateKey: crypto.fromBase64(this.config.device.privateKey)
+        serverPublicKey: keys.fromBase64(this.config.device.publicKey),
+        serverPrivateKey: keys.fromBase64(this.config.device.privateKey)
     });
     curveStream.on("close", function() {
         curveStream.stream.end();
@@ -91,21 +91,14 @@ AuthenticationComponent.prototype._setupServerConnection = function(connection) 
     curveStream.on("data", function(chunk) {
         var json = JSON.parse(chunk);
         if (json.payload.type == "joinRequest") {
-            if (this.config.user) {
-                this.emit("joinRequest", json.payload.device);
+            if (authenticationComponent.config.user) {
+                authenticationComponent.emit("joinRequest", json.payload.device);
             };
         } else if (json.payload.type == "joinConfirmation") {
-            if (!this.config.user.publicKey && this.joinRequestSend) {
-                this.joinRequestSend = false;
-                this.emit("joinConfirmation", json.payload.user);
-                this.directory.get(user_public_key, "local", function(user) {
-                    if (_.has(user.devices, device.publicKey)) {
-                        var config = authenticationComponent.config;
-                        config.addUser(user);
-                        authenticationComponent.directory.setUser(config.user);
-                        authenticationComponent.connectionManager.setUser(config.user);
-                    };
-                });
+            if (!authenticationComponent.config.user.publicKey && authenticationComponent.joinRequestSend) {
+                authenticationComponent.joinRequestSend = false;
+                authenticationComponent.config.addUser(json.payload.user);
+                authenticationComponent.emit("joinConfirmation", json.payload.user);
             };
         };
     });
@@ -117,18 +110,19 @@ AuthenticationComponent.prototype._setupServerConnection = function(connection) 
 
 AuthenticationComponent.prototype._contactDeviceWithJoinRequest = function(device) {
     this.joinRequestSend = true;
-    var device = this.config.device.publicJSON();
+    var myDevice = this.config.device.publicJSON();
     this._connectToDevice(device, JSON.stringify({
         'service': 'authentication',
         'payload': {
             'type': 'joinRequest',
-            'device': device
+            'device': myDevice
         }
     }));
 };
 
 AuthenticationComponent.prototype._contactDeviceWithJoinConfirmation = function(device) {
     var user = this.config.user.publicJSON();
+    user.privateKey = this.config.user.privateKey;
     this._connectToDevice(device, JSON.stringify({
         'service': 'authentication',
         'payload': {
@@ -139,30 +133,31 @@ AuthenticationComponent.prototype._contactDeviceWithJoinConfirmation = function(
 };
 
 AuthenticationComponent.prototype._connectToDevice = function(publicKey, message) {
-    debug("establishing connection to device %s from device %s", publicKey, this.device.publicKey);
+    debug("establishing connection to device %s from device %s", publicKey, this.config.device.publicKey);
     var authenticationComponent = this;
-    _.each(this._contactedDevices[publicKey].ipv4, function(address) {
-        var connection = net.connect(this._contactedDevices[publicKey].authPort, address, function() {
-            authenticationComponent._setupClientConnection(connection, publicKey, message);
+    authenticationComponent.directory.get(publicKey, "local", function(device, deviceInfo) {
+        _.each(deviceInfo.ipv4, function(address) {
+            var connection = net.connect(deviceInfo.authPort, address, function() {
+                authenticationComponent._setupClientConnection(connection, publicKey, message);
+            });
         });
     });
 };
 
 AuthenticationComponent.prototype._setupClientConnection = function(connection, publicKey, message) {
     debug("setting up client stream for connection to %s", publicKey);
-    var connectionManager = this;
     var curveStream = new CurveCPStream({
         stream: connection,
         is_server: false,
-        serverPublicKey: nacl.encode_latin1(Base64.fromBase64(publicKey)),
-        clientPublicKey: crypto.fromBase64(this.config.device.publicKey),
-        clientPrivateKey: crypto.fromBase64(this.config.device.privateKey)
+        serverPublicKey: keys.fromBase64(publicKey),
+        clientPublicKey: keys.fromBase64(this.config.device.publicKey),
+        clientPrivateKey: keys.fromBase64(this.config.device.privateKey)
     });
     curveStream.on("close", function() {
         curveStream.stream.end();
     });
     curveStream.on("drain", function() {
-        var publicKey = Base64.toBase64(nacl.decode_latin1(curveStream.serverPublicKey));
+        var publicKey = keys.toBase64(curveStream.serverPublicKey);
         curveStream.write(message);
         curveStream.stream.end();
     });
@@ -180,8 +175,6 @@ AuthenticationComponent.prototype._setupClientConnection = function(connection, 
 
 AuthenticationComponent.prototype.createUser = function(name, description, email) {
     this.config.createNewUser(name, description, email);
-    this.directory.setUser(this.config.user);
-    this.connectionManager.setUser(this.config.user);
 };
 
 //Put out a request to discover users on the local network
@@ -192,12 +185,13 @@ AuthenticationComponent.prototype.discoverUsersOnLocalNetwork = function(callbac
 // Sends out a request to join a user instance
 AuthenticationComponent.prototype.sendRequestToJoinUser = function(user_public_key) {
     var authenticationComponent = this;
-    this.directory.get(user_public_key, "local", function(user) {
+    this.directory.get(user_public_key, "local", function(key, user) {
+        debug("user's devices retrieved %s", user.devices);
         _.each(user.devices, function(device) {
             if (!_.has(authenticationComponent._contactedDevices, device)) {
                 authenticationComponent._contactedDevices[device] = {};
                 authenticationComponent.directory.get(device, "local", function(device, deviceInfo) {
-                    if (Object.keys(authenticationComponent._contactedDevices[device].length == 0)) {
+                    if (Object.keys(authenticationComponent._contactedDevices[device]).length == 0) {
                         authenticationComponent._contactedDevices[device] = deviceInfo;
                         authenticationComponent._contactDeviceWithJoinRequest(device);
                     };
@@ -222,11 +216,13 @@ AuthenticationComponent.prototype.addDeviceToUser = function(publicKey) {
  */
 
 AuthenticationComponent.prototype.setup = function(peerID) {
-    this.peers[peerID] = mmds.SyncStream({
+    var authenticationComponent = this;
+    this.peers[peerID] = new mmds.SyncStream({
         own_id: "authentication",
-        db: this._deviceHistory});
+        db: this._deviceHistory
+    });
     this.peers[peerID].on("data", function(chunk) {
-        this.push({
+        authenticationComponent.push({
             to: peerID,
             service: "authentication",
             payload: chunk
@@ -235,7 +231,7 @@ AuthenticationComponent.prototype.setup = function(peerID) {
 };
 
 AuthenticationComponent.prototype.tearDown = function(peerID) {
-    if(_.has(this.peers, peerID)) {
+    if (_.has(this.peers, peerID)) {
         delete this.peers[peerID];
     };
 };

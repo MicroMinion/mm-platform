@@ -18,7 +18,7 @@ function ComponentManager(opts) {
     opts.objectMode = true;
     Duplex.call(this, opts);
     extend(this, {
-        components: [],
+        components: {},
     }, opts);
     this._setupAuthenticationComponent();
     this._setupDiscoveryComponent();
@@ -32,19 +32,12 @@ function ComponentManager(opts) {
 
 inherits(ComponentManager, Duplex); 
 
-ComponentManager.prototype.setConnectionManager = function(connectionManager) {
-    this.authenticationComponent.setConnectionManager(connectionManager);
-};
-
 ComponentManager.prototype._read = function(size) {
 };
 
-ComponentManager.prototype.sendMessage = function(destination, service, payload) {
-    this.push({
-        to: destination,
-        service: service,
-        payload: payload
-    });
+ComponentManager.prototype.sendMessage = function(message) {
+    debug("sendMessage %s", JSON.stringify(message));
+    this.push(message);
 };
 
 //Accept message from connectionManager and dispatch to services
@@ -81,14 +74,14 @@ ComponentManager.prototype._setupAuthenticationComponent = function() {
         config: this.config,
         directory: this.directory,
     });
-    this.components.push(this.authenticationComponent);
+    this.components["authentication"] = this.authenticationComponent;
 };
 
 ComponentManager.prototype._setupDiscoveryComponent = function() {
     this.discoveryComponent = new DiscoveryComponent({
         componentManager: this
     });
-    this.components.push(this.discoveryComponent);
+    this.components["discovery"] = this.discoveryComponent;
 };
 
 ComponentManager.prototype._setupMetadataComponent = function() {
