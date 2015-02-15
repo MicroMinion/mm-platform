@@ -8,6 +8,7 @@ var CurveCPStream = require("curve-protocol");
 var mmds = require("mmds");
 var keys = require("flunky-utils").keys;
 var _ = require("lodash");
+var store = require("flunky-utils").store;
 
 inherits(AuthenticationComponent, FlunkyComponent);
 
@@ -17,16 +18,40 @@ function AuthenticationComponent(opts) {
     this.localProvides = ["authentication"];
     this.provides = ["authentication"];
     this.peers = {};
+    var auth = this;
     this._deviceHistory = new mmds.Collection({
         resource: "deviceHistory"
     });
+    store.get("deviceHistory", {
+        success: function(value) {
+            auth._deviceHistory.documents = value;
+        },
+        error: function(msg) {
+            console.log("ERROR: %s", msg);
+        }
+    });
+    store.get("deviceHistory-log", {
+        success: function(value) {
+            auth._deviceHistory.events = value;
+        },
+        error: function(msg) {
+            console.log("ERROR: %s", msg);
+        }
+    });
     var config = this.config;
-    var auth = this;
     this._deviceHistory.on("newEvent", function(event) {
         if (!_.has(config.user.devices, event.document.device)) {
             config.user.addDevice(event.document.device);
             auth.emit("deviceAdded", event.document.device);
         };
+        store.put("deviceHistory", auth._deviceHistory.documents, {
+            success: function() {},
+            error: function() {}
+        });
+        store.put("deviceHistory-log", auth._deviceHistory.events, {
+            success: function() {},
+            error: function() {}
+        });
     });
     this._setupListeningSocket();
     this._contactedDevices = {};
@@ -204,7 +229,7 @@ AuthenticationComponent.prototype.sendRequestToJoinUser = function(user_public_k
 //Confirm adding a new instance to the user 
 AuthenticationComponent.prototype.addDeviceToUser = function(publicKey) {
     //Add to database which will automatically ensure propagation to 1) other devices and 2) config file
-    this._deviceHistory.create({
+    this._deviceHistory.add({
         "operation": "deviceAdded",
         "device": publicKey
     });
