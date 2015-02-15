@@ -8,7 +8,7 @@ var inherits = require('inherits');
 var Directory = require('flunky-directory').Client;
 var ConnectionManager = require('flunky-connectivity');
 var ComponentManager = require('./component-manager.js');
-var createStore = utils.createStore;
+var store = utils.store;
 var Settings = utils.Settings;
 
 function FlunkyPlatform() {
@@ -19,13 +19,27 @@ function FlunkyPlatform() {
 inherits(FlunkyPlatform, EventEmitter);
 
 FlunkyPlatform.prototype._loadConfig = function() {
-    this._config = new Settings();
     var platform = this;
-    var publicKey = this._config.getDeviceID();
-    if (publicKey == undefined || publicKey == "") {
-        this._config.createNewConfig();
-    };
-    this._configLoaded();
+    this._config = new Settings();
+    this._config.on("change", function() {
+        store.put("settings", platform._config.dump(), {
+            success: function() {},
+            error: function(msg) {
+                console.log("ERROR: %s", msg);
+            }
+        });
+    });
+    store.get("settings", {
+        success: function(value) {
+            platform._config.load(value);
+            platform._configLoaded();
+        },
+        error: function(msg) {
+            console.log("ERROR: %s", msg);
+            platform._config.createNewConfig();
+            platform._configLoaded();
+        }
+    });
 };
 
 FlunkyPlatform.prototype._configLoaded = function() {
