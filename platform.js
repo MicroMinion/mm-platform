@@ -35,7 +35,7 @@ FlunkyPlatform.prototype._loadConfig = function() {
             platform._configLoaded();
         },
         error: function(msg) {
-            console.log("ERROR: %s", msg);
+            console.log("error while loading settings: %s", msg);
             platform._config.createNewConfig();
             platform._configLoaded();
         }
@@ -43,6 +43,7 @@ FlunkyPlatform.prototype._loadConfig = function() {
 };
 
 FlunkyPlatform.prototype._configLoaded = function() {
+    console.log("config loaded");
     this._setupDirectory();
     this._setupComponents();
     this._setupConnectivity();
