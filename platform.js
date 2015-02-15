@@ -46,6 +46,7 @@ FlunkyPlatform.prototype._configLoaded = function() {
     this._setupDirectory();
     this._setupComponents();
     this._setupConnectivity();
+    this.emit("ready");
 };
 
 FlunkyPlatform.prototype._setupDirectory = function() {
@@ -74,4 +75,8 @@ FlunkyPlatform.prototype._setupConnectivity = function() {
 
 FlunkyPlatform.prototype.getComponent = function(name) {
     return this._componentManager.components[name];
+};
+
+FlunkyPlatform.prototype.createDatabase = function(name) {
+    this._componentManager.createMetadataComponent(name);
 };
