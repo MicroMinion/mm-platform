@@ -18,16 +18,16 @@
   "author": "Thomas Delaet <thomas@delaet.org>",
   "license": "Commercial",
   "dependencies": {
-    "curve-protocol": "git+https://bitbucket.org/nodatacenter/curve-protocol.git",
+    "curve-protocol": "git+ssh://git@bitbucket.org:nodatacenter/curve-protocol.git",
     "debug": "^2.1.0",
     "extend.js": "0.0.2",
-    "flunky-component": "git+https://bitbucket.org/nodatacenter/flunky-component.git",
-    "flunky-component-metadata": "git+https://bitbucket.org/nodatacenter/flunky-component-metadata.git",
-    "flunky-connectivity": "git+https://bitbucket.org/nodatacenter/flunky-connectivity.git",
-    "flunky-directory": "git+https://bitbucket.org/nodatacenter/flunky-directory.git",
-    "flunky-utils": "git+https://bitbucket.org/nodatacenter/flunky-utils.git",
+    "flunky-component": "git+ssh://git@bitbucket.org/nodatacenter:flunky-component.git",
+    "flunky-component-metadata": "git+ssh://git@bitbucket.org:nodatacenter/flunky-component-metadata.git",
+    "flunky-connectivity": "git+ssh://git@bitbucket.org:nodatacenter/flunky-connectivity.git",
+    "flunky-directory": "git+ssh://git@bitbucket.org:nodatacenter/flunky-directory.git",
+    "flunky-utils": "git+ssh://git@bitbucket.org:nodatacenter/flunky-utils.git",
     "inherits": "^2.0.1",
     "lodash": "^3.0.1",
-    "mmds": "git+https://bitbucket.org/nodatacenter/mmds.git"
+    "mmds": "git+ssh://git@bitbucket.org:nodatacenter/mmds.git"
   }
 }
