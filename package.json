@@ -21,7 +21,7 @@
     "curve-protocol": "git+ssh://git@bitbucket.org:nodatacenter/curve-protocol.git",
     "debug": "^2.1.0",
     "extend.js": "0.0.2",
-    "flunky-component": "git+ssh://git@bitbucket.org/nodatacenter:flunky-component.git",
+    "flunky-component": "git+ssh://git@bitbucket.org:nodatacenter/flunky-component.git",
     "flunky-component-metadata": "git+ssh://git@bitbucket.org:nodatacenter/flunky-component-metadata.git",
     "flunky-connectivity": "git+ssh://git@bitbucket.org:nodatacenter/flunky-connectivity.git",
     "flunky-directory": "git+ssh://git@bitbucket.org:nodatacenter/flunky-directory.git",
