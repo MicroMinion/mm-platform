@@ -9,6 +9,7 @@ var extend = require("extend.js");
 var _ = require("lodash");
 
 var AuthenticationComponent = require("./authentication.js");
+var DataComponent = require("flunky-component-data");
 var DiscoveryComponent = require("./discovery.js");
 var MetadataComponent = require("flunky-component-metadata");
 var ShareComponent = require("flunky-component-share");
@@ -21,6 +22,7 @@ function ComponentManager(opts) {
         components: {},
     }, opts);
     this._setupAuthenticationComponent();
+    this._setupDataComponent();
     this._setupDiscoveryComponent();
     this._setupShareComponent();
     this._collectServiceDefinitions();
@@ -30,7 +32,7 @@ function ComponentManager(opts) {
     }, this);
 };
 
-inherits(ComponentManager, Duplex); 
+inherits(ComponentManager, Duplex);
 
 ComponentManager.prototype._read = function(size) {
 };
@@ -46,7 +48,7 @@ ComponentManager.prototype._write = function(chunk, encoding, done) {
     var service = chunk.service;
     _.each(this.components, function(component) {
         if(_.includes(component.getProvidedServices(), service)) {
-           component.write(chunk); 
+           component.write(chunk);
         };
     });
     done();
@@ -68,7 +70,7 @@ ComponentManager.prototype.setupPeer = function(peerID, services) {
 };
 
 ComponentManager.prototype.removePeer = function(peerID) {
-    _.each(this.components, function(component) { component.tearDown(peerID); }, this); 
+    _.each(this.components, function(component) { component.tearDown(peerID); }, this);
 };
 
 ComponentManager.prototype._setupAuthenticationComponent = function() {
@@ -77,6 +79,10 @@ ComponentManager.prototype._setupAuthenticationComponent = function() {
         directory: this.directory,
     });
     this.components["authentication"] = this.authenticationComponent;
+};
+
+ComponentManager.prototype._setupDataComponent = function() {
+    this.components["data"] = new DataComponent({});
 };
 
 ComponentManager.prototype._setupDiscoveryComponent = function() {
@@ -105,4 +111,3 @@ ComponentManager.prototype._collectServiceDefinitions = function() {
 ComponentManager.prototype._connectLocalServices = function() {
     //FIXME: Implement
 };
-
