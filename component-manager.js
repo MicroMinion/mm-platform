@@ -11,6 +11,7 @@ var _ = require("lodash");
 var AuthenticationComponent = require("./authentication.js");
 var DiscoveryComponent = require("./discovery.js");
 var MetadataComponent = require("flunky-component-metadata");
+var ShareComponent = require("flunky-component-share");
 
 function ComponentManager(opts) {
     if(!opts) opts = {};
@@ -21,6 +22,7 @@ function ComponentManager(opts) {
     }, opts);
     this._setupAuthenticationComponent();
     this._setupDiscoveryComponent();
+    this._setupShareComponent();
     this._collectServiceDefinitions();
     var componentManager = this;
     _.each(this.components, function(component) {
@@ -82,6 +84,10 @@ ComponentManager.prototype._setupDiscoveryComponent = function() {
         componentManager: this
     });
     this.components["discovery"] = this.discoveryComponent;
+};
+
+ComponentManager.prototype._setupShareComponent = function() {
+    this.components["share"] = new ShareComponent({});
 };
 
 ComponentManager.prototype.createMetadataComponent = function(resource) {
