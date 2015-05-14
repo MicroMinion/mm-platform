@@ -85,3 +85,7 @@ FlunkyPlatform.prototype.addComponent = function(name, component) {
 FlunkyPlatform.prototype.createDatabase = function(name) {
     this._componentManager.createMetadataComponent(name);
 };
+
+FlunkyPlatform.prototype.getUser = function() {
+    return this._config.user;
+};
