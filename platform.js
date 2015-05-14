@@ -78,6 +78,10 @@ FlunkyPlatform.prototype.getComponent = function(name) {
     return this._componentManager.components[name];
 };
 
+FlunkyPlatform.prototype.addComponent = function(name, component) {
+    this._componentManager.addComponent(name, component);
+};
+
 FlunkyPlatform.prototype.createDatabase = function(name) {
     this._componentManager.createMetadataComponent(name);
 };

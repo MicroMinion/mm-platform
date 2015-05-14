@@ -96,6 +96,10 @@ ComponentManager.prototype.createMetadataComponent = function(resource) {
     });
 };
 
+ComponentManager.prototype.addComponent = function(name, component) {
+    this.components[name] = component;
+};
+
 ComponentManager.prototype._collectServiceDefinitions = function() {
     this.providedServices = _.uniq(_.map(this.components, function(component) { component.getProvidedServices(); }, this));
     this.neededServices = _.uniq(_.map(this.components, function(component) { component.getNeededServices(); }, this));
