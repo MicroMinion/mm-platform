@@ -1,35 +1,21 @@
 {
   "name": "flunky-platform",
   "version": "0.0.1",
-  "description": "FlunkyBox PaaS platform",
-  "main": "index.js",
+  "description": "P2P encrypted messaging platform",
+  "main": "src/index.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {},
   "repository": {
     "type": "git",
-    "url": "git@bitbucket.org:nodatacenter/paas.git"
+    "url": "git@bitbucket.org:nodatacenter/flunky-platform.git"
   },
   "keywords": [
     "paas",
     "flunkybox"
   ],
   "author": "Thomas Delaet <thomas@delaet.org>",
-  "license": "Commercial",
   "dependencies": {
-    "curve-protocol": "git+ssh://git@bitbucket.org:nodatacenter/curve-protocol.git",
-    "debug": "^2.1.0",
-    "extend.js": "0.0.2",
-    "flunky-component": "git+ssh://git@bitbucket.org:nodatacenter/flunky-component.git",
-    "flunky-component-data": "git+ssh://git@bitbucket.org:nodatacenter/flunky-component-data.git",
-    "flunky-component-metadata": "git+ssh://git@bitbucket.org:nodatacenter/flunky-component-metadata.git",
-    "flunky-component-share": "git+ssh://git@bitbucket.org:nodatacenter/flunky-component-share.git",
-    "flunky-connectivity": "git+ssh://git@bitbucket.org:nodatacenter/flunky-connectivity.git",
-    "flunky-directory": "git+ssh://git@bitbucket.org:nodatacenter/flunky-directory.git",
-    "flunky-utils": "git+ssh://git@bitbucket.org:nodatacenter/flunky-utils.git",
-    "inherits": "^2.0.1",
-    "lodash": "^3.0.1",
-    "mmds": "git+ssh://git@bitbucket.org:nodatacenter/mmds.git"
   }
 }
