@@ -17,5 +17,6 @@
   ],
   "author": "Thomas Delaet <thomas@delaet.org>",
   "dependencies": {
+    "multicast-dns": "^3.0.0"
   }
 }

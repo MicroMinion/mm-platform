@@ -6,6 +6,12 @@ var instances = {
     global: require("./directory/dht.js")
 };
 
+instances.local.on("error", function(err) {
+    console.log("ERROR " + err);
+    console.log("disabling mDNS directory");
+    instances.local = null;
+});
+
 var put = function(key, value, options) {
     if(instances.local) {
         instances.local.put(key, value, options);
