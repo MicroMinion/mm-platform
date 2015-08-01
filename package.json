@@ -17,6 +17,8 @@
   ],
   "author": "Thomas Delaet <thomas@delaet.org>",
   "dependencies": {
-    "multicast-dns": "^3.0.0"
+    "bittorrent-dht": "^3.2.4",
+    "multicast-dns": "^3.0.0",
+    "rate-limit": "^0.1.1"
   }
 }
