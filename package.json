@@ -17,8 +17,14 @@
   ],
   "author": "Thomas Delaet <thomas@delaet.org>",
   "dependencies": {
+    "backoff": "^2.4.1",
     "bittorrent-dht": "^3.2.4",
+    "extend.js": "0.0.2",
+    "inherits": "^2.0.1",
+    "lodash": "^3.10.1",
     "multicast-dns": "^3.0.0",
+    "curve-protocol": "git+ssh://git@bitbucket.org:nodatacenter/curve-protocol.git",
+    "node-uuid": "^1.4.3",
     "rate-limit": "^0.1.1"
   }
 }

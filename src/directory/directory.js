@@ -17,8 +17,8 @@ var rateLimit = require("rate-limit");
  */
 
 var instances = {
-    local: require("./directory/mdns.js"),
-    global: require("./directory/dht.js")
+    local: require("./mdns.js"),
+    global: require("./dht.js")
 };
 
 
