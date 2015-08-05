@@ -35,8 +35,8 @@ AuthProtocol.prototype.sendVerificationRequest = function(contact) {
         name: this.profile.name,
         accounts: this.profile.accounts
     };
-    _.forEach(contact.instances, function(instance) {
-        this.messaging.send(instance.key, "auth.verificationRequest", data, options);   
+    _.forEach(_.keys(contact.keys), function(instance) {
+        this.messaging.send(instance, "auth.verificationRequest", data, options);   
     }, this);
 };
 

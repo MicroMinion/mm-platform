@@ -1,6 +1,6 @@
 var uuid = require("node-uuid");
 var _ = require("lodash");
-var events = require("events");
+var EventEmitter = require("ak-eventemitter");
 var inherits = require("inherits");
 var directory = require("../directory/directory.js");
 
@@ -10,7 +10,11 @@ var SEND_TIMEOUT = 10000;
 
 
 var Messaging = function(profile) {
+    EventEmitter.call(this, {
+        delimiter: '.'
+    });
     this.profile = profile;
+    this.devices = {};
     this.contacts = {};
     this.directoryCache = {};
     this.connectionStats = {};
@@ -37,16 +41,17 @@ var Messaging = function(profile) {
         messaging.connectionStats[publicKey].connectInProgress = false;
         messaging.connectionStats[publicKey].connected = true;
         messaging._flushQueue(publicKey);
-
     });
     this.transportManager.on("connectionError", function(publicKey) {
         messaging.connectionStats[publicKey].connectInProgress = false;
         messaging.connectionStats[publicKey].connected = false;
         console.log("impossible to connect to " + publicKey);
     });
-    this.transportManager.on("message", function(message) {
+    this.transportManager.on("message", function(publicKey, message) {
         console.log("message received");
         console.log(message);
+        var scope = messaging.getScope(message.publicKey);
+        messaging.emit(scope + "." + message.topic, message);
     });
     setInterval(function() {
         _.forEach(_.keys(messaging.sendQueues), function(publicKey) {
@@ -61,6 +66,29 @@ var Messaging = function(profile) {
             };
         });
     }, SEND_TIMEOUT * 5);
+};
+
+inherits(Messaging, EventEmitter);
+
+Messaging.prototype.getScope = function(publicKey) {
+    if(this._getScope(publicKey, this.devices)) {
+        return "self";
+    } else {
+        var friends = _.any(_.values(this.contacts), function(value, index, collection) {
+            return this._getScope(publicKey, value.keys);
+        }, this);
+        if(friends) {
+            return "friends";
+        } else {
+            return "public";
+        };
+    };
+};
+
+Messaging.prototype._getScope = function(publicKey, searchObject) {
+    return _.any(_.values(searchObject), function(value, index, collection) {
+        return value === publicKey;
+    });
 };
 
 Messaging.prototype.setContacts = function(contacts) {
