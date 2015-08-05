@@ -5,17 +5,15 @@ var backoff = require("backoff");
 var curveProtocol = require("curve-protocol");
 
 var SENDER_ID = "559190877287";
-var SENDER_PUBLIC_KEY = "453W1OR7HYcUsDHkFtAMcm7Vll4WTU2r/FFlbjtEzHI=";
 
 function GCMTransport(publicKey, privateKey) {
-    console.log("initializing gcm");
     events.EventEmitter.call(this);
     this.registrationId = undefined;
-    this.registrationOngoing = true;
-    this.registrationMessageId = "";
     this.publicKey = publicKey;
     this.privateKey = privateKey;
-    
+    this.directoryCache = {};
+    this.pendingMessages = {};
+
     var gcm = this;
 
     chrome.gcm.onMessage.addListener(gcm.onMessage.bind(this));
@@ -46,44 +44,73 @@ GCMTransport.prototype.register = function() {
         } else {
             console.log("registration succeeded");
             gcm.registrationId = registrationId;
-            gcm.registrationMessageId = uuid.v4();
-            chrome.gcm.send({
-                destinationId: SENDER_ID + "@gcm.googleapis.com",
-                messageId: gcm.registrationMessageId,
-                timeToLive: 0,
-                data: {
-                    type: "register",
-                    publicKey: gcm.publicKey,
-                    signature: curveProtocol.sign(gcm.registrationId, gcm.registrationMessageId, SENDER_PUBLIC_KEY, gcm.privateKey)
-                }
-            }, function(messageId) {
-                console.log("message send");
-                if(chrome.runtime.lastError) {
-                    console.log("GCM: problem with sending registration message to app server");
-                    console.log(chrome.runtime.lastError);
-                    gcm.backoff.backoff();
-                };
-            });
+            gcm.backoff.reset();
+            gcm.emit("ready",{"gcm": gcm.registrationId});
         };
     });
+};
+
+GCMTransport.prototype._send = function(to, id, message) {
+    this.pendingMessages[id] = message;
+    var gcm = this;
+    setTimeout(function() {
+        gcm.sendError(id);
+    }, 1000);
+    chrome.gcm.send({
+        destinationId: SENDER_ID + "@gcm.googleapis.com",
+        messageId: id,
+        timeToLive: 0,
+        data: {
+            type: "MESSAGE",
+            to: to,
+            from: this.registrationId, 
+            data: message 
+        }
+    }, function(messageId) {
+        if(chrome.runtime.lastError) {
+            console.log("GCM: problem with sending message to app server");
+            console.log(chrome.runtime.lastError);
+            gcm.sendError(messageId);
+        } else {
+        };
+    });
+};
+
+
+GCMTransport.prototype.connect = function(publicKey, connectionInfo) {
+    this.directoryCache[publicKey] = connectionInfo;
+};
+
+GCMTransport.prototype.send = function(message) {
+    if(!this.directoryCache[publicKey]) {
+        this.emit("sendError", message.id);
+    } else {
+        this._send(this.directoryCache[publicKey], message.id, message);
+    };
+};
+
+GCMTransport.sendError = function(messageId) {
+    if(this.pendingMessages[messageId]) {
+        this.emit("sendError", messageId);
+        delete this.pendingMessages[messageId];
+    };
 };
 
 GCMTransport.prototype.onMessage = function(message) {
     console.log("gcm: onMessage");
     console.log(message);
-    if(message.data.type === "delivered") {
-    } else if(message.data.type === "message") {
+    if(message.data.type === "MESSAGE") {
 
-    } else if(message.data.type === "notDelivered") {
-
-    } else if(message.data.type === "registrationOK") {
-        this.backoff.reset();
-        this.registrationOngoing = false;
-        this.registrationMessageId = "";
-        this.emit("ready", {});
-    } else if(message.data.type === "registrationFailed") {
-        this.registrationMessageId = "";
-        this.backoff.backoff();
+    } else if(message.data.type === "MESSAGE_DELIVERED") {
+        var id = message.data.message_id;
+        if(id && this.pendingMessages[id]) {
+            GCMTransport.sendConfirmation(id);
+        };
+    } else if(message.data.type === "MESSAGE_NOT_DELIVERED") {
+        var id = message.data.message_id;
+        if(id && this.pendingMessages[id]) {
+            GCMTransport.sendError(id);
+        };
     } else {
         console.log("GCM: Unknown message type received");
         console.log(message);
@@ -99,8 +126,13 @@ GCMTransport.prototype.onSendError = function(error) {
     console.log(error.messageId);
     console.log(error.details);
     if(error.messageId) {
-
+        this.sendError(error.messageId);
     };
+    this.disable();
+};
+
+GCMTransport.prototype.disable = function() {
+    this.registrationId = undefined;
     this.emit("disable");
     this.backoff.backoff();
 };
