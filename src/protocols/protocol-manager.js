@@ -25,6 +25,10 @@ ProtocolManager.prototype.setProfile = function(profile) {
     };
 };
 
+ProtocolManager.prototype.setContacts = function(contacts) {
+    this.messaging.setContacts(contacts);
+};
+
 ProtocolManager.prototype.registerProtocol = function(name, classObject) {
     this.availableProtocols[name] = classObject;
 };

@@ -1,3 +1,6 @@
+
+//WARNING: THIS CLASS IS OLD CODE, AND NEEDS TO BE REFACTORED BEFORE BEING USED AGAIN
+
 var inherits = require("inherits");
 var events = require("events");
 var directory = require("../directory.js");

@@ -2,19 +2,6 @@ var inherits = require("inherits");
 var events = require("events");
 var _ = require("lodash");
 
-var options = {
-    realtime: true,
-    success: function(msg) {
-        console.log(msg);
-    },
-    error: function(err) {
-        console.log(err);
-    },
-    warning: function(warning) {
-        console.log(warning);
-    },
-};
-
 var _generateCode = function() {
     var text = "";
     var possible = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -39,8 +26,12 @@ AuthProtocol.prototype.setContacts = function(contacts) {
 
 
 AuthProtocol.prototype.sendVerificationRequest = function(contact) {
+    var options = {
+        realtime: true,
+        expireAfter: 60 * 60 * 24
+    };
     contact.verificationCode = _generateCode();
-    data = {
+    var data = {
         name: this.profile.name,
         accounts: this.profile.accounts
     };
