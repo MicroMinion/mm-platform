@@ -1,6 +1,6 @@
 var _ = require("lodash");
 var rateLimit = require("rate-limit");
-
+var gcm = require("./gcm.js");
 
 /*
  * Thoughts on implementation:
@@ -16,7 +16,7 @@ var rateLimit = require("rate-limit");
  * - de stores gaan er van uit dat een lookup meerdere matches kan geven. het is dus perfect okay om voor een get request meerdere keren success callback aan te roepen
  */
 
-var instances = {
+/* var instances = {
     local: require("./mdns.js"),
     global: require("./dht.js")
 };
@@ -34,9 +34,12 @@ instances.local.on("error", function(err) {
 });
 
 
-
+*/
 
 var put = function(key, value, options) {
+    return gcm.put(key, value, options);
+
+    /*
     if(instances.local) {
         instances.local.put(key, value, options);
     } else {
@@ -51,9 +54,11 @@ var put = function(key, value, options) {
             options.error("Not possible to publish key  %s on the global network", key);
         };
     };
+    */
 };
 
 var get = function(key, options) {
+    return gcm.get(key, options);
 };
 
 

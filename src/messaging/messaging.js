@@ -23,6 +23,9 @@ var Messaging = function(profile) {
     var messaging = this;
     this.transportManager.on("ready", function(connectionInfo) {
         //TODO: Implement signature so that we can discard bogus info immediatly from DHT
+        console.log("ready received");
+        console.log(messaging.profile.publicKey);
+        console.log(connectionInfo);
         directory.put(messaging.profile.publicKey, JSON.stringify(connectionInfo));
         this.transportAvailable = true;
     });
