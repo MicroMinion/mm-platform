@@ -20,6 +20,7 @@
     "ak-eventemitter": "0.0.5",
     "backoff": "^2.4.1",
     "bittorrent-dht": "^3.2.4",
+    "chai": "^3.2.0",
     "curve-protocol": "git+ssh://git@bitbucket.org:nodatacenter/curve-protocol.git",
     "extend.js": "0.0.2",
     "inherits": "^2.0.1",

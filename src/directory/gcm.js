@@ -27,18 +27,15 @@ backoff.on("ready", function() {
     });
 });
 
-chrome.gcm.onMessage.addListener(onMessage);
-chrome.gcm.onSendError.addListener(onSendError);
-
 var onMessage = function(message) {
     if(message.data.type === "GET_REPLY") {
-        if(pendingMessages[data.id].success) {
+        if(pendingMessages[message.data.id].success) {
             var values = JSON.parse(message.data.values);
             _.forEach(values, function(value) {
-                pendingMessages[data.id].success(message.data.key, value);
+                pendingMessages[message.data.id].success(message.data.key, value);
             });
         };
-        delete pendingMessages[data.id]
+        delete pendingMessages[message.data.id]
     }
 };
 
@@ -49,6 +46,9 @@ var onSendError = function(error) {
     console.log(error.messageId);
     console.log(error.details);
 };
+
+chrome.gcm.onMessage.addListener(onMessage);
+chrome.gcm.onSendError.addListener(onSendError);
 
 var get = function(key, options) {
     console.log("GET");
@@ -69,7 +69,7 @@ var _send = function(data, options) {
     pendingMessages[id] = options;
     if(data.type === "GET") {
     setTimeout(function() {
-        if(pendingMessages[id].error) {
+        if(pendingMessages[id] && pendingMessages[id].error) {
             pendingMessages[id].error("operation timed out");
         };
         delete pendingMessages[id];

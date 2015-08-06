@@ -2,8 +2,10 @@ var uuid = require("node-uuid");
 var inherits = require("inherits");
 var events = require("events");
 var backoff = require("backoff");
-var curveProtocol = require("curve-protocol");
+var curve = require("curve-protocol");
 var _ = require("lodash");
+var Duplex = require("stream").Duplex;
+var extend = require("extend.js");
 
 var SENDER_ID = "559190877287";
 
@@ -56,12 +58,16 @@ GCMTransport.prototype.register = function() {
 
 
 GCMTransport.prototype.connect = function(publicKey, connectionInfo) {
+    console.log("GCMTransport.connect");
     this.directoryCache[publicKey] = connectionInfo.gcm;
+    if(connectionInfo.gcm in this.connections) {
+        return;
+    };
     var gcmStream = new GCMStream({
         source: this.registrationId,
         destination: connectionInfo
     });
-    this.connections[connectionInfo] = new CurveCPStream({
+    this.connections[connectionInfo] = new curve.CurveCPStream({
         stream: gcmStream,
         is_server: false,
         serverPublicKey: curve.fromBase64(publicKey),
@@ -74,19 +80,21 @@ GCMTransport.prototype.connect = function(publicKey, connectionInfo) {
 GCMTransport.prototype.connectStream = function(stream) {
     var gcm = this;
     stream.on("error", function(error) {
+        console.log("GCMTransport: stream error");
         console.log(error);
     });
     stream.on("end", function() {
-        var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
-        var publicKey = curve.toBase64(publicKey)
-        gcm.emit("connectionError", publicKey);
+        console.log("GCMTransport: end stream event");
+        gcm._end(stream.stream.destination);
     });
     stream.on("drain", function() {
+        console.log("GCMTransport: stream drain event");
         var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
         var publicKey = curve.toBase64(publicKey)
         gcm.emit("connection", publicKey);
     });
     stream.on("data", function(data) {
+        console.log("GCMTransport: stream data event");
         var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
         var publicKey = curve.toBase64(publicKey)
         data = JSON.parse(data);
@@ -94,12 +102,33 @@ GCMTransport.prototype.connectStream = function(stream) {
     });
 };
 
+GCMTransport.prototype.disconnect = function(publicKey) {
+    _.forEach(this.connections, function(connection, index, collection) {
+        var publicKey = curve.fromBase64(publicKey);
+        if(publicKey === connection.clientPublicKey || publicKey === connection.serverPublicKey) {
+            this._end(index);
+        };
+    }, this);
+};
+
+GCMTransport.prototype._end = function(destination) {
+    var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
+    var publicKey = curve.toBase64(publicKey);
+    var stream = this.connections[destination];
+    stream.removeAllListeners("end");
+    stream.removeAllListeners("drain");
+    stream.removeAllListeners("data");
+    stream.removeAllListeners("error");
+    delete this.connections[destination];
+    gcm.emit("connectionStopped", publicKey);
+};
+
 GCMTransport.prototype.send = function(message) {
     console.log("sending ...");
     var publicKey = message.destination;
     if(!this.directoryCache[publicKey]) {
         console.log("Send error");
-        this.emit("connectionError", publicKey);
+        this.emit("connectionStopped", publicKey);
     } else {
         this.connections[this.directoryCache[publicKey]].write(JSON.stringify(message));
     };
@@ -153,10 +182,10 @@ GCMTransport.prototype.disable = function() {
 };
 
 var GCMStream = function(opts) {
-    debug("initializing GCM stream");
+    console.log("initializing GCM stream");
     if(!opts) opts = {};
     opts.objectMode = false;
-    Duplex.call(this.opts);
+    Duplex.call(this, opts);
     extend(this, {
         source: null,
         destination: null
