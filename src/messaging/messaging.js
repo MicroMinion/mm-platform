@@ -46,12 +46,18 @@ var Messaging = function(profile) {
     });
     this.transportManager.on("connection", function(publicKey) {
         console.log("Messaging: connection event received from transportManager");
+        if(!messaging.connectionStats[publicKey]) {
+            messaging.connectionStats[publicKey] = {};
+        };
         messaging.connectionStats[publicKey].connectInProgress = false;
         messaging.connectionStats[publicKey].connected = true;
         messaging._flushQueue(publicKey);
     });
     this.transportManager.on("connectionStopped", function(publicKey) {
         console.log("Messaging: connectionStopped event received from transportManager");
+        if(!messaging.connectionStats[publicKey]) {
+            messaging.connectionStats[publicKey] = {};
+        };
         messaging.connectionStats[publicKey].connectInProgress = false;
         messaging.connectionStats[publicKey].connected = false;
         console.log("impossible to connect to " + publicKey);

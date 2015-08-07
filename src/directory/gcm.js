@@ -51,20 +51,16 @@ chrome.gcm.onMessage.addListener(onMessage);
 chrome.gcm.onSendError.addListener(onSendError);
 
 var get = function(key, options) {
-    console.log("GET");
     _send({type: "GET", key: key}, options);
 };
 
 
 var put = function(key, value, options) {
-    console.log("PUT");
     _send({type: "PUT", key: key, value: value}, options);
 };
 
 
 var _send = function(data, options) {
-    console.log(data);
-    console.log(options);
     var id = uuid.v4();
     pendingMessages[id] = options;
     if(data.type === "GET") {

@@ -6,10 +6,17 @@ var curve = require("curve-protocol");
 var _ = require("lodash");
 var Duplex = require("stream").Duplex;
 var extend = require("extend.js");
+var chai = require("chai");
+
+var expect = chai.expect;
 
 var SENDER_ID = "559190877287";
 
 function GCMTransport(publicKey, privateKey) {
+    expect(publicKey).to.be.a("string");
+    expect(privateKey).to.be.a("string");
+    expect(curve.fromBase64(publicKey)).to.have.length(32);
+    expect(curve.fromBase64(privateKey)).to.have.length(32);
     events.EventEmitter.call(this);
     this.registrationId = undefined;
     this.publicKey = publicKey;
@@ -40,6 +47,8 @@ function GCMTransport(publicKey, privateKey) {
 inherits(GCMTransport, events.EventEmitter);
 
 GCMTransport.prototype.register = function() {
+    expect(this.backoff).to.exist;
+    expect(chrome.gcm).to.exist;
     var gcm = this;
     chrome.gcm.register([SENDER_ID], function(registrationId) {
         if(chrome.runtime.lastError) {
@@ -58,26 +67,37 @@ GCMTransport.prototype.register = function() {
 
 
 GCMTransport.prototype.connect = function(publicKey, connectionInfo) {
-    console.log("GCMTransport.connect");
+    expect(publicKey).to.be.a("string");
+    expect(curve.fromBase64(publicKey)).to.have.length(32);
+    expect(connectionInfo).to.be.an("object");
+    expect(connectionInfo).to.have.property("gcm");
+    expect(connectionInfo.gcm).to.be.a("string");
+    expect(this.registrationId).to.be.a("string");
+    expect(this.registrationId).to.have.length.of.at.least(1);
     this.directoryCache[publicKey] = connectionInfo.gcm;
     if(connectionInfo.gcm in this.connections) {
         return;
     };
     var gcmStream = new GCMStream({
         source: this.registrationId,
-        destination: connectionInfo
+        destination: connectionInfo.gcm
     });
-    this.connections[connectionInfo] = new curve.CurveCPStream({
+    this.connections[connectionInfo.gcm] = new curve.CurveCPStream({
         stream: gcmStream,
         is_server: false,
         serverPublicKey: curve.fromBase64(publicKey),
         clientPublicKey: curve.fromBase64(this.publicKey),
         clientPrivateKey: curve.fromBase64(this.privateKey)
     });
-    this.connectStream(this.connections[connectionInfo]);
+    this.connectStream(this.connections[connectionInfo.gcm]);
 };
 
 GCMTransport.prototype.connectStream = function(stream) {
+    expect(stream).to.exist;
+    expect(stream).to.be.an.instanceof(curve.CurveCPStream);
+    expect(stream.stream).to.exist;
+    expect(stream.stream).to.be.an.instanceof(GCMStream);
+    expect(stream.stream.destination).to.be.a("string");
     var gcm = this;
     stream.on("error", function(error) {
         console.log("GCMTransport: stream error");
@@ -88,13 +108,11 @@ GCMTransport.prototype.connectStream = function(stream) {
         gcm._end(stream.stream.destination);
     });
     stream.on("drain", function() {
-        console.log("GCMTransport: stream drain event");
         var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
         var publicKey = curve.toBase64(publicKey)
         gcm.emit("connection", publicKey);
     });
     stream.on("data", function(data) {
-        console.log("GCMTransport: stream data event");
         var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
         var publicKey = curve.toBase64(publicKey)
         data = JSON.parse(data);
@@ -124,7 +142,6 @@ GCMTransport.prototype._end = function(destination) {
 };
 
 GCMTransport.prototype.send = function(message) {
-    console.log("sending ...");
     var publicKey = message.destination;
     if(!this.directoryCache[publicKey]) {
         console.log("Send error");
@@ -135,29 +152,38 @@ GCMTransport.prototype.send = function(message) {
 };
 
 GCMTransport.prototype.onMessage = function(message) {
-    console.log("gcm: onMessage");
-    console.log(message);
+    expect(message.data.type).to.be.a("string");
+    expect(this.connections).to.be.a("object");
+    expect(this.registrationId).to.be.a("string");
     if(message.data.type === "MESSAGE") {
+        expect(message.data.source).to.be.a("string");
+        expect(message.data.destination).to.be.a("string");
+        expect(message.data.data).to.be.a("string");
         if(message.data.destination !== this.registrationId) {
             console.log("message received which does not have our registrationId as destination");
         } else {
             var source = message.data.source;
-            var stream = new GCMStream({
-                source: this.registrationId,
-                destination: source
-            });
-            this.connections[source] = new CurveCPStream({
-                stream: stream,
-                is_server: true,
-                serverPublicKey: curve.fromBase64(this.publicKey),
-                serverPrivateKey: curve.fromase64(this.privateKey)
-            });
-            this.connectStream(this.connections[source]);
-            stream.emit('data', curve.fromBase64(message.data.data));
+            var stream;
+            if(!this.connections[source]) {
+                var stream = new GCMStream({
+                    source: this.registrationId,
+                    destination: source
+                });
+                this.connections[source] = new curve.CurveCPStream({
+                    stream: stream,
+                    is_server: true,
+                    serverPublicKey: curve.fromBase64(this.publicKey),
+                    serverPrivateKey: curve.fromBase64(this.privateKey)
+                });
+                this.connectStream(this.connections[source]);
+            };
+            stream = this.connections[source].stream;
+            stream.emit('data', new Buffer(curve.fromBase64(message.data.data)));
         };
     } else if(message.data.type === "MESSAGE_DELIVERED") {
     } else if(message.data.type === "MESSAGE_NOT_DELIVERED") {
         this.connections[message.data.destination].stream.error("Could not deliver message");
+    } else if(message.data.type === "GET_REPLY") {
     } else {
         console.log("GCM: Unknown message type received");
         console.log(message);
@@ -185,6 +211,7 @@ var GCMStream = function(opts) {
     console.log("initializing GCM stream");
     if(!opts) opts = {};
     opts.objectMode = false;
+    opts.decodeStrings = true;
     Duplex.call(this, opts);
     extend(this, {
         source: null,
@@ -192,10 +219,17 @@ var GCMStream = function(opts) {
     }, opts);
 };
 
+inherits(GCMStream, Duplex);
+
 GCMStream.prototype._read = function(size) {
 };
 
 GCMStream.prototype._write = function(chunk, encoding, done) {
+    expect(Buffer.isBuffer(chunk)).to.be.true;
+    expect(chunk).to.have.length.of.at.least(1);
+    expect(done).to.be.an.instanceof(Function);
+    expect(this.source).to.be.a("string");
+    expect(this.destination).to.be.a("string");
     var stream = this;
     chrome.gcm.send({
         destinationId: SENDER_ID + "@gcm.googleapis.com",
@@ -205,13 +239,16 @@ GCMStream.prototype._write = function(chunk, encoding, done) {
             type: "MESSAGE",
             destination: stream.destination,
             source: stream.source, 
-            data: curve.toBase64(chunk) 
+            data: curve.toBase64(new Uint8Array(chunk)) 
         }
     }, function(messageId) {
         if(chrome.runtime.lastError) {
             console.log("GCM: problem with sending message to app server");
             console.log(chrome.runtime.lastError);
+            done(new Error("GCM: problem with sending messag to app server"));
             stream.error("Problem with sending message to GCM server");
+        } else {
+            done();
         };
     });
 };
