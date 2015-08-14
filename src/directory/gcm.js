@@ -79,8 +79,8 @@ var _send = function(data, options) {
         data: data 
     }, function(messageId) {
         if(chrome.runtime.lastError) {
-            console.log("GCM: problem with sending messages to app server");
-            console.log(chrome.runtime.lastError);
+            //console.log("GCM: problem with sending messages to app server");
+            //console.log(chrome.runtime.lastError);
             if(pendingMessages[messageId] && pendingMessages[messageId].error) {
                 pendingMessages[messageId].error("GCM: problem with sending messages to app server");
             };

@@ -1,26 +1,19 @@
 var uuid = require("node-uuid");
 var inherits = require("inherits");
-var events = require("events");
-var backoff = require("backoff");
 var curve = require("curve-protocol");
 var _ = require("lodash");
 var Duplex = require("stream").Duplex;
 var extend = require("extend.js");
 var chai = require("chai");
+var AbstractTransport = require("./transport-abstract");
 
 var expect = chai.expect;
 
 var SENDER_ID = "559190877287";
 
 function GCMTransport(publicKey, privateKey) {
-    expect(publicKey).to.be.a("string");
-    expect(privateKey).to.be.a("string");
-    expect(curve.fromBase64(publicKey)).to.have.length(32);
-    expect(curve.fromBase64(privateKey)).to.have.length(32);
-    events.EventEmitter.call(this);
+    AbstractTransport.call(this, publicKey, privateKey);
     this.registrationId = undefined;
-    this.publicKey = publicKey;
-    this.privateKey = privateKey;
     // publicKey => registrationId
     this.directoryCache = {};
     // registrationId => CurveCPStream
@@ -32,37 +25,32 @@ function GCMTransport(publicKey, privateKey) {
     chrome.gcm.onMessagesDeleted.addListener(gcm.onMessagesDeleted.bind(this));
     chrome.gcm.onSendError.addListener(gcm.onSendError.bind(this));
 
-    this.backoff = backoff.fibonacci({
-        initialDelay: 1,
-        maxDelay: 10000,
-        randomisationFactor: 0
-    });
-    this.backoff.on("ready", function() {
-        gcm.register();
-    });
-    this.backoff.backoff();
+    this.enable();
 };
 
 
-inherits(GCMTransport, events.EventEmitter);
+inherits(GCMTransport, AbstractTransport);
 
-GCMTransport.prototype.register = function() {
-    expect(this.backoff).to.exist;
+GCMTransport.prototype.enable = function() {
     expect(chrome.gcm).to.exist;
     var gcm = this;
     chrome.gcm.register([SENDER_ID], function(registrationId) {
         if(chrome.runtime.lastError) {
             console.log("GCM Registration failed");
             console.log(chrome.runtime.lastError);
-            gcm.backoff.backoff();
+            gcm.emit("disable");
         } else {
-            console.log("registration succeeded");
             gcm.registrationId = registrationId;
-            console.log(registrationId);
-            gcm.backoff.reset();
             gcm.emit("ready",{"gcm": gcm.registrationId});
         };
     });
+};
+
+GCMTransport.prototype.disable = function() {
+    this.registrationId = undefined;
+    _.forEach(this.connections, function(stream, key) {
+        this._end(key);
+    }, this);
 };
 
 
@@ -110,7 +98,7 @@ GCMTransport.prototype.connectStream = function(stream) {
     stream.on("drain", function() {
         var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
         var publicKey = curve.toBase64(publicKey)
-        gcm.emit("connection", publicKey);
+        gcm.emit("connectionEstablished", publicKey);
     });
     stream.on("data", function(data) {
         var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
@@ -121,8 +109,10 @@ GCMTransport.prototype.connectStream = function(stream) {
 };
 
 GCMTransport.prototype.disconnect = function(publicKey) {
+    expect(publicKey).to.be.a("string");
+    expect(curve.fromBase64(publicKey)).to.have.length(32);
+    publicKey = curve.fromBase64(publicKey);
     _.forEach(this.connections, function(connection, index, collection) {
-        var publicKey = curve.fromBase64(publicKey);
         if(publicKey === connection.clientPublicKey || publicKey === connection.serverPublicKey) {
             this._end(index);
         };
@@ -130,9 +120,12 @@ GCMTransport.prototype.disconnect = function(publicKey) {
 };
 
 GCMTransport.prototype._end = function(destination) {
-    var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
-    var publicKey = curve.toBase64(publicKey);
+    expect(destination).to.be.a("string");
+    expect(this.connections[destination]).to.exist;
+    expect(this.connections[destination]).to.be.an.instanceof(curve.CurveCPStream);
     var stream = this.connections[destination];
+    var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
+    publicKey = curve.toBase64(publicKey);
     stream.removeAllListeners("end");
     stream.removeAllListeners("drain");
     stream.removeAllListeners("data");
@@ -142,18 +135,22 @@ GCMTransport.prototype._end = function(destination) {
 };
 
 GCMTransport.prototype.send = function(message) {
-    var publicKey = message.destination;
-    if(!this.directoryCache[publicKey]) {
-        console.log("Send error");
-        this.emit("connectionStopped", publicKey);
-    } else {
-        this.connections[this.directoryCache[publicKey]].write(JSON.stringify(message));
-    };
+    expect(message).to.exist;
+    expect(message).to.be.an("object");
+    expect(message.destination).to.be.a("string");
+    expect(curve.fromBase64(message.destination)).to.have.length(32);
+    expect(message.source).to.be.a("string");
+    expect(message.source).to.be.equal(this.publicKey);
+    expect(this.directoryCache[message.destination]).to.exist;
+    expect(this.directoryCache[message.destination]).to.be.a("string");
+    expect(this.connections[this.directoryCache[message.destination]]).to.exist;
+    expect(this.connections[this.directoryCache[message.destination]]).to.be.an.instanceof(curve.CurveCPStream);
+    this.connections[this.directoryCache[message.destination]].write(JSON.stringify(message));
 };
 
 GCMTransport.prototype.onMessage = function(message) {
     expect(message.data.type).to.be.a("string");
-    expect(this.connections).to.be.a("object");
+    expect(this.connections).to.be.an("object");
     expect(this.registrationId).to.be.a("string");
     if(message.data.type === "MESSAGE") {
         expect(message.data.source).to.be.a("string");
@@ -182,7 +179,16 @@ GCMTransport.prototype.onMessage = function(message) {
         };
     } else if(message.data.type === "MESSAGE_DELIVERED") {
     } else if(message.data.type === "MESSAGE_NOT_DELIVERED") {
-        this.connections[message.data.destination].stream.error("Could not deliver message");
+        expect(message.data.source).to.be.a("string");
+        expect(message.data.destination).to.be.a("string");
+        if(message.data.source !== this.registrationId) {
+            console.log("message received that was not for us");
+        } else {
+            if(this.connections[message.data.destination]) {
+                expect(this.connections[message.data.destination]).to.be.an.instanceof(curve.CurveCPStream);
+                this.connections[message.data.destination].stream.error("Could not deliver message");
+            };
+        };
     } else if(message.data.type === "GET_REPLY") {
     } else {
         console.log("GCM: Unknown message type received");
@@ -208,20 +214,23 @@ GCMTransport.prototype.disable = function() {
 };
 
 var GCMStream = function(opts) {
-    console.log("initializing GCM stream");
-    if(!opts) opts = {};
+    expect(opts).to.be.an("object");
+    expect(opts.source).to.be.a("string");
+    expect(opts.destination).to.be.a("string");
     opts.objectMode = false;
     opts.decodeStrings = true;
     Duplex.call(this, opts);
-    extend(this, {
-        source: null,
-        destination: null
-    }, opts);
+    extend(this, opts);
 };
 
 inherits(GCMStream, Duplex);
 
+
+/*
+ * This method should not be called since we are using emit('data') to signal when new data is available
+ */
 GCMStream.prototype._read = function(size) {
+    throw new Error("Method not implemented. Listen to emit('data') events");
 };
 
 GCMStream.prototype._write = function(chunk, encoding, done) {
@@ -243,10 +252,9 @@ GCMStream.prototype._write = function(chunk, encoding, done) {
         }
     }, function(messageId) {
         if(chrome.runtime.lastError) {
-            console.log("GCM: problem with sending message to app server");
-            console.log(chrome.runtime.lastError);
-            done(new Error("GCM: problem with sending messag to app server"));
-            stream.error("Problem with sending message to GCM server");
+            var message = "GCM: problem with sending message to app server (" + chrome.runtime.lastError.message + ")";
+            done(new Error(message));
+            stream.error(message);
         } else {
             done();
         };
@@ -254,6 +262,8 @@ GCMStream.prototype._write = function(chunk, encoding, done) {
 };
 
 GCMStream.prototype.error = function(errorMessage) {
+    expect(errorMessage).to.be.a("string");
+    expect(errorMessage).to.have.length.of.at.least(1);
     this.emit("error", new Error(errorMessage));
     this.emit("end");
     this.emit("close");
