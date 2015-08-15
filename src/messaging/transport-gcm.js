@@ -21,9 +21,9 @@ function GCMTransport(publicKey, privateKey) {
 
     var gcm = this;
 
-    chrome.gcm.onMessage.addListener(gcm.onMessage.bind(this));
-    chrome.gcm.onMessagesDeleted.addListener(gcm.onMessagesDeleted.bind(this));
-    chrome.gcm.onSendError.addListener(gcm.onSendError.bind(this));
+    chrome.gcm.onMessage.addListener(gcm.onMessage.bind(gcm));
+    chrome.gcm.onMessagesDeleted.addListener(gcm.onMessagesDeleted.bind(gcm));
+    chrome.gcm.onSendError.addListener(gcm.onSendError.bind(gcm));
 
     this.enable();
 };
@@ -70,14 +70,21 @@ GCMTransport.prototype.connect = function(publicKey, connectionInfo) {
         source: this.registrationId,
         destination: connectionInfo.gcm
     });
-    this.connections[connectionInfo.gcm] = new curve.CurveCPStream({
+    var stream = new curve.CurveCPStream({
         stream: gcmStream,
         is_server: false,
         serverPublicKey: curve.fromBase64(publicKey),
         clientPublicKey: curve.fromBase64(this.publicKey),
         clientPrivateKey: curve.fromBase64(this.privateKey)
     });
-    this.connectStream(this.connections[connectionInfo.gcm]);
+    this.connections[connectionInfo.gcm] = stream;
+    this.connectStream(stream);
+    var gcm = this;
+    setTimeout(function() {
+       if(!stream.connected) {
+            gcm._end(connectionInfo.gcm);
+        };
+    }, 5000);
 };
 
 GCMTransport.prototype.connectStream = function(stream) {
@@ -104,6 +111,8 @@ GCMTransport.prototype.connectStream = function(stream) {
         var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
         var publicKey = curve.toBase64(publicKey)
         data = JSON.parse(data);
+        expect(data.source).to.equal(publicKey);
+        expect(data.destination).to.equal(gcm.publicKey);
         gcm.emit("message", publicKey, data);
     });
 };
@@ -131,7 +140,7 @@ GCMTransport.prototype._end = function(destination) {
     stream.removeAllListeners("data");
     stream.removeAllListeners("error");
     delete this.connections[destination];
-    gcm.emit("connectionStopped", publicKey);
+    this.emit("connectionStopped", publicKey);
 };
 
 GCMTransport.prototype.send = function(message) {
@@ -230,7 +239,6 @@ inherits(GCMStream, Duplex);
  * This method should not be called since we are using emit('data') to signal when new data is available
  */
 GCMStream.prototype._read = function(size) {
-    throw new Error("Method not implemented. Listen to emit('data') events");
 };
 
 GCMStream.prototype._write = function(chunk, encoding, done) {

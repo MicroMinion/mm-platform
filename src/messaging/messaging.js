@@ -7,6 +7,7 @@ var chai = require("chai");
 var curve = require("curve-protocol");
 var TransportManager = require("./transport-gcm.js");
 var storagejs = require("storagejs");
+var parallel = require("run-parallel");
 
 var expect = chai.expect;
 
@@ -76,7 +77,6 @@ var Messaging = function(profile) {
     expect(profile.privateKey).to.be.a("string");
     expect(curve.fromBase64(profile.publicKey)).to.have.length(32);
     expect(curve.fromBase64(profile.privateKey)).to.have.length(32);
-    expect(Object.observe).to.be.a("function");
     EventEmitter.call(this, {
         delimiter: '.'
     });
@@ -114,11 +114,6 @@ var Messaging = function(profile) {
      * @type {Object.<string, Object>}
      */
     this.directoryCache = {};
-    var __observe = function() {
-        Object.observe(this.directoryCache, function(changes) {
-            storagejs.put("flunky-messaging-directoryCache", messaging.directoryCache);
-        }, ["add", "update"]);
-    };
     var options = {
         success: function(value) {
             expect(value).to.be.an("object");
@@ -127,12 +122,10 @@ var Messaging = function(profile) {
                     messaging.directoryCache[key] = n;
                 };
             });
-            __observe();
         },
         error: function(errorMessage) {
             console.log("unable to retrieve flunky-messaging-directoryCache");
             console.log(errorMessage);
-            __observe();
         }
     };
     storagejs.get("flunky-messaging-directoryCache", options);
@@ -143,25 +136,22 @@ var Messaging = function(profile) {
      * @type {Object.<string, Object>}
      */
     this.connectionStats = {};
-    var __observe = function() {
-        Object.observe(this.connectionStats, function(changes) {
-            storagejs.put("flunky-messaging-connectionStats", messaging.connectionStats);
-        }, ["add", "update"]);
-    };
     var options = {
         success: function(value) {
             expect(value).to.be.an("object");
             _.forEach(value, function(n, key) {
+                delete n.connectInProgress;
+                delete n.connected;
+                delete n.lookupInProgress;
                 if(!_.has(messaging.connectionStats, key)) {
                     messaging.connectionStats[key] = n;
+
                 };
             });
-            __observe();
         },
         error: function(errorMessage) {
             console.log("unable to retrieve flunky-messaging-connectionStats");
             console.log(errorMessage);
-            __observe();
         }
     };
     storagejs.get("flunky-messaging-connectionStats", options);
@@ -192,51 +182,49 @@ var Messaging = function(profile) {
      * @type {Object.<string, Object.<string, Object>>}
      */
     this.sendQueues = {};
-    var __observe = function() {
-        Object.observe(messaging.sendQueues, function(changes) {
-           storagejs.put("flunky-messaging-sendQueues", JSON.stringify(_.keys(messaging.sendQueues)));
-        }, ["add", "update", "delete"]);
-    };
+    this._sendQueuesRetrieved = false;
     var options = {
         success: function(value) {
             expect(value).to.be.a("string");
             value = JSON.parse(value);
             expect(value).to.be.an("array");
+            var parallelFunctions = [];
             _.forEach(value, function(publicKey) {
                 expect(publicKey).to.be.a("string");
                 expect(curve.fromBase64(publicKey)).to.have.length(32);
                 if(!_.has(messaging.sendQueues, publicKey)) {
                     messaging.sendQueues[publicKey] = {};
                 };
-                var __publicKeyObserve = function() {
-                    Object.observe(messaging.sendQueues[publicKey], function(changes) {
-                        storagejs.put("flunky-messaging-sendQueues-" + publicKey, messaging.sendQueues[publicKey]);
-                    }, ["add", "update", "delete"]);
+                var callBackfunction = function(callback) {
+                    var publicKeyoptions = {
+                        success: function(value) {
+                            expect(value).to.be.an("object");
+                            _.forEach(value, function(message, uuid) {
+                                if(!_.has(messaging.sendQueues[publicKey][uuid])) {
+                                    messaging.sendQueues[publicKey][uuid] = message;
+                                };
+                            });
+                            callback(null, publicKey);
+                        },
+                        error: function(errorMessage) {
+                            console.log("unable to retrieve sendQueue for " + publicKey);
+                            console.log(errorMessage);
+                            callback(errorMessage, null);
+                        }
+                    };
+                    storagejs.get("flunky-messaging-sendQueues-" + publicKey, publicKeyoptions);
                 };
-                var publicKeyoptions = {
-                    success: function(value) {
-                        expect(value).to.be.an("object");
-                        _.forEach(value, function(message, uuid) {
-                          if(!_.has(messaging.sendQueues[publicKey][uuid])) {
-                            messaging.sendQueues[publicKey][uuid] = message;
-                          };
-                        });
-                        __publicKeyObserve();
-                    },
-                    error: function(errorMessage) {
-                        console.log("unable to retrieve sendQueue for " + publicKey);
-                        console.log(errorMessage);
-                        __publicKeyObserve();
-                    }
-                };
-                storagejs.get("flunky-messaging-sendQueues-" + publicKey, publicKeyoptions);
+                parallelFunctions.push(callBackfunction);
             });
-            __observe();
+            parallel(parallelFunctions, function(err, results) {
+                messaging._sendQueuesRetrieved = true;
+                messaging._saveSendQueues(_.keys(this.sendQueues));
+            });
         },
         error: function(errorMessage) {
             console.log("unable to retrieve flunky-messaging-sendQueues");
             console.log(errorMessage);
-            __observe();
+            messaging._sendQueuesRetrieved = true;
         }
     };
     storagejs.get("flunky-messaging-sendQueues", options);
@@ -268,7 +256,6 @@ var Messaging = function(profile) {
         if(!messaging.connectionStats[publicKey]) {
             messaging.connectionStats[publicKey] = {};
         };
-        expect(message.connectionStats[publicKey].connected).to.be.false;
         messaging.connectionStats[publicKey].connectInProgress = false;
         messaging.connectionStats[publicKey].connected = true;
         messaging._flushQueue(publicKey);
@@ -278,7 +265,6 @@ var Messaging = function(profile) {
         expect(curve.fromBase64(publicKey)).to.have.length(32);
         expect(messaging.connectionStats[publicKey]).to.exist;
         expect(messaging.connectionStats[publicKey]).to.be.an("object");
-        expect(messaging.connectionStats[publicKey].connected).to.be.true;
         messaging.connectionStats[publicKey].connectInProgress = false;
         messaging.connectionStats[publicKey].connected = false;
     });
@@ -287,7 +273,7 @@ var Messaging = function(profile) {
         expect(curve.fromBase64(publicKey)).to.have.length(32);
         console.log("message received");
         console.log(message);
-        var scope = messaging.getScope(message.publicKey);
+        var scope = messaging.getScope(publicKey);
         messaging.emit(scope + "." + message.topic, message);
     });
 
@@ -299,7 +285,8 @@ var Messaging = function(profile) {
         };
         _.forEach(_.keys(messaging.connectionStats), function(publicKey) {
             var lastUpdate = messaging.connectionStats[publicKey].lastUpdate;
-            if(!messaging.connectionStats[publicKey].lookupInProgress && (lastUpdate + PUBLISH_CONNECTION_INFO_INTERVAL < new Date())) {
+            var diff = Math.abs(new Date() - new Date(lastUpdate));
+            if(!messaging.connectionStats[publicKey].lookupInProgress && diff > PUBLISH_CONNECTION_INFO_INTERVAL) {
                 messaging._lookupKey(publicKey);
             };
         })
@@ -307,6 +294,23 @@ var Messaging = function(profile) {
 };
 
 inherits(Messaging, EventEmitter);
+
+Messaging.prototype._saveSendQueues = function(publicKeys) {
+    expect(publicKeys).to.be.an("array");
+    if(!this._sendQueuesRetrieved) {
+        return;
+    };
+    storagejs.put("flunky-messaging-sendQueues", JSON.stringify(_.keys(this.sendQueues)));
+    _.forEach(publicKeys, function(publicKey) {
+            expect(publicKey).to.be.a("string");
+            expect(curve.fromBase64(publicKey)).to.have.length(32);
+            if(_.has(this.sendQueues, publicKey)) {
+                storagejs.put("flunky-messaging-sendQueues-" + publicKey, this.sendQueues[publicKey]);
+            } else {
+                storagejs.delete("flunky-messaging-sendQueues-" + publicKey);
+            };
+    }, this);
+};
 
 /**
  * Manually disable transportManager
@@ -399,11 +403,12 @@ Messaging.prototype._flushQueue = function(publicKey) {
     expect(this.connectionStats[publicKey].connected).to.be.true;
     expect(this.transportAvailable).to.be.true;
     _.forEach(this.sendQueues[publicKey], function(message) {
-        if(message.timestamp + timestamp.expireAfter > new Date()) {
+        if(Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
             this.transportManager.send(message);
         };
     }, this);
     delete this.sendQueues[publicKey];
+    this._saveSendQueues([publicKey]);
 };
 
 /**
@@ -432,13 +437,14 @@ Messaging.prototype.send = function(publicKey, topic, data, options) {
         id: options.id ? options.id : uuid.v4(), 
         topic: topic,
         data: data,
-        timestamp: new Date(),
+        timestamp: new Date().toJSON(),
         expireAfter: options.expireAfter ? options.expireAfter : MAX_EXPIRE_TIME
     };
     if(!this.sendQueues[message.destination]) {
         this.sendQueues[message.destination] = {};
     };
     this.sendQueues[message.destination][message.id] = message;
+    this._saveSendQueues([message.destination]);
     if(options.realtime) {
         process.nextTick(this._trigger.bind(this, message.destination));
     };
@@ -484,15 +490,17 @@ Messaging.prototype._lookupKey = function(publicKey) {
     this.connectionStats[publicKey].lookupInProgress = true;
     var messaging = this;
     var options = {
-        error: function(key, err) {
-            console.log("lookup error for " + key + " " + err);
+        error: function(err) {
+            console.log("lookup error for " + publicKey + ": " + err);
             messaging.connectionStats[publicKey].lookupInProgress = false;
         },
         success: function(key, value) {
             console.log("lookup success for " + key);
             messaging.connectionStats[publicKey].lookupInProgress = false;
-            messaging.connectionStats[publicKey].lastUpdate = new Date();
+            messaging.connectionStats[publicKey].lastUpdate = new Date().toJSON();
+            storagejs.put("flunky-messaging-connectionStats", messaging.connectionStats);
             messaging.directoryCache[publicKey] = JSON.parse(value);
+            storagejs.put("flunky-messaging-directoryCache", messaging.directoryCache);
             messaging._trigger(publicKey);
         },
     };

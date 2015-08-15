@@ -44,7 +44,7 @@ AuthProtocol.prototype.setContacts = function(contacts) {
 AuthProtocol.prototype.sendVerificationRequest = function(contact) {
     var options = {
         realtime: true,
-        expireAfter: 60 * 60 * 24
+        expireAfter: 1000 * 60 * 60 * 24
     };
     contact.verificationCodeForContact = _generateCode();
     var data = {
