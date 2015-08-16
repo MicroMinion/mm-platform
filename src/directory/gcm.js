@@ -29,7 +29,7 @@ backoff.on("ready", function() {
 
 var onMessage = function(message) {
     if(message.data.type === "GET_REPLY") {
-        if(pendingMessages[message.data.id].success) {
+        if(pendingMessages[message.data.id] && pendingMessages[message.data.id].success) {
             var values = JSON.parse(message.data.values);
             _.forEach(values, function(value) {
                 pendingMessages[message.data.id].success(message.data.key, value);

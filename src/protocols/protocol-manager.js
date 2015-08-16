@@ -18,7 +18,7 @@ ProtocolManager.prototype.setProfile = function(profile) {
         this.profile = profile;
         this.messaging = new Messaging(profile);
         _.forEach(this._delayedInitializations, function(protocolInfo) {
-            this._initializeProtocol(protocolInfo.className, protocolInfo.name, protocolInfo.options);
+            this._initializeProtocol(protocolInfo.className, protocolInfo.name, protocolInfo.options, protocolInfo.callback);
         }, this);
     } else {
         throw Error("Can not set profile twice on ProtocolManager");
@@ -33,22 +33,24 @@ ProtocolManager.prototype.registerProtocol = function(name, classObject) {
     this.availableProtocols[name] = classObject;
 };
 
-ProtocolManager.prototype.initializeProtocol = function(className, name, options) {
+ProtocolManager.prototype.initializeProtocol = function(className, name, options, callback) {
     if(!this.messaging) {
         this._delayedInitializations.push({
             className: className,
             name: name,
-            options: options
+            options: options,
+            callback: callback
         });
     } else {
-        this._initializeProtocol(className, name, options);
+        this._initializeProtocol(className, name, options, callback);
     };
 };
 
-ProtocolManager.prototype._initializeProtocol = function(className, name, options) {
+ProtocolManager.prototype._initializeProtocol = function(className, name, options, callback) {
     options.messaging = this.messaging;
     options.profile = this.profile;
     this.protocols[name] = new this.availableProtocols[className](options);
+    callback();
 };
 
 ProtocolManager.prototype.getProtocol = function(name) {

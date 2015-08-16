@@ -105,6 +105,9 @@ GCMTransport.prototype.connectStream = function(stream) {
     stream.on("drain", function() {
         var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
         var publicKey = curve.toBase64(publicKey)
+        if(!_.has(gcm.directoryCache, publicKey)) {
+            gcm.directoryCache[publicKey] = stream.stream.destination;
+        };
         gcm.emit("connectionEstablished", publicKey);
     });
     stream.on("data", function(data) {
