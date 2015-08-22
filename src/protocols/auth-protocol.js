@@ -2,6 +2,9 @@ var inherits = require("inherits");
 var events = require("events");
 var _ = require("lodash");
 var uuid = require("node-uuid");
+var chai = require("chai");
+
+var expect = chai.expect;
 
 var _generateCode = function() {
     var text = "";
@@ -16,6 +19,93 @@ var verificationState = {
     NOT_VERIFIED: 2,
     PENDING_VERIFICATION: 3,
     VERIFIED: 4
+};
+
+
+var AuthenticationManager = function(options) {
+    events.EventEmitter.call(this);
+    this.profile = options.profile;
+    this.messaging = options.messaging;
+    this.ongoingAuthentications = {};
+    this.setContacts(options.contacts);
+    this.setDevices(options.devices);
+    this.messaging.on("public.auth.initiate", this.onInitiate);
+    this.messaging.on("public.auth.code", this.onCode);
+    this.messaging.on("friends.auth.confirmation", this.onConfirmation);
+    this.messaging.on("self.auth.confirmation", this.onConfirmation);
+};
+
+AuthenticationManager.prototype.setContacts = function(contacts) {
+
+};
+
+AuthenticationManager.prototype.setDevices = function(devices) {
+
+};
+
+AuthenticationManager.prototype.onInitiate = function(message) {
+
+};
+
+AuthenticationManager.prototype.onCode = function(message) {
+
+};
+
+AuthenticationManager.prototype.onConfirmation = function(message) {
+
+};
+
+inherits(AuthenticationManager, events.EventEmitter);
+
+var PublicKeyVerificationProtocol = function(publicKey, profile) {
+    this.publicKey = publicKey;
+    this.profile = profile;
+    this.initiateSend = false;
+    this.initiateReceived = false;
+    this.codeSend = false;
+    this.codeReceived = false;
+    this.confirmationSend = false;
+    this.confirmationReceived = false;
+};
+
+
+PublicKeyVerificationProtocol.prototype.sendInitiate = function() {
+    var options = {
+        realtime: true,
+        expireAfter: 1000 * 60
+    };
+    var data = {
+        name: this.profile.name,
+        device: this.profile.device,
+        accounts: this.profile.accounts,
+        type: this.profile.type,
+        application: this.profile.application
+    };
+    this.initiateSend = true;
+    this.emit("message", this.publicKey, "auth.initiate", data, options);
+};
+
+
+PublicKeyVerificationProtocol.prototype.onInitiate = function(message) {
+    expect(message.topic).to.equal("public.auth.initiate");
+
+
+};
+
+PublicKeyVerificationProtocol.prototype.sendCode = function() {
+
+};
+
+PublicKeyVerificationProtocol.prototype.onSendCode = function(message) {
+
+};
+
+PublicKeyVerificationProtocol.prototype.sendConfirmation = function() {
+
+};
+
+PublicKeyVerificationProtocol.prototype.onConfirmation = function(message) {
+
 };
 
 var AuthProtocol = function(options) {
