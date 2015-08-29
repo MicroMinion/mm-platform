@@ -29,6 +29,10 @@ ProtocolManager.prototype.setContacts = function(contacts) {
     this.messaging.setContacts(contacts);
 };
 
+ProtocolManager.prototype.setDevices = function(devices) {
+    this.messaging.setDevices(devices);
+};
+
 ProtocolManager.prototype.registerProtocol = function(name, classObject) {
     this.availableProtocols[name] = classObject;
 };
@@ -49,6 +53,7 @@ ProtocolManager.prototype.initializeProtocol = function(className, name, options
 ProtocolManager.prototype._initializeProtocol = function(className, name, options, callback) {
     options.messaging = this.messaging;
     options.profile = this.profile;
+    options.name = name;
     this.protocols[name] = new this.availableProtocols[className](options);
     callback();
 };

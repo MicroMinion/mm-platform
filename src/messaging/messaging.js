@@ -390,6 +390,17 @@ Messaging.prototype.setContacts = function(contacts) {
     this.contacts = contacts;
 };
 
+/**
+ * Set devices that we consider to be trusted
+ * Messages from these devices will be triggered in the 'Self' namespace
+ * 
+ * @param {Object.<string, Object>} devices
+ * @public
+ */
+Messaging.prototype.setDevices = function(devices) {
+    this.devices = devices;
+};
+
 
 /**
  * Flush message queue: send all messages which have not expired
