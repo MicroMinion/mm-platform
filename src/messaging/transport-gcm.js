@@ -157,6 +157,7 @@ GCMTransport.prototype.send = function(message) {
     expect(this.directoryCache[message.destination]).to.be.a("string");
     expect(this.connections[this.directoryCache[message.destination]]).to.exist;
     expect(this.connections[this.directoryCache[message.destination]]).to.be.an.instanceof(curve.CurveCPStream);
+    console.log("SEND " + JSON.stringify(message));
     this.connections[this.directoryCache[message.destination]].write(JSON.stringify(message));
 };
 
