@@ -1,10 +1,7 @@
-var inherits = require("inherits");
-var events = require("events");
 var _ = require("lodash");
-var uuid = require("node-uuid");
 var chai = require("chai");
-var storagejs = require("storagejs");
-var extend = require('extend.js');
+var events = require("events");
+var inherits = require("inherits");
 
 var expect = chai.expect;
 
@@ -17,66 +14,29 @@ var _generateCode = function() {
 };
 
 var AuthenticationManager = function(options) {
-    events.EventEmitter.call(this);
     var manager = this;
-    this.profile = options.profile;
+    events.EventEmitter.call(this);
     this.name = options.name;
     this.scope = options.scope;
-    this.messaging = options.messaging;
     this.ongoingVerifications = {};
     this.messaging.on("public." + this.name + ".initiate", this.onInitiate.bind(this));
     this.messaging.on("public." + this.name + ".code", this.onCode.bind(this));
     this.messaging.on(this.scope + "." + this.name + ".confirmation", this.onConfirmation.bind(this));
-    var options = {
-        success: function(value) {
-            _.forEach(value, function(protocol, publicKey) {
-                manager.connectProtocol(publicKey, protocol);
-                manager.startVerification(publicKey);
-            });
-        },
-    };
-    storagejs.get(this.name, options);
 };
 
 inherits(AuthenticationManager, events.EventEmitter);
 
-AuthenticationManager.prototype.connectProtocol = function(publicKey, protocolState) {
-    expect(publicKey).to.be.a("string");
+AuthenticationManager.prototype.connectProtocol = function(publicKey, state) {
     var manager = this;
-    if(!protocolState) {
-        protocolState = {};
-    };
-    var protocol = new PublicKeyVerificationProtocol(publicKey, this.profile, protocolState);
-    protocol.name = this.name;
-    protocol.scope = this.scope;
-    protocol.on("message", function(publicKey, topic, data, options) {
-        manager.messaging.send(topic, publicKey, data, options);           
-    });
+    expect(publicKey).to.be.a("string");
+    var protocol = new PublicKeyVerificationProtocol(publicKey, state, this.name, this.messaging);
     protocol.on("newCodeNeeded", function() {
-        manager.emit("newCodeNeeded");
+        manager.messaging.send("profile.newCodeNeeded", "local", {});
     });
-    protocol.on("verified", function(publicKey) {
-        manager.emit("verified", publicKey);
-    });
-    protocol.on("confirmed", function(publicKey) {
-        manager.emit("confirmed", publicKey);
-        delete manager.ongoingVerifications[publicKey];
-        manager.save();
-    });
-    protocol.on('stateUpdate', this.save.bind(manager));
-    protocol.on("codeChanged", function(publicKey, code) {
-        manager.emit("codeChanged", publicKey, code);
+    protocol.on("update" , function() {
+        manager.emit("updateVerificationState", publicKey);        
     });
     this.ongoingVerifications[publicKey] = protocol;
-    this.emit("codeChanged", publicKey, protocol.ourCode);
-};
-
-AuthenticationManager.prototype.save = function() {
-    var state = {};
-    _.forEach(this.ongoingVerifications, function(protocol, publicKey) {
-        state[publicKey] = protocol.getState();
-    }, this);
-    storagejs.put(this.name, state);
 };
 
 AuthenticationManager.prototype.onInitiate = function(topic, publicKey, data) {
@@ -99,36 +59,17 @@ AuthenticationManager.prototype.onConfirmation = function(topic, publicKey, data
     };
 };
 
-AuthenticationManager.prototype.startVerification = function(publicKey) {
-    if(!_.has(this.ongoingVerifications, publicKey)) {
-        this.connectProtocol(publicKey, {});
-    };
-    this.ongoingVerifications[publicKey].start();
-
-};
-
-AuthenticationManager.prototype.setCode = function(publicKey, codeType, code) {
-    expect(this.ongoingVerifications).to.have.property(publicKey);
-    this.ongoingVerifications[publicKey].setCode(codeType, code);
-};
-
-AuthenticationManager.prototype.changeOurCode = function(publicKey, code) {
-    expect(this.ongoingVerifications).to.have.property(publicKey);
-    this.ongoingVerifications[publicKey].setOurCode(code);
-};
-
-var PublicKeyVerificationProtocol = function(publicKey, profile, protocolState) {
+var PublicKeyVerificationProtocol = function(publicKey, state, name, messaging) {
     events.EventEmitter.call(this);
+    this.name = name;
+    this.messaging = messaging;
     this.publicKey = publicKey;
-    this.profile = profile;
-    this.initiateSend = false;
-    this.initiateReceived = false;
-    this.codeSend = false;
-    this.codeReceived = false;
-    this.confirmationSend = false;
-    this.confirmationReceived = false;
-    extend(this, protocolState);
-    if(!this.ourCode) {
+    this.state = state;
+    if(!this.state.verification) {
+        this.state.verification = {};
+    };
+    this.profile = undefined;
+    if(!this.state.ourCode) {
         this.generateOurCode();
     };
 };
@@ -137,40 +78,40 @@ inherits(PublicKeyVerificationProtocol, events.EventEmitter);
 
 PublicKeyVerificationProtocol.prototype.generateOurCode = function() {
     this.setOurCode(_generateCode());
-    this.emit("codeChanged", this.publicKey, this.ourCode);
 };
 
 PublicKeyVerificationProtocol.prototype.setOurCode = function(code) {
     this.ourCode = code;
-    this.emit('stateUpdate');
+    this.emit('update');
 };
 
-PublicKeyVerificationProtocol.prototype.getState = function() {
-    return {
-        initiateSend: this.initiateSend,
-        initiateReceived: this.initiateReceived,
-        codeSend: this.codeSend,
-        codeReceived: this.codeReceived,
-        confirmationSend: this.confirmationSend,
-        confirmationReceived: this.confirmationReceived,
-        ourCode: this.ourCode,
-        otherCode: this.otherCode,
-        otherCodeType: this.otherCodeType
+PublicKeyVerificationProtocol.prototype.set = function(attribute) {
+    if(!this.state.verification[attribute]) {
+        this.state.verification[attribute] = true;
+        this.emit("update");
     };
 };
 
 /* INITIATE LOGIC */
 
 PublicKeyVerificationProtocol.prototype.start = function() {
-    if(!this.initiateReceived) {
+    if(!this.profile) { return; };
+    if(!this.state.verification.initiateReceived) {
         this.sendInitiate();
-    } else if(!this.codeReceived && this.otherCode) {
+    } else if(!this.state.verification.codeReceived && this.state.verification.otherCode) {
         this.sendCode();
-    } else if(this.codeReceived && this.codeSend && !this.confirmationReceived) {
+    } else if(this.state.verification.codeReceived && this.state.verification.codeSend && !this.state.verification.confirmationReceived) {
         this.sendConfirmation();
     };
 };
 
+PublicKeyVerificationProtocol.prototype.setProfile = function(profile) {
+    var start = !Boolean(this.profile);
+    this.profile = profile;
+    if(start) {
+        this.start();
+    };
+};
 
 PublicKeyVerificationProtocol.prototype.sendInitiate = function(reply) {
     var options = {
@@ -180,58 +121,51 @@ PublicKeyVerificationProtocol.prototype.sendInitiate = function(reply) {
     if(!reply) {
         reply = false;
     };
-    this.initiateSend = true;
     var data = {
         info: this.profile.info,
         reply: reply
     }
-    this.emit("message", this.publicKey, this.name + ".initiate", data, options);
-    this.emit('stateUpdate');
+    this.messaging.send(this.name + ".initiate", this.publicKey, data, options);
+    this.set("initiateSend");
 };
 
-
 PublicKeyVerificationProtocol.prototype.onInitiate = function(data) {
-    this.initiateReceived = true;
-    this.emit('stateUpdate');
+    this.set("initiateReceived");
     if(!data.reply) {
         this.sendInitiate(true);
     };
-    if(this.initiateSend && this.initiateReceived && this.otherCode) {
+    if(this.state.verification.initiateSend && this.state.verification.initiateReceived && this.state.code) {
         this.sendCode();
     };
 };
 
 /* CODE LOGIC */
 
-PublicKeyVerificationProtocol.prototype.setCode = function(codeType, code) {
-    this.otherCodeType = codeType;
-    this.otherCode = code;
-    this.emit('stateUpdate');
-    if(this.initiateSend && this.initiateReceived) {
+PublicKeyVerificationProtocol.prototype.setCode = function() {
+    if(this.state.verification.initiateSend && this.state.verification.initiateReceived) {
         this.sendCode();
     };
 };
 
 PublicKeyVerificationProtocol.prototype.sendCode = function() {
-    expect(this.initiateSend).to.be.true;
-    expect(this.initiateReceived).to.be.true;
-    expect(this.otherCode).to.exist;
-    expect(this.otherCodeType).to.exist;
+    expect(this.state.verification.initiateSend).to.be.true;
+    expect(this.state.verification.initiateReceived).to.be.true;
+    expect(this.state.code).to.exist;
+    expect(this.state.codeType).to.exist;
     var options = {
         realtime: true,
         expireAfter: 1000 * 60
     };
     var data = {
-        codeType: this.otherCodeType,
-        code: this.otherCode
+        codeType: this.state.codeType,
+        code: this.state.code
     };
-    this.emit("message", this.publicKey, this.name + ".code", data, options);
-    this.codeSend = true;
-    this.emit('stateUpdate');
+    this.messaging.send(this.name + ".code", this.publicKey, data, options);
+    this.set("codeSend");
 };
 
 PublicKeyVerificationProtocol.prototype.onCode = function(data) {
-    if(this.initiateSend && this.initiateReceived && !this.codeReceived) {
+    if(this.state.verification.initiateSend && this.state.verification.initiateReceived && !this.state.verification.codeReceived) {
         var codeValid = false;
         if(data.codeType === "qr") {
             codeValid = (data.code === this.profile.code);
@@ -239,18 +173,16 @@ PublicKeyVerificationProtocol.prototype.onCode = function(data) {
                 this.emit("newCodeNeeded");
             };
         } else if(data.codeType === "sixdots") {
-            codeValid = (data.code === this.ourCode);
+            codeValid = (data.code === this.state.ourCode);
             if(!codeValid) {
                 this.generateOurCode();
             };
         };
         if(codeValid) {
-            this.codeReceived = true;
-            this.emit("verified", this.publicKey);
-            this.emit('stateUpdate');
-            if(this.codeSend) {
+            this.set("codeReceived");
+            if(this.state.verification.codeSend) {
                 this.sendConfirmation();
-            } else if(this.otherCode) {
+            } else if(this.state.code) {
                 this.sendCode();
             };
         };
@@ -270,24 +202,19 @@ PublicKeyVerificationProtocol.prototype.sendConfirmation = function(reply) {
     var data = {
         reply: reply
     };
-    this.emit("message", this.publicKey, this.name + ".confirmation", data, options);
-    this.confirmationSend = true;
-    this.emit('stateUpdate');
+    this.messaging.send(this.name + ".confirmation", this.publicKey, data, options);
+    this.set("confirmationSend");
 };
 
 PublicKeyVerificationProtocol.prototype.onConfirmation = function(data) {
-    expect(this.initiateSend).to.be.true;
-    expect(this.initiateReceived).to.be.true;
-    expect(this.codeReceived).to.be.true;
-    expect(this.codeSend).to.be.true;
+    expect(this.state.verification.initiateSend).to.be.true;
+    expect(this.state.verification.initiateReceived).to.be.true;
+    expect(this.state.verification.codeReceived).to.be.true;
+    expect(this.state.verification.codeSend).to.be.true;
     if(!data.reply) {
         this.sendConfirmation();
     };
-    if(this.sendConfirmation) {
-        this.emit("confirmed", this.publicKey);
-    };
-    this.confirmationReceived = true;
-    this.emit('stateUpdate');
+    this.set("confirmationReceived");
 };
 
 module.exports = AuthenticationManager;
