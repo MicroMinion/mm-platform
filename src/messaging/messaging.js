@@ -57,7 +57,8 @@ var verificationState = {
     UNKNOWN: 1,
     NOT_VERIFIED: 2,
     PENDING_VERIFICATION: 3,
-    VERIFIED: 4
+    VERIFIED: 4,
+    CONFIRMED: 5
 };
 
 /**
@@ -66,17 +67,8 @@ var verificationState = {
  *
  * @constructor
  * @public
- * @param {Object} profile - Profile object of application user. 
- * @param {string} profile.publicKey - Base64 encoded publicKey for use with Nacl libraries
- * @param {String} profile.privateKey - Base64 encoded privateKey for use with Nacl libraries
  */
-var Messaging = function(profile) {
-    expect(profile).to.exist;
-    expect(profile).to.be.an("object");
-    expect(profile.publicKey).to.be.a("string");
-    expect(profile.privateKey).to.be.a("string");
-    expect(curve.fromBase64(profile.publicKey)).to.have.length(32);
-    expect(curve.fromBase64(profile.privateKey)).to.have.length(32);
+var Messaging = function() {
     EventEmitter.call(this, {
         delimiter: '.'
     });
@@ -92,7 +84,10 @@ var Messaging = function(profile) {
      * @access private
      * @type {Object}
      */
-    this.profile = profile;
+    this.profile = undefined;
+    this.on("self.profile.update", function(topic, publicKey, data) {
+        messaging.setProfile(data);
+    };
     /**
      * List of devices that belong to the current user
      * 
@@ -100,6 +95,9 @@ var Messaging = function(profile) {
      * @type {Object.<string, Object>}
      */
     this.devices = {};
+    this.on("self.devices.update", function(topic, publicKey, data) {
+        messaging.setDevices(data);
+    };
     /**
      * List of trusted contacts
      * 
@@ -107,6 +105,9 @@ var Messaging = function(profile) {
      * @type {Object.<string, Object>}
      */
     this.contacts = {};
+    this.on("self.contacts.update", function(topic, publicKey, data) {
+        messaging.setContacts(data);
+    };
     /**
      * Connection information from previously used public keys
      * 
@@ -164,7 +165,7 @@ var Messaging = function(profile) {
     this.connectionInfo = {};
     setInterval(function() {
         if(messaging.transportAvailable) {
-            messaging.publishConnectionInfo();
+            messaging._publishConnectionInfo();
         };
     }, PUBLISH_CONNECTION_INFO_INTERVAL);
     /**
@@ -238,45 +239,7 @@ var Messaging = function(profile) {
      * @type {TransportManager}
      *
      */
-    this.transportManager = new TransportManager(profile.publicKey, profile.privateKey);
-    this.transportManager.on("ready", function(connectionInfo) {
-        expect(connectionInfo).to.be.an("object");
-        expect(messaging.transportAvailable).to.be.false;
-        messaging.connectionInfo = connectionInfo;
-        messaging.transportAvailable = true;
-        messaging.publishConnectionInfo();
-    });
-    this.transportManager.on("disable", function() {
-        expect(messaging.transportAvailable).to.be.true;
-        messaging.transportAvailable = false;
-    });
-    this.transportManager.on("connectionEstablished", function(publicKey) {
-        expect(publicKey).to.be.a("string");
-        expect(curve.fromBase64(publicKey)).to.have.length(32);
-        if(!messaging.connectionStats[publicKey]) {
-            messaging.connectionStats[publicKey] = {};
-        };
-        messaging.connectionStats[publicKey].connectInProgress = false;
-        messaging.connectionStats[publicKey].connected = true;
-        messaging._flushQueue(publicKey);
-    });
-    this.transportManager.on("connectionStopped", function(publicKey) {
-        expect(publicKey).to.be.a("string");
-        expect(curve.fromBase64(publicKey)).to.have.length(32);
-        expect(messaging.connectionStats[publicKey]).to.exist;
-        expect(messaging.connectionStats[publicKey]).to.be.an("object");
-        messaging.connectionStats[publicKey].connectInProgress = false;
-        messaging.connectionStats[publicKey].connected = false;
-    });
-    this.transportManager.on("message", function(publicKey, message) {
-        expect(publicKey).to.be.a("string");
-        expect(curve.fromBase64(publicKey)).to.have.length(32);
-        console.log("message received");
-        console.log(message);
-        var scope = messaging.getScope(publicKey);
-        messaging.emit(scope + "." + message.topic, message.source, message.data);
-    });
-
+    this.transportManager = undefined;
     setInterval(function() {
         if(messaging.transportAvailable) {
             _.forEach(_.keys(messaging.sendQueues), function(publicKey) {
@@ -318,7 +281,9 @@ Messaging.prototype._saveSendQueues = function(publicKeys) {
  * @public
  */
 Messaging.prototype.disable = function() {
-    this.transportManager.disable();
+    if(this.transportManager) {
+        this.transportManager.disable();
+    };
 };
 
 /**
@@ -327,7 +292,30 @@ Messaging.prototype.disable = function() {
  * @public
  */
 Messaging.prototype.enable = function() {
-    this.transportManager.enable();
+    if(this.transportManager) {
+        this.transportManager.enable();
+    };
+};
+
+/**
+ * Set profile
+ *
+ * @param {Object} profile - Profile object of application user. 
+ * @param {string} profile.publicKey - Base64 encoded publicKey for use with Nacl libraries
+ * @param {String} profile.privateKey - Base64 encoded privateKey for use with Nacl libraries
+ * @public
+ */
+Messaging.prototype.setProfile = function(profile) {
+    expect(profile).to.exist;
+    expect(profile).to.be.an("object");
+    expect(profile.publicKey).to.be.a("string");
+    expect(profile.privateKey).to.be.a("string");
+    expect(curve.fromBase64(profile.publicKey)).to.have.length(32);
+    expect(curve.fromBase64(profile.privateKey)).to.have.length(32);
+    if(!this.profile || this.profile.privateKey !== profile.privateKey) {
+        this._setupTransportManager();
+    };
+    this.profile = profile;
 };
 
 /**
@@ -335,7 +323,7 @@ Messaging.prototype.enable = function() {
  *
  * @private
  */
-Messaging.prototype.publishConnectionInfo = function() {
+Messaging.prototype._publishConnectionInfo = function() {
     //TODO: Implement signature so that we can discard bogus info immediatly from DHT
     //TODO: Deal with expiration times
     //TODO: Add random nonce to signature (or do we want increment?) version info ... (timestamp maybe?)
@@ -343,39 +331,51 @@ Messaging.prototype.publishConnectionInfo = function() {
     directory.put(this.profile.publicKey, JSON.stringify(this.connectionInfo));
 };
 
-/**
- * Get scope of a publicKey
- *
- * @param {string} publicKey
- * @return {string} one of "self", "friends", "public"
- * @private
- */
-Messaging.prototype.getScope = function(publicKey) {
-    expect(publicKey).to.be.a("string");
-    expect(curve.fromBase64(publicKey)).to.have.length(32);
-    if(this._getScope(publicKey, this.devices)) {
-        return "self";
-    } else {
-        var friends = _.any(_.values(this.contacts), function(value, index, collection) {
-            return this._getScope(publicKey, value.keys);
-        }, this);
-        if(friends) {
-            return "friends";
-        } else {
-            return "public";
-        };
-    };
-};
 
-/**
- * @private
- * @param {string} publicKey
- * @param {Object} searchObject
- * @return {boolean} true or false if the publicKey is a property of searchObject and it's verificationState is verified
- */
-Messaging.prototype._getScope = function(publicKey, searchObject) {
-    return _.any(searchObject, function(value, index, collection) {
-        return index === publicKey && value.verificationState === verificationState.VERIFIED; 
+Messaging.prototype._setupTransportManager = function() {
+    var messaging = this;
+    if(this.transportManager) {
+        this.transportAvailable = false;
+        this.transportManager.disable();
+        this.transportManager.removeAllListeners();
+    };
+    this.transportManager = new TransportManager(profile.publicKey, profile.privateKey);
+    this.transportManager.on("ready", function(connectionInfo) {
+        expect(connectionInfo).to.be.an("object");
+        expect(messaging.transportAvailable).to.be.false;
+        messaging.connectionInfo = connectionInfo;
+        messaging.transportAvailable = true;
+        messaging.publishConnectionInfo();
+    });
+    this.transportManager.on("disable", function() {
+        expect(messaging.transportAvailable).to.be.true;
+        messaging.transportAvailable = false;
+    });
+    this.transportManager.on("connectionEstablished", function(publicKey) {
+        expect(publicKey).to.be.a("string");
+        expect(curve.fromBase64(publicKey)).to.have.length(32);
+        if(!messaging.connectionStats[publicKey]) {
+            messaging.connectionStats[publicKey] = {};
+        };
+        messaging.connectionStats[publicKey].connectInProgress = false;
+        messaging.connectionStats[publicKey].connected = true;
+        messaging._flushQueue(publicKey);
+    });
+    this.transportManager.on("connectionStopped", function(publicKey) {
+        expect(publicKey).to.be.a("string");
+        expect(curve.fromBase64(publicKey)).to.have.length(32);
+        expect(messaging.connectionStats[publicKey]).to.exist;
+        expect(messaging.connectionStats[publicKey]).to.be.an("object");
+        messaging.connectionStats[publicKey].connectInProgress = false;
+        messaging.connectionStats[publicKey].connected = false;
+    });
+    this.transportManager.on("message", function(publicKey, message) {
+        expect(publicKey).to.be.a("string");
+        expect(curve.fromBase64(publicKey)).to.have.length(32);
+        console.log("message received");
+        console.log(message);
+        var scope = messaging._getScope(publicKey);
+        messaging.emit(scope + "." + message.topic, publicKey, message.data);
     });
 };
 
@@ -403,24 +403,8 @@ Messaging.prototype.setDevices = function(devices) {
 
 
 /**
- * Flush message queue: send all messages which have not expired
- *
- * @param {string} publicKey - destination
- * @private
+ * SEND LOGIC
  */
-Messaging.prototype._flushQueue = function(publicKey) {
-    expect(publicKey).to.be.a("string");
-    expect(curve.fromBase64(publicKey)).to.have.length(32);
-    expect(this.connectionStats[publicKey].connected).to.be.true;
-    expect(this.transportAvailable).to.be.true;
-    _.forEach(this.sendQueues[publicKey], function(message) {
-        if(Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
-            this.transportManager.send(message);
-        };
-    }, this);
-    delete this.sendQueues[publicKey];
-    this._saveSendQueues([publicKey]);
-};
 
 /**
  * Deliver a message to another instance defined by its public key
@@ -435,31 +419,43 @@ Messaging.prototype._flushQueue = function(publicKey) {
  */
 Messaging.prototype.send = function(topic, publicKey, data, options) {
     expect(publicKey).to.be.a("string");
-    expect(curve.fromBase64(publicKey)).to.have.length(32);
+    expect(curve.fromBase64(publicKey).length === 32 || publicKey === "local").to.be.true;
     expect(topic).to.be.a("string");
     expect(data).to.be.an("object");
+    //TODO: restriction to be removed once we have reliable transport
     expect(JSON.stringify(data)).to.have.length.below(1200);
     expect(options).to.be.an("object");
     if(options.realtime) { expect(options.realtime).to.be.a("boolean"); };
     if(options.expireAfter) { expect(options.expireAfter).to.be.a("number"); };
     var message = {
-        source: this.profile.publicKey,
-        destination: publicKey,
         id: options.id ? options.id : uuid.v4(), 
         topic: topic,
         data: data,
         timestamp: new Date().toJSON(),
         expireAfter: options.expireAfter ? options.expireAfter : MAX_EXPIRE_TIME
     };
-    if(!this.sendQueues[message.destination]) {
-        this.sendQueues[message.destination] = {};
+    if(this._isLocal(publicKey)) {
+        this.emit("self." + topic, publicKey, data);
     };
-    this.sendQueues[message.destination][message.id] = message;
-    this._saveSendQueues([message.destination]);
+    if(!this.sendQueues[publicKey]) {
+        this.sendQueues[publicKey] = {};
+    };
+    this.sendQueues[publicKey][message.id] = message;
+    this._saveSendQueues([publicKey]);
     if(options.realtime) {
-        process.nextTick(this._trigger.bind(this, message.destination));
+        process.nextTick(this._trigger.bind(this, publicKey));
     };
 
+};
+
+Messaging.prototype._isLocal = function(publicKey) {
+    if(publicKey === "local") {
+        return true;
+    };
+    if(this.profile) {
+        return this.profile.publicKey === publicKey;
+    };
+    return false;
 };
 
 /**
@@ -517,6 +513,67 @@ Messaging.prototype._lookupKey = function(publicKey) {
     };
     directory.get(publicKey, options);
 };
+
+/**
+ * Flush message queue: send all messages which have not expired
+ *
+ * @param {string} publicKey - destination
+ * @private
+ */
+Messaging.prototype._flushQueue = function(publicKey) {
+    expect(publicKey).to.be.a("string");
+    expect(curve.fromBase64(publicKey)).to.have.length(32);
+    expect(this.connectionStats[publicKey].connected).to.be.true;
+    expect(this.transportAvailable).to.be.true;
+    _.forEach(this.sendQueues[publicKey], function(message) {
+        if(Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
+            this.transportManager.send(message);
+        };
+    }, this);
+    delete this.sendQueues[publicKey];
+    this._saveSendQueues([publicKey]);
+};
+
+/**
+ * RECEIVE LOGIC
+ */
+
+/**
+ * Get scope of a publicKey
+ *
+ * @param {string} publicKey
+ * @return {string} one of "self", "friends", "public"
+ * @private
+ */
+Messaging.prototype._getScope = function(publicKey) {
+    expect(publicKey).to.be.a("string");
+    expect(curve.fromBase64(publicKey)).to.have.length(32);
+    if(this._inScope(publicKey, this.devices)) {
+        return "self";
+    } else {
+        var friends = _.any(_.values(this.contacts), function(value, index, collection) {
+            return this._inScope(publicKey, value.keys);
+        }, this);
+        if(friends) {
+            return "friends";
+        } else {
+            return "public";
+        };
+    };
+};
+
+/**
+ * @private
+ * @param {string} publicKey
+ * @param {Object} searchObject
+ * @return {boolean} true or false if the publicKey is a property of searchObject and it's verificationState is verified
+ */
+Messaging.prototype._inScope = function(publicKey, searchObject) {
+    return _.any(searchObject, function(value, index, collection) {
+        return index === publicKey && value.verificationState >= verificationState.VERIFIED; 
+    });
+};
+
 
 module.exports = Messaging;
 
