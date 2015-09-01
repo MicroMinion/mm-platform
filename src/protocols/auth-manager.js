@@ -50,7 +50,7 @@ AuthenticationManager.prototype.connectProtocol = function(publicKey, protocolSt
     protocol.name = this.name;
     protocol.scope = this.scope;
     protocol.on("message", function(publicKey, topic, data, options) {
-        manager.messaging.send(publicKey, topic, data, options);           
+        manager.messaging.send(topic, publicKey, data, options);           
     });
     protocol.on("newCodeNeeded", function() {
         manager.emit("newCodeNeeded");
@@ -79,23 +79,23 @@ AuthenticationManager.prototype.save = function() {
     storagejs.put(this.name, state);
 };
 
-AuthenticationManager.prototype.onInitiate = function(topic, message) {
-    this.emit("newInstance", message.source, message.data);
-    if(!_.has(this.ongoingVerifications, message.source)) {
-        this.connectProtocol(message.source, {});
+AuthenticationManager.prototype.onInitiate = function(topic, publicKey, data) {
+    this.emit("newInstance", publicKey, data);
+    if(!_.has(this.ongoingVerifications, publicKey)) {
+        this.connectProtocol(publicKey, {});
     };
-    this.ongoingVerifications[message.source].onInitiate(message);
+    this.ongoingVerifications[publicKey].onInitiate(data);
 };
 
-AuthenticationManager.prototype.onCode = function(topic, message) {
-    if(_.has(this.ongoingVerifications, message.source)) {
-        this.ongoingVerifications[message.source].onCode(message);
+AuthenticationManager.prototype.onCode = function(topic, publicKey, data) {
+    if(_.has(this.ongoingVerifications, publicKey)) {
+        this.ongoingVerifications[publicKey].onCode(data);
     };
 };
 
-AuthenticationManager.prototype.onConfirmation = function(topic, message) {
-    if(_.has(this.ongoingVerifications, message.source)) {
-        this.ongoingVerifications[message.source].onConfirmation(message);       
+AuthenticationManager.prototype.onConfirmation = function(topic, publicKey, data) {
+    if(_.has(this.ongoingVerifications, publicKey)) {
+        this.ongoingVerifications[publicKey].onConfirmation(data);       
     };
 };
 
@@ -190,11 +190,10 @@ PublicKeyVerificationProtocol.prototype.sendInitiate = function(reply) {
 };
 
 
-PublicKeyVerificationProtocol.prototype.onInitiate = function(message) {
-    expect(message.topic).to.equal(this.name + ".initiate");
+PublicKeyVerificationProtocol.prototype.onInitiate = function(data) {
     this.initiateReceived = true;
     this.emit('stateUpdate');
-    if(!message.data.reply) {
+    if(!data.reply) {
         this.sendInitiate(true);
     };
     if(this.initiateSend && this.initiateReceived && this.otherCode) {
@@ -231,16 +230,16 @@ PublicKeyVerificationProtocol.prototype.sendCode = function() {
     this.emit('stateUpdate');
 };
 
-PublicKeyVerificationProtocol.prototype.onCode = function(message) {
+PublicKeyVerificationProtocol.prototype.onCode = function(data) {
     if(this.initiateSend && this.initiateReceived && !this.codeReceived) {
         var codeValid = false;
-        if(message.data.codeType === "qr") {
-            codeValid = (message.data.code === this.profile.code);
+        if(data.codeType === "qr") {
+            codeValid = (data.code === this.profile.code);
             if(codeValid) {
                 this.emit("newCodeNeeded");
             };
-        } else if(message.data.codeType === "sixdots") {
-            codeValid = (message.data.code === this.ourCode);
+        } else if(data.codeType === "sixdots") {
+            codeValid = (data.code === this.ourCode);
             if(!codeValid) {
                 this.generateOurCode();
             };
@@ -276,12 +275,12 @@ PublicKeyVerificationProtocol.prototype.sendConfirmation = function(reply) {
     this.emit('stateUpdate');
 };
 
-PublicKeyVerificationProtocol.prototype.onConfirmation = function(message) {
+PublicKeyVerificationProtocol.prototype.onConfirmation = function(data) {
     expect(this.initiateSend).to.be.true;
     expect(this.initiateReceived).to.be.true;
     expect(this.codeReceived).to.be.true;
     expect(this.codeSend).to.be.true;
-    if(!message.data.reply) {
+    if(!data.reply) {
         this.sendConfirmation();
     };
     if(this.sendConfirmation) {

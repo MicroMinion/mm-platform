@@ -274,7 +274,7 @@ var Messaging = function(profile) {
         console.log("message received");
         console.log(message);
         var scope = messaging.getScope(publicKey);
-        messaging.emit(scope + "." + message.topic, message);
+        messaging.emit(scope + "." + message.topic, message.source, message.data);
     });
 
     setInterval(function() {
@@ -433,7 +433,7 @@ Messaging.prototype._flushQueue = function(publicKey) {
  * @param {number=} [options.expireAfter=MAX_EXPIRE_TIME] - flag to indicate how long message delivery should be tried
  * @public
  */
-Messaging.prototype.send = function(publicKey, topic, data, options) {
+Messaging.prototype.send = function(topic, publicKey, data, options) {
     expect(publicKey).to.be.a("string");
     expect(curve.fromBase64(publicKey)).to.have.length(32);
     expect(topic).to.be.a("string");
