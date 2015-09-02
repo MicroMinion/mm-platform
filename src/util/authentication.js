@@ -36,15 +36,17 @@ AuthenticationManager.prototype.connectProtocol = function(publicKey, state) {
     protocol.on("update" , function() {
         manager.emit("updateVerificationState", publicKey);        
     });
+    protocol.on("ourCodeUpdate", function() {
+        manager.emit("ourCodeUpdate", publicKey);
+    });
+    if(this.profile) {
+        protocol.profile = this.profile;
+    };
     this.ongoingVerifications[publicKey] = protocol;
 };
 
 AuthenticationManager.prototype.onInitiate = function(topic, publicKey, data) {
     this.emit("newInstance", publicKey, data);
-    if(!_.has(this.ongoingVerifications, publicKey)) {
-        this.connectProtocol(publicKey, {});
-    };
-    this.ongoingVerifications[publicKey].onInitiate(data);
 };
 
 AuthenticationManager.prototype.onCode = function(topic, publicKey, data) {
@@ -78,10 +80,11 @@ inherits(PublicKeyVerificationProtocol, events.EventEmitter);
 
 PublicKeyVerificationProtocol.prototype.generateOurCode = function() {
     this.setOurCode(_generateCode());
+    this.emit('ourCodeUpdate');
 };
 
 PublicKeyVerificationProtocol.prototype.setOurCode = function(code) {
-    this.ourCode = code;
+    this.state.ourCode = code;
     this.emit('update');
 };
 
@@ -181,7 +184,7 @@ PublicKeyVerificationProtocol.prototype.onCode = function(data) {
         if(codeValid) {
             this.set("codeReceived");
             if(this.state.verification.codeSend) {
-                this.sendConfirmation();
+                this.sendConfirmation(true);
             } else if(this.state.code) {
                 this.sendCode();
             };
@@ -211,8 +214,8 @@ PublicKeyVerificationProtocol.prototype.onConfirmation = function(data) {
     expect(this.state.verification.initiateReceived).to.be.true;
     expect(this.state.verification.codeReceived).to.be.true;
     expect(this.state.verification.codeSend).to.be.true;
-    if(!data.reply) {
-        this.sendConfirmation();
+    if(data.reply) {
+        this.sendConfirmation(false);
     };
     this.set("confirmationReceived");
 };

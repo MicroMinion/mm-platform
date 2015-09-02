@@ -53,13 +53,7 @@ var PUBLISH_CONNECTION_INFO_INTERVAL = 1000 * 60 * 5
  * @default
  * @public
  */
-var verificationState = {
-    UNKNOWN: 1,
-    NOT_VERIFIED: 2,
-    PENDING_VERIFICATION: 3,
-    VERIFIED: 4,
-    CONFIRMED: 5
-};
+var verificationState = require("../constants/verificationState.js");
 
 /**
  * Messaging API that allows to send/receive messages using only a public key as identifier. 
@@ -87,7 +81,7 @@ var Messaging = function() {
     this.profile = undefined;
     this.on("self.profile.update", function(topic, publicKey, data) {
         messaging.setProfile(data);
-    };
+    });
     /**
      * List of devices that belong to the current user
      * 
@@ -97,7 +91,7 @@ var Messaging = function() {
     this.devices = {};
     this.on("self.devices.update", function(topic, publicKey, data) {
         messaging.setDevices(data);
-    };
+    });
     /**
      * List of trusted contacts
      * 
@@ -107,7 +101,7 @@ var Messaging = function() {
     this.contacts = {};
     this.on("self.contacts.update", function(topic, publicKey, data) {
         messaging.setContacts(data);
-    };
+    });
     /**
      * Connection information from previously used public keys
      * 
@@ -313,7 +307,7 @@ Messaging.prototype.setProfile = function(profile) {
     expect(curve.fromBase64(profile.publicKey)).to.have.length(32);
     expect(curve.fromBase64(profile.privateKey)).to.have.length(32);
     if(!this.profile || this.profile.privateKey !== profile.privateKey) {
-        this._setupTransportManager();
+        this._setupTransportManager(profile);
     };
     this.profile = profile;
 };
@@ -332,7 +326,7 @@ Messaging.prototype._publishConnectionInfo = function() {
 };
 
 
-Messaging.prototype._setupTransportManager = function() {
+Messaging.prototype._setupTransportManager = function(profile) {
     var messaging = this;
     if(this.transportManager) {
         this.transportAvailable = false;
@@ -345,7 +339,7 @@ Messaging.prototype._setupTransportManager = function() {
         expect(messaging.transportAvailable).to.be.false;
         messaging.connectionInfo = connectionInfo;
         messaging.transportAvailable = true;
-        messaging.publishConnectionInfo();
+        messaging._publishConnectionInfo();
     });
     this.transportManager.on("disable", function() {
         expect(messaging.transportAvailable).to.be.true;
@@ -372,9 +366,11 @@ Messaging.prototype._setupTransportManager = function() {
     this.transportManager.on("message", function(publicKey, message) {
         expect(publicKey).to.be.a("string");
         expect(curve.fromBase64(publicKey)).to.have.length(32);
-        console.log("message received");
-        console.log(message);
+        message = JSON.parse(message);
         var scope = messaging._getScope(publicKey);
+        console.log("message received");
+        console.log(scope + "." + message.topic);
+        console.log(message);
         messaging.emit(scope + "." + message.topic, publicKey, message.data);
     });
 };
@@ -419,12 +415,10 @@ Messaging.prototype.setDevices = function(devices) {
  */
 Messaging.prototype.send = function(topic, publicKey, data, options) {
     expect(publicKey).to.be.a("string");
-    expect(curve.fromBase64(publicKey).length === 32 || publicKey === "local").to.be.true;
+    expect(publicKey === "local" || curve.fromBase64(publicKey).length === 32).to.be.true;
     expect(topic).to.be.a("string");
     expect(data).to.be.an("object");
-    //TODO: restriction to be removed once we have reliable transport
-    expect(JSON.stringify(data)).to.have.length.below(1200);
-    expect(options).to.be.an("object");
+    if(options) { expect(options).to.be.an("object"); } else { options = {} };
     if(options.realtime) { expect(options.realtime).to.be.a("boolean"); };
     if(options.expireAfter) { expect(options.expireAfter).to.be.a("number"); };
     var message = {
@@ -436,6 +430,7 @@ Messaging.prototype.send = function(topic, publicKey, data, options) {
     };
     if(this._isLocal(publicKey)) {
         this.emit("self." + topic, publicKey, data);
+        return;
     };
     if(!this.sendQueues[publicKey]) {
         this.sendQueues[publicKey] = {};
@@ -527,7 +522,10 @@ Messaging.prototype._flushQueue = function(publicKey) {
     expect(this.transportAvailable).to.be.true;
     _.forEach(this.sendQueues[publicKey], function(message) {
         if(Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
-            this.transportManager.send(message);
+            console.log("send messsage");
+            console.log(message.topic);
+            console.log(message);
+            this.transportManager.send(publicKey, JSON.stringify(message));
         };
     }, this);
     delete this.sendQueues[publicKey];

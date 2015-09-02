@@ -1,3 +1,5 @@
 module.exports = {
-    Authentication: require("./authentication.js"),
+    Devices: require("./devices.js"),
+    Profile: require("./profile.js"),
+    Contacts: require("./contacts.js")
 };

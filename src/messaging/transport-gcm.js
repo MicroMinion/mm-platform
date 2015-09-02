@@ -113,9 +113,6 @@ GCMTransport.prototype.connectStream = function(stream) {
     stream.on("data", function(data) {
         var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
         var publicKey = curve.toBase64(publicKey)
-        data = JSON.parse(data);
-        expect(data.source).to.equal(publicKey);
-        expect(data.destination).to.equal(gcm.publicKey);
         gcm.emit("message", publicKey, data);
     });
 };
@@ -146,19 +143,15 @@ GCMTransport.prototype._end = function(destination) {
     this.emit("connectionStopped", publicKey);
 };
 
-GCMTransport.prototype.send = function(message) {
+GCMTransport.prototype.send = function(publicKey, message) {
     expect(message).to.exist;
-    expect(message).to.be.an("object");
-    expect(message.destination).to.be.a("string");
-    expect(curve.fromBase64(message.destination)).to.have.length(32);
-    expect(message.source).to.be.a("string");
-    expect(message.source).to.be.equal(this.publicKey);
-    expect(this.directoryCache[message.destination]).to.exist;
-    expect(this.directoryCache[message.destination]).to.be.a("string");
-    expect(this.connections[this.directoryCache[message.destination]]).to.exist;
-    expect(this.connections[this.directoryCache[message.destination]]).to.be.an.instanceof(curve.CurveCPStream);
-    console.log("SEND " + JSON.stringify(message));
-    this.connections[this.directoryCache[message.destination]].write(JSON.stringify(message));
+    expect(publicKey).to.be.a("string");
+    expect(curve.fromBase64(publicKey)).to.have.length(32);
+    expect(this.directoryCache[publicKey]).to.exist;
+    expect(this.directoryCache[publicKey]).to.be.a("string");
+    expect(this.connections[this.directoryCache[publicKey]]).to.exist;
+    expect(this.connections[this.directoryCache[publicKey]]).to.be.an.instanceof(curve.CurveCPStream);
+    this.connections[this.directoryCache[publicKey]].write(message);
 };
 
 GCMTransport.prototype.onMessage = function(message) {
@@ -166,8 +159,6 @@ GCMTransport.prototype.onMessage = function(message) {
     expect(this.connections).to.be.an("object");
     expect(this.registrationId).to.be.a("string");
     if(message.data.type === "MESSAGE") {
-        expect(message.data.source).to.be.a("string");
-        expect(message.data.destination).to.be.a("string");
         expect(message.data.data).to.be.a("string");
         if(message.data.destination !== this.registrationId) {
             console.log("message received which does not have our registrationId as destination");
