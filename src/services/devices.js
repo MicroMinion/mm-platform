@@ -26,7 +26,6 @@ var Devices = function(messaging) {
     });
     this.on("updateVerificationState", function(publicKey) {
         devices._updateVerificationState(devices.devices[publicKey]);
-        devices._saveDevices();
     });
 };
 
@@ -42,7 +41,7 @@ Devices.prototype._loadDevices = function() {
             _.forEach(devices.devices, function(device, publicKey) {
                 if(device.verificationState < verificationState.CONFIRMED) {
                     this._createProtocol(publicKey);
-                    this.startVerification(publicKey);
+                    this.startVerification("self.devices.startVerification", "local", {publicKey: publicKey});
                 };
             }, devices);
             devices.messaging.send("devices.update", "local", devices.devices);
