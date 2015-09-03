@@ -164,7 +164,7 @@ Profile.prototype.setDeviceName = function() {
         if(!_.isUndefined(window.cordova) && !_.isUndefined(window.device)) {
             this.profile.info.device = device.platform + " " + device.version + " on " + device.model;
             this.update(true);
-        } else if(!_.isUndefined(window.navigator.userAgent)) {
+        } else if(!_.isUndefined(window.navigator) && !_.isUndefined(window.navigator.userAgent)) {
             var agent = useragent.parse(window.navigator.userAgent);
             this.profile.info.device = agent.os.toString().replace(" 0.0.0","");
             if(agent.device.toString() !== "Other 0.0.0") {

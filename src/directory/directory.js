@@ -1,6 +1,9 @@
 var _ = require("lodash");
 var rateLimit = require("rate-limit");
-var gcm = require("./gcm.js");
+
+if(typeof chrome !== "undefined" && typeof chrome.gcm !== "undefined") {
+    var gcm = require("./gcm.js");
+};
 
 /*
  * Thoughts on implementation:
@@ -37,7 +40,9 @@ instances.local.on("error", function(err) {
 */
 
 var put = function(key, value, options) {
-    return gcm.put(key, value, options);
+    if(typeof gcm !== "undefined") {
+        return gcm.put(key, value, options);
+    };
 
     /*
     if(instances.local) {
@@ -58,7 +63,9 @@ var put = function(key, value, options) {
 };
 
 var get = function(key, options) {
-    return gcm.get(key, options);
+    if(typeof gcm !== "undefined") {
+        return gcm.get(key, options);
+    };
 };
 
 

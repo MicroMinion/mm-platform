@@ -2,7 +2,6 @@
 
 var Log;
 
-var debug = require("debug")("mmds:db");
 var uuid = require("node-uuid");
 var _ = require("lodash");
 var EventEmitter = require("events").EventEmitter;

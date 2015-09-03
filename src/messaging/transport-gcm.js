@@ -20,12 +20,14 @@ function GCMTransport(publicKey, privateKey) {
     this.connections = {};
 
     var gcm = this;
-
-    chrome.gcm.onMessage.addListener(gcm.onMessage.bind(gcm));
-    chrome.gcm.onMessagesDeleted.addListener(gcm.onMessagesDeleted.bind(gcm));
-    chrome.gcm.onSendError.addListener(gcm.onSendError.bind(gcm));
-
-    this.enable();
+    if(typeof chrome !== "undefined" && typeof chrome.gcm !== "undefined") {
+        chrome.gcm.onMessage.addListener(gcm.onMessage.bind(gcm));
+        chrome.gcm.onMessagesDeleted.addListener(gcm.onMessagesDeleted.bind(gcm));
+        chrome.gcm.onSendError.addListener(gcm.onSendError.bind(gcm));
+        this.enable();
+    } else {
+        this.disable();
+    };
 };
 
 
@@ -190,14 +192,16 @@ GCMTransport.prototype.onMessage = function(message) {
         };
     } else if(message.data.type === "MESSAGE_DELIVERED") {
     } else if(message.data.type === "MESSAGE_NOT_DELIVERED") {
-        //if(message.data.source !== this.registrationId) {
-        //    console.log("message received that was not for us");
-        //} else {
-        //    if(this.connections[message.data.destination]) {
-        //        expect(this.connections[message.data.destination]).to.be.an.instanceof(curve.CurveCPStream);
-        //        this.connections[message.data.destination].stream.error("Could not deliver message");
-        //    };
-        //};
+        /*
+        if(message.data.source !== this.registrationId) {
+            console.log("message received that was not for us");
+        } else {
+            if(this.connections[message.data.destination]) {
+                expect(this.connections[message.data.destination]).to.be.an.instanceof(curve.CurveCPStream);
+                this.connections[message.data.destination].stream.error("Could not deliver message");
+            };
+        };
+        */
     } else if(message.data.type === "GET_REPLY") {
     } else {
         console.log("GCM: Unknown message type received");
@@ -219,7 +223,6 @@ GCMTransport.prototype.onSendError = function(error) {
 GCMTransport.prototype.disable = function() {
     this.registrationId = undefined;
     this.emit("disable");
-    this.backoff.backoff();
 };
 
 var GCMStream = function(opts) {
