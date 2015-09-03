@@ -51,7 +51,7 @@ Devices.prototype._loadDevices = function() {
     var options = {
         success: function(value) {
             devices.devices = value;
-            devices.syncEngine.collection = value;
+            devices.syncEngine.setCollection(value);
             _.forEach(devices.devices, function(device, publicKey) {
                 if(device.verificationState < verificationState.CONFIRMED) {
                     this._createProtocol(publicKey);

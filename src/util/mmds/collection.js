@@ -22,6 +22,10 @@ Log = function(name, idAttribute, collection) {
 inherits(Log, EventEmitter);
 
 
+Log.prototype.setCollection = function(collection) {
+    this.collection = collection;
+};
+
 Log.prototype._loadLog = function() {
     var log = this;
     var options = {

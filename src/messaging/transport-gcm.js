@@ -190,16 +190,14 @@ GCMTransport.prototype.onMessage = function(message) {
         };
     } else if(message.data.type === "MESSAGE_DELIVERED") {
     } else if(message.data.type === "MESSAGE_NOT_DELIVERED") {
-        expect(message.data.source).to.be.a("string");
-        expect(message.data.destination).to.be.a("string");
-        if(message.data.source !== this.registrationId) {
-            console.log("message received that was not for us");
-        } else {
-            if(this.connections[message.data.destination]) {
-                expect(this.connections[message.data.destination]).to.be.an.instanceof(curve.CurveCPStream);
-                this.connections[message.data.destination].stream.error("Could not deliver message");
-            };
-        };
+        //if(message.data.source !== this.registrationId) {
+        //    console.log("message received that was not for us");
+        //} else {
+        //    if(this.connections[message.data.destination]) {
+        //        expect(this.connections[message.data.destination]).to.be.an.instanceof(curve.CurveCPStream);
+        //        this.connections[message.data.destination].stream.error("Could not deliver message");
+        //    };
+        //};
     } else if(message.data.type === "GET_REPLY") {
     } else {
         console.log("GCM: Unknown message type received");

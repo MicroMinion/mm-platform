@@ -5,8 +5,6 @@ var _ = require("lodash");
 
 var SYNC_INTERVAL = 30000;
 
-//TODO: Use options available for message sending (expireAfter, realtime)
-
 function SyncStream(publicKey, service, log, messaging) {
     events.EventEmitter.call(this);
     this.publicKey = publicKey;
@@ -32,14 +30,14 @@ SyncStream.prototype.stop = function() {
 /* LAST SEQUENCE REQUEST */
 
 SyncStream.prototype.send_last_sequence_request = function() {
-    this.messaging.send(this.service + ".last_sequence_request", this.publicKey, {});
+    this.messaging.send(this.service + ".last_sequence_request", this.publicKey, {}, {expireAfter: 15000, realtime: false});
 };
 
 SyncStream.prototype.on_last_sequence_request = function(message) {
     var data = {
         "lastSequence": this.log.getLastSequence()
     };
-    this.messaging.send(this.service + ".last_sequence", this.publicKey, data);
+    this.messaging.send(this.service + ".last_sequence", this.publicKey, data, {expireAfter: 15000, realtime: false});
 };
 
 /* LAST SEQUENCE */
@@ -70,7 +68,7 @@ SyncStream.prototype.sendEventRequests = function(startSequence) {
 };
 
 SyncStream.prototype.send_event_request = function(sequences) {
-    this.messaging.send(this.service + ".event_request", this.publicKey, {sequences: sequences});
+    this.messaging.send(this.service + ".event_request", this.publicKey, {sequences: sequences}, {expireAfter: 15000, realtime: true});
 };
 
 SyncStream.prototype.on_event_request = function(receivedData) {
@@ -78,13 +76,13 @@ SyncStream.prototype.on_event_request = function(receivedData) {
     for (var i = 0; i < receivedData.sequences.length; i++) {
         data.push(this.log.getEvent(receivedData.sequences[i]));
     };
-    this.messaging.send(this.service + ".events", this.publicKey, data);
+    this.messaging.send(this.service + ".events", this.publicKey, data, {expireAfter: 15000, realtime: true});
 };
 
 /* EVENTS */
 
 SyncStream.prototype.sendEvent = function(event) {
-    this.messaging.send(this.service + ".events", this.publicKey, [event]);
+    this.messaging.send(this.service + ".events", this.publicKey, [event], {expireAfter: 15000, realtime: true});
 };
 
 

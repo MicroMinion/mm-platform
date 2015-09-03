@@ -56,6 +56,11 @@ var SyncEngine = function(messaging, service, idAttribute, collection) {
 
 inherits(SyncEngine, events.EventEmitter);
 
+SyncEngine.prototype.setCollection = function(collection) {
+    this.collection  = collection;
+    this.log.setCollection(collection);
+};
+
 /* MESSAGE HANDLERS */
 
 SyncEngine.prototype.updateDevices = function(topic, publicKey, data) {

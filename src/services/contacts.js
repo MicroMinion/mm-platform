@@ -74,7 +74,7 @@ Contacts.prototype.loadContacts = function() {
     var options = {
         success: function(value) {
             contacts.contacts = value;
-            contacts.syncEngine.collection = value;
+            contacts.syncEngine.setCollection(value);
             _.forEach(contacts.contacts, function(contact, uuid) {
                 if(contact.verificationState < verificationState.CONFIRMED && contact.verificationState >= verificationState.PENDING) {
                     _.forEach(contact.keys, function(keyData, publicKey) {
