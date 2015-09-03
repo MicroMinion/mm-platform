@@ -417,7 +417,6 @@ Messaging.prototype.send = function(topic, publicKey, data, options) {
     expect(publicKey).to.be.a("string");
     expect(publicKey === "local" || curve.fromBase64(publicKey).length === 32).to.be.true;
     expect(topic).to.be.a("string");
-    expect(data).to.be.an("object");
     if(options) { expect(options).to.be.an("object"); } else { options = {} };
     if(options.realtime) { expect(options.realtime).to.be.a("boolean"); };
     if(options.expireAfter) { expect(options.expireAfter).to.be.a("number"); };

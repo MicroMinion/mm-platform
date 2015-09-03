@@ -1,64 +1,77 @@
 "use strict";
 
-var Collection;
+var Log;
 
 var debug = require("debug")("mmds:db");
 var uuid = require("node-uuid");
 var _ = require("lodash");
 var EventEmitter = require("events").EventEmitter;
 var inherits = require("inherits");
+var storagejs = require("storagejs");
 
-Collection = function(opts) {
-    if (!opts) {
-        opts = {};
-    };
-    EventEmitter.call(this, opts);
+Log = function(name, idAttribute, collection) {
+    EventEmitter.call(this);
     this.events = {};
-    this.documents = {};
-    var collection = this;
-    this.resourceName = opts.resource;
+    this.name = name + "-log";
+    this.idAttribute = idAttribute;
+    this.collection = collection;
+    this._loadLog();
 };
 
-inherits(Collection, EventEmitter);
 
-Collection.prototype.uuid = uuid.v4;
+inherits(Log, EventEmitter);
 
-Collection.prototype.add = function(dictionary) {
-    debug("add model to collection: %s", JSON.stringify(dictionary));
-    if (!_.has(dictionary, "uuid")) {
-        dictionary.uuid = uuid.v4();
+
+Log.prototype._loadLog = function() {
+    var log = this;
+    var options = {
+        success: function(value) {
+            log.events = value;
+        }
     };
-    if (!_.has(dictionary, "lastModified")) {
-        dictionary.lastModified = new Date().toJSON();
+    storagejs.get(log.name, options);
+};
+
+/* LOCAL LOG MODIFICATION */
+
+Log.prototype.add = function(id) {
+    if(!_.has(this.collection[id][this.idAttribute])) {
+        this.collection[id][this.idAttribute] = id;
     };
-    this.documents[dictionary.uuid] = dictionary;
-    this.createNewEvent("create", this.documents[dictionary.uuid]);
-    return dictionary.uuid;
+    this.collection[id].lastModified = new Date().toJSON();
+    this._createNewEvent("add", this.collection[id]);
 };
 
-Collection.prototype.delete = function(uuid) {
-    debug("remove model from collection %s", uuid);
-    delete this.documents[uuid];
-    this.createNewEvent("delete", {uuid:
-        uuid,
-        lastModified: new Date().toJSON()
-    });
+Log.prototype.remove = function(id) {
+    var data = {};
+    data[this.idAttribute] = id;
+    data.lastModified = new Date().toJSON();
+    this._createNewEvent("remove", data);
 };
 
-Collection.prototype.update = function(uuid, changedAttributes) {
-    debug("change model in collection: %s", JSON.stringify(changedAttributes));
-    this.documents[uuid].lastModified = new Date().toJSON();
-    _.forEach(changedAttributes, function(value, key) {
-            this.documents[uuid][key] = value;        
-    }, this);
-    this.createNewEvent("change", this.documents[uuid]);
+Log.prototype.update = function(id) {
+    if(!_.has(this.collection[id][this.idAttribute])) {
+        this.collection[id][this.idAttribute] = id;
+    };
+    this.collection[id].lastModified = new Date().toJSON();
+    this._createNewEvent("update", this.collection[id]);
 };
 
-Collection.prototype.getAll = function() {
-    return _.values(this.documents);
+Log.prototype._createNewEvent = function(action, document) {
+    var sequence = this.getLastSequence() + 1;
+    var event = {};
+    event.action = action;
+    event.sequence = sequence;
+    event[this.idAttribute] = document[this.idAttribute];
+    event.document = JSON.parse(JSON.stringify(document));
+    this.events[event[this.idAttribute]] = event;
+    storagejs.put(this.name, this.events);
+    this.emit("newEvent", event);
 };
 
-Collection.prototype.getLastSequence = function() {
+/* HELPER METHODS FOR SYNC STREAMS */
+
+Log.prototype.getLastSequence = function() {
     var lastSequence = _.max(this.events, function(event) {
         return event.sequence;
     });
@@ -70,57 +83,37 @@ Collection.prototype.getLastSequence = function() {
     return lastSequence;
 };
 
-Collection.prototype.getEvent = function(sequence) {
-    debug("lookup event sequence in log %s", sequence);
+
+Log.prototype.getEvent = function(sequence) {
     var result = _.find(this.events, function(event) {
         return event.sequence === sequence;
     }, this);
     if (result === undefined) {
-        result[0] = {
-            action: "change",
+        result = {
+            action: "update",
             sequence: sequence,
             document: {}
         };
     };
-    return result[0];
+    return result;
 };
 
-Collection.prototype.processEvent = function(event) {
-    debug("process incoming event %s", JSON.stringify(event));
+Log.prototype.processEvent = function(event) {
     var document = event.document;
     var lastModified = event.document.lastModified;
-    var lastEvent = this.getLastEvent(document.uuid);
+    var lastEvent = this.getLastEvent(document[this.idAttribute]);
     var lastModifiedInCollection = new Date("1900/01/01").toJSON();
     if (lastEvent !== null && lastEvent !== undefined) {
         lastModifiedInCollection = lastEvent.document.lastModified;
     };
     if (lastModified > lastModifiedInCollection) {
-        if (event.action === "delete") {
-            delete this.documents[document.uuid];
-            this.createNewEvent("delete", document);
-        } else {
-            this.documents[document.uuid] = document;
-            this.createNewEvent(event.action, document);
-        }
+        this.emit("processEvent", event.action, document);
+        this._createNewEvent(event.action, document);
     }
-
 };
 
-Collection.prototype.getLastEvent = function(uuid) {
-    debug("lookup last event for doc %s", uuid);
-    return this.events[uuid];
+Log.prototype.getLastEvent = function(id) {
+    return this.events[id];
 };
 
-Collection.prototype.createNewEvent = function(action, document) {
-    debug("create new %s event for %s", action, JSON.stringify(document));
-    var sequence = this.getLastSequence() + 1;
-    var event = {};
-    event.action = action;
-    event.sequence = sequence;
-    event.uuid = document.uuid;
-    event.document = JSON.parse(JSON.stringify(document));
-    this.events[event.uuid] = event;
-    this.emit("newEvent", event);
-};
-
-module.exports = Collection;
+module.exports = Log;

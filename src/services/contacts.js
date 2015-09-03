@@ -7,6 +7,7 @@ var AuthenticationManager = require("../util/authentication.js");
 var verificationState = require("../constants/verificationState.js");
 var directory = require("../directory/directory.js");
 var node_uuid = require("node-uuid");
+var SyncEngine = require("../util/mmds/index.js");
 
 CONTACT_LOOKUP_INTERVAL = 1000 * 60;
 
@@ -51,6 +52,17 @@ var Contacts = function(messaging) {
             }, contacts)
         });
     }, CONTACT_LOOKUP_INTERVAL);
+    this.syncEngine = new SyncEngine(messaging, "contacts", "uuid", this.contacts);
+    this.syncEngine.on("processEvent", function(action, document) {
+        if(action === "update") {
+           contacts.contacts[document.uuid] = document; 
+        } else if(action === "add") {
+           contacts.contacts[document.uuid] = document;
+        } else if(action === "remove") {
+            delete contact.contacts[document.uuid];
+        };
+        contacts.update();
+    });
 };
 
 inherits(Contacts, AuthenticationManager);
@@ -62,6 +74,7 @@ Contacts.prototype.loadContacts = function() {
     var options = {
         success: function(value) {
             contacts.contacts = value;
+            contacts.syncEngine.collection = value;
             _.forEach(contacts.contacts, function(contact, uuid) {
                 if(contact.verificationState < verificationState.CONFIRMED && contact.verificationState >= verificationState.PENDING) {
                     _.forEach(contact.keys, function(keyData, publicKey) {
@@ -95,8 +108,10 @@ Contacts.prototype.updateInfo = function(topic, publicKey, data) {
         this.contacts[data.uuid] = {};
         this.contacts[data.uuid].uuid = data.uuid;
         this.contacts[data.uuid].info = data.info;
+        this.syncEngine.add(data.uuid);
     } else {
         this.contacts[data.uuid].info = data.info;    
+        this.syncEngine.update(data.uuid);
     };
     this.update();
     this.searchKeys(data.uuid);
@@ -113,6 +128,7 @@ Contacts.prototype.addKey = function(topic, local, data) {
         contact.keys[data.publicKey].publicKey = data.publicKey;
         this.updateVerificationState(data.publicKey);
         this.update();
+        this.syncEngine.update(data.uuid);
     };
 };
 
@@ -128,6 +144,7 @@ Contacts.prototype.startVerification = function(topic, publicKey, data) {
         this.createProtocol(key, contact);
         this.ongoingVerifications[key].start();
     }, this);
+    this.syncEngine.update(data.uuid);
     this.update();
 };
 
@@ -142,6 +159,7 @@ Contacts.prototype.enterCode = function(topic, local, data) {
             this.ongoingVerifications[publicKey].setCode();
         };
     }, this);
+    this.syncEngine.update(data.uuid);
     this.update();
 };
 
@@ -196,35 +214,51 @@ Contacts.prototype.ourCodeUpdate = function(publicKey) {
     _.forEach(contact.keys, function(value, publicKey) {
       value.ourCode = contact.ourCode;
     });
+    this.syncEngine.update(contact.uuid);
     this.update();
 };
 
 Contacts.prototype.updateVerificationStateKey = function(contact, publicKey) {
+    var modified = false;
     var state = contact.keys[publicKey];
     if(state.verificationState < verificationState.PENDING && state.verification && (state.verification.initiateSend || state.verificationState.initiateReceived)) {
+        modified = true;
         state.verificationState = verificationState.PENDING;
     };
     if(state.verificationState < verificationState.VERIFIED && state.verification && state.verification.codeReceived) {
+        modified = true;
         state.verificationState = verificationState.VERIFIED;
     };
     if(state.verificationState < verificationState.CONFIRMED && state.verification && state.verification.confirmationSend && state.verification.confirmationReceived) {
+        modified = true;
         state.verificationState = verificationState.CONFIRMED;
+    };
+    if(modified) {
+        this.syncEngine.update(contact.uuid);
     };
 };
 
 Contacts.prototype.updateVerificationStateContact = function(contact, publicKey) {
+    var modified = false;
     var state = contact.keys[publicKey];
     if(contact.verificationState < verificationState.NOT_VERIFIED) {
+        modified = true;
         contact.verificationState = verificationState.NOT_VERIFIED;
     };
     if(contact.verificationState < verificationState.PENDING && state.verification && (state.verification.initiateSend || state.verificationState.initiateReceived)) {
+        modified = true;
         contact.verificationState = verificationState.PENDING;
     };
     if(contact.verificationState < verificationState.VERIFIED && state.verification && state.verification.codeReceived) {
+        modified = true;
         contact.verificationState = verificationState.VERIFIED;
     };
     if(contact.verificationState < verificationState.CONFIRMED && (state.verificationState === verificationState.CONFIRMED)) {
+        modified = true;
         contact.verificationState = verificationState.CONFIRMED;
+    };
+    if(modified) {
+        this.syncEngine.update(contact.uuid);
     };
 };
 

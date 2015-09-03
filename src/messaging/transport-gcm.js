@@ -96,7 +96,7 @@ GCMTransport.prototype.connectStream = function(stream) {
     var gcm = this;
     stream.on("error", function(error) {
         console.log("GCMTransport: stream error");
-        console.log(error);
+        //console.log(error);
     });
     stream.on("end", function() {
         console.log("GCMTransport: end stream event");
@@ -130,17 +130,24 @@ GCMTransport.prototype.disconnect = function(publicKey) {
 
 GCMTransport.prototype._end = function(destination) {
     expect(destination).to.be.a("string");
-    expect(this.connections[destination]).to.exist;
-    expect(this.connections[destination]).to.be.an.instanceof(curve.CurveCPStream);
+    //expect(this.connections[destination]).to.exist;
+    //expect(this.connections[destination]).to.be.an.instanceof(curve.CurveCPStream);
     var stream = this.connections[destination];
-    var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
-    publicKey = curve.toBase64(publicKey);
-    stream.removeAllListeners("end");
-    stream.removeAllListeners("drain");
-    stream.removeAllListeners("data");
-    stream.removeAllListeners("error");
-    delete this.connections[destination];
-    this.emit("connectionStopped", publicKey);
+    if(stream) {
+        stream.removeAllListeners("end");
+        stream.removeAllListeners("drain");
+        stream.removeAllListeners("data");
+        stream.removeAllListeners("error");
+        delete this.connections[destination];
+    };
+    if(stream) {
+        var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey;
+        if(publicKey) {
+            //TODO: Fix since we need to emit connectionStopped
+            publicKey = curve.toBase64(publicKey);
+            this.emit("connectionStopped", publicKey);
+        };
+    };
 };
 
 GCMTransport.prototype.send = function(publicKey, message) {

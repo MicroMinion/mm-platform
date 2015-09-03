@@ -7,6 +7,7 @@ var curve = require("curve-protocol");
 var useragent = require("useragent");
 var qrImage = require("qr-image");
 var directory = require("../directory/directory.js");
+var SyncEngine = require("../util/mmds/index.js");
 
 var PUBLISH_INTERVAL = 1000 * 60 * 5;
 
@@ -25,6 +26,17 @@ var Profile = function(messaging) {
             authenticated: false,
     };
     this.loadProfile();
+    this.collection = {};
+    this.collection["profile"] = this.profile.info; 
+    this.syncEngine = new SyncEngine(messaging, "profile", "id", this.collection);
+    this.syncEngine.on("processEvent", function(action, document) {
+        if(action === "update") {
+            profile.collection["profile"] = document;
+            profile.profile.info.name = document.name;
+            profile.profile.info.accounts = document.accounts;
+            profile.update(true);
+        };
+    });
     this.messaging.on("self.profile.newCodeNeeded", function(topic, publicKey, data) {
         profile.setCode();
     });
@@ -33,6 +45,9 @@ var Profile = function(messaging) {
     });
     this.messaging.on("self.profile.updateInfo", function(topic, publicKey, data) {
         profile.profile.info = data.info;
+        profile.collection["profile"].name = data.info.name;
+        profile.collection["profile"].accounts = data.info.accounts;
+        profile.syncEngine.update("profile");
         profile.updateAuthenticationState();
         profile.update(true);
     });
@@ -69,6 +84,8 @@ Profile.prototype.loadProfile = function() {
     var options = {
         success: function(state) {
             profile.profile = state;
+            profile.collection["profile"].name = state.info.name;
+            profile.collection["profile"].accounts = state.info.accounts;
             profile.setDefaults();
             profile.update(false);
             profile.messaging.send("profile.ready", "local", {});

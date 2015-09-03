@@ -5,6 +5,7 @@ var extend = require("extend.js");
 var chai = require("chai");
 var AuthenticationManager = require("../util/authentication.js");
 var verificationState = require("../constants/verificationState.js");
+var SyncEngine = require("../util/mmds/index.js");
 
 var expect = chai.expect;
 
@@ -27,6 +28,18 @@ var Devices = function(messaging) {
     this.on("updateVerificationState", function(publicKey) {
         devices._updateVerificationState(devices.devices[publicKey]);
     });
+    this.messaging.on("self.devices.updateRequest", function(topic, publicKey, data) {
+        devices.update(false);
+    });
+    this.syncEngine = new SyncEngine(messaging, "devices", "publicKey", this.devices);
+    this.syncEngine.on("processEvent", function(action, document) {
+        if(action === "remove") {
+            delete devices.devices[document.publicKey];      
+        } else {
+            devices.devices[document.publicKey] = document;
+        };
+        devices.update(true);
+    });
 };
 
 inherits(Devices, AuthenticationManager);
@@ -38,21 +51,24 @@ Devices.prototype._loadDevices = function() {
     var options = {
         success: function(value) {
             devices.devices = value;
+            devices.syncEngine.collection = value;
             _.forEach(devices.devices, function(device, publicKey) {
                 if(device.verificationState < verificationState.CONFIRMED) {
                     this._createProtocol(publicKey);
                     this.startVerification("self.devices.startVerification", "local", {publicKey: publicKey});
                 };
             }, devices);
-            devices.messaging.send("devices.update", "local", devices.devices);
+            devices.update(false);
         }
     };
     storagejs.get("devices", options);
 };
 
-Devices.prototype.update = function() {
+Devices.prototype.update = function(store) {
     this.messaging.send("devices.update", "local", this.devices);
-    storagejs.put("devices", this.devices);
+    if(store) {
+        storagejs.put("devices", this.devices);
+    };
 };
 
 /* MESSAGE HANDLERS */
@@ -65,15 +81,22 @@ Devices.prototype.setProfile = function(topic, publicKey, data) {
 };
 
 Devices.prototype.add = function(topic, publicKey, data) {
-   if(!_.has(this.devices, data.publicKey)) {
+    var add = false;
+    if(!_.has(this.devices, data.publicKey)) {
         this.devices[data.publicKey] = {};
+        add = true;
     };
     this.devices[data.publicKey].info = data.info;
     this.devices[data.publicKey].publicKey = data.publicKey;
     if(!_.has(this.devices[data.publicKey], "verificationState")) {
         this.devices[data.publicKey].verificationState = verificationState.PENDING_VERIFICATION;
     };
-    this.update();
+    if(add) {
+        this.syncEngine.add(data.publicKey);
+    } else {
+        this.syncEngine.update(data.publicKey);
+    };
+    this.update(true);
 };
 
 
@@ -84,6 +107,7 @@ Devices.prototype.setCode = function(topic, publicKey, data) {
     device.codeType = data.codeType;
     //CHECK: TODO
     this.ongoingVerifications[data.publicKey].setCode();
+    this.syncEngine.update(data.publicKey);
 };
 
 
@@ -101,14 +125,19 @@ Devices.prototype._createProtocol = function(publicKey) {
 };
 
 Devices.prototype._updateVerificationState = function(device) {
+    var update = false;
     var state = device.verificationState;
     if(state < verificationState.VERIFIED && device.verification && device.verification.codeReceived) {
         device.verificationState = verificationState.VERIFIED;
-        this.update();
+        update =  true;
     };
     if(state < verificationState.CONFIRMED && device.verification && device.verification.confirmationSend && device.verification.confirmationReceived) {
         device.verificationState = verificationState.CONFIRMED;
-        this.update();
+        update = true;
+    };
+    if(update) {
+        this.syncEngine.update(device.publicKey);
+        this.update(true);
     };
 };
 
