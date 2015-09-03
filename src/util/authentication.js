@@ -159,9 +159,14 @@ PublicKeyVerificationProtocol.prototype.sendCode = function() {
         realtime: true,
         expireAfter: 1000 * 60
     };
+    var noCodeRequired = false;
+    if(this.state.codeType === "qr") {
+        noCodeRequired = true;
+    };
     var data = {
         codeType: this.state.codeType,
-        code: this.state.code
+        code: this.state.code,
+        noCodeRequired: noCodeRequired
     };
     this.messaging.send(this.name + ".code", this.publicKey, data, options);
     this.set("codeSend");
@@ -180,6 +185,10 @@ PublicKeyVerificationProtocol.prototype.onCode = function(data) {
             if(!codeValid) {
                 this.generateOurCode();
             };
+        } else if(data.codeType === "none") {
+            if(this.state.codeType === "qr") {
+                codeValid = true;
+            };
         };
         if(codeValid) {
             this.set("codeReceived");
@@ -187,6 +196,9 @@ PublicKeyVerificationProtocol.prototype.onCode = function(data) {
                 this.sendConfirmation(true);
             } else if(this.state.code) {
                 this.sendCode();
+            } else if(data.noCodeRequired) {
+                this.state.code = "";
+                this.state.codeType ="none";
             };
         };
     };
