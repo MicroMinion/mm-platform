@@ -5,7 +5,6 @@ var extend = require("extend.js");
 var chai = require("chai");
 var AuthenticationManager = require("../util/authentication.js");
 var verificationState = require("../constants/verificationState.js");
-var directory = require("../directory/directory.js");
 var node_uuid = require("node-uuid");
 var SyncEngine = require("../util/mmds/index.js");
 
@@ -23,6 +22,17 @@ var Contacts = function(messaging) {
     messaging.on("self.contacts.addKey", this.addKey.bind(this));
     messaging.on("self.contacts.startVerification", this.startVerification.bind(this));
     messaging.on("self.contacts.enterCode", this.enterCode.bind(this));
+    messaging.on("self.directory.getReply", function(topic, publicKey, data) {
+        var contact = _.find(contacts.contacts, function(contact) {
+            return _.any(contact.accounts, function(account) {
+                var key = account.type + ":" + account.id;
+                return key === data.key;
+            });
+        });
+        if(contact) {
+            contacs.addKey("self.contacts.addKey", "local", {uuid: contact.uuid, publicKey: data.value});
+        };
+    });
     this.on("newInstance", function(publicKey, data) {
         var contact = contacts.getContact(publicKey);
         var uuid;
@@ -174,13 +184,7 @@ Contacts.prototype.searchKeys = function(uuid) {
 
 Contacts.prototype.searchKey = function(uuid, account) {
     var key = account.type + ":" + account.id;
-    var contacts = this;
-    var options = {
-        success: function(key, value) {
-            contacts.addKey("self.contacts.addKey", "local", {uuid: uuid, publicKey: value});
-        }
-    };
-    directory.get(key, options);
+    this.messaging.send("directory.get", "local", {key: key});
 },
 
 /* AUTHENTICATION HELPER METHODS */

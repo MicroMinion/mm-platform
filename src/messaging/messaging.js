@@ -2,7 +2,6 @@ var uuid = require("node-uuid");
 var _ = require("lodash");
 var EventEmitter = require("ak-eventemitter");
 var inherits = require("inherits");
-var directory = require("../directory/directory.js");
 var chai = require("chai");
 var curve = require("curve-protocol");
 var TransportManager = require("./transport-gcm.js");
@@ -109,21 +108,8 @@ var Messaging = function() {
      * @type {Object.<string, Object>}
      */
     this.directoryCache = {};
-    var options = {
-        success: function(value) {
-            expect(value).to.be.an("object");
-            _.forEach(value, function(n, key) {
-                if(!_.has(messaging.directoryCache, key)) {
-                    messaging.directoryCache[key] = n;
-                };
-            });
-        },
-        error: function(errorMessage) {
-            console.log("unable to retrieve flunky-messaging-directoryCache");
-            console.log(errorMessage);
-        }
-    };
-    storagejs.get("flunky-messaging-directoryCache", options);
+    this._loadDirectoryCache();
+    this.on("self.directory.getReply", this._processGetReply);
     /**
      * Connection statistics/state for previously used public keys
      * 
@@ -131,25 +117,7 @@ var Messaging = function() {
      * @type {Object.<string, Object>}
      */
     this.connectionStats = {};
-    var options = {
-        success: function(value) {
-            expect(value).to.be.an("object");
-            _.forEach(value, function(n, key) {
-                delete n.connectInProgress;
-                delete n.connected;
-                delete n.lookupInProgress;
-                if(!_.has(messaging.connectionStats, key)) {
-                    messaging.connectionStats[key] = n;
-
-                };
-            });
-        },
-        error: function(errorMessage) {
-            console.log("unable to retrieve flunky-messaging-connectionStats");
-            console.log(errorMessage);
-        }
-    };
-    storagejs.get("flunky-messaging-connectionStats", options);
+    this._loadConnectionStats();
     /**
      * Our own connection information, to be published in directory
      * 
@@ -163,13 +131,6 @@ var Messaging = function() {
         };
     }, PUBLISH_CONNECTION_INFO_INTERVAL);
     /**
-     * Flag to indicate whether any transport for sending messages is available or not
-     * 
-     * @access private
-     * @type {boolean}
-     */
-    this.transportAvailable = false;
-    /**
      * Queue of messages that still need to be send, key is publicKey of destination
      * Per destination, messages are indexed by message id
      * 
@@ -178,6 +139,48 @@ var Messaging = function() {
      */
     this.sendQueues = {};
     this._sendQueuesRetrieved = false;
+    this._loadSendQueues();
+    /**
+     * Flag to indicate whether the transport for sending messages is available or not
+     * 
+     * @access private
+     * @type {boolean}
+     */
+    this.transportAvailable = false;
+    /**
+     * Interface for actually sending/receiving messages. This can be either an aggregator object that dispaches between
+     * different transport mechanisms or one transport mechanism (as long as they use the same interface / generate the same
+     * events
+     * 
+     * @access private
+     * @type {TransportManager}
+     *
+     */
+    this.transportManager = undefined;
+    setInterval(function() {
+        if(messaging.transportAvailable) {
+            _.forEach(_.keys(messaging.sendQueues), function(publicKey) {
+                messaging._trigger(publicKey);
+            });
+        };
+        _.forEach(_.keys(messaging.connectionStats), function(publicKey) {
+            var lastUpdate = messaging.connectionStats[publicKey].lastUpdate;
+            var diff = Math.abs(new Date() - new Date(lastUpdate));
+            if(!messaging.connectionStats[publicKey].lookupInProgress && diff > PUBLISH_CONNECTION_INFO_INTERVAL) {
+                messaging._lookupKey(publicKey);
+            };
+        })
+    }, SEND_INTERVAL);
+};
+
+inherits(Messaging, EventEmitter);
+
+/**
+ * PERSISTENCE
+ */
+
+Messaging.prototype._loadSendQueues = function() {
+    var messaging = this;
     var options = {
         success: function(value) {
             expect(value).to.be.a("string");
@@ -213,7 +216,7 @@ var Messaging = function() {
             });
             parallel(parallelFunctions, function(err, results) {
                 messaging._sendQueuesRetrieved = true;
-                messaging._saveSendQueues(_.keys(this.sendQueues));
+                messaging._saveSendQueues(_.keys(messaging.sendQueues));
             });
         },
         error: function(errorMessage) {
@@ -223,34 +226,7 @@ var Messaging = function() {
         }
     };
     storagejs.get("flunky-messaging-sendQueues", options);
-
-    /**
-     * Interface for actually sending/receiving messages. This can be either an aggregator object that dispaches between
-     * different transport mechanisms or one transport mechanism (as long as they use the same interface / generate the same
-     * events
-     * 
-     * @access private
-     * @type {TransportManager}
-     *
-     */
-    this.transportManager = undefined;
-    setInterval(function() {
-        if(messaging.transportAvailable) {
-            _.forEach(_.keys(messaging.sendQueues), function(publicKey) {
-                messaging._trigger(publicKey);
-            });
-        };
-        _.forEach(_.keys(messaging.connectionStats), function(publicKey) {
-            var lastUpdate = messaging.connectionStats[publicKey].lastUpdate;
-            var diff = Math.abs(new Date() - new Date(lastUpdate));
-            if(!messaging.connectionStats[publicKey].lookupInProgress && diff > PUBLISH_CONNECTION_INFO_INTERVAL) {
-                messaging._lookupKey(publicKey);
-            };
-        })
-    }, SEND_INTERVAL);
 };
-
-inherits(Messaging, EventEmitter);
 
 Messaging.prototype._saveSendQueues = function(publicKeys) {
     expect(publicKeys).to.be.an("array");
@@ -268,6 +244,53 @@ Messaging.prototype._saveSendQueues = function(publicKeys) {
             };
     }, this);
 };
+
+
+Messaging.prototype._loadDirectoryCache = function() {
+    var messaging = this;
+    var options = {
+        success: function(value) {
+            expect(value).to.be.an("object");
+            _.forEach(value, function(n, key) {
+                if(!_.has(messaging.directoryCache, key)) {
+                    messaging.directoryCache[key] = n;
+                };
+            });
+        },
+        error: function(errorMessage) {
+            console.log("unable to retrieve flunky-messaging-directoryCache");
+            console.log(errorMessage);
+        }
+    };
+    storagejs.get("flunky-messaging-directoryCache", options);
+};
+
+Messaging.prototype._loadConnectionStats = function() {
+    var messaging = this;
+    var options = {
+        success: function(value) {
+            expect(value).to.be.an("object");
+            _.forEach(value, function(n, key) {
+                delete n.connectInProgress;
+                delete n.connected;
+                delete n.lookupInProgress;
+                if(!_.has(messaging.connectionStats, key)) {
+                    messaging.connectionStats[key] = n;
+
+                };
+            });
+        },
+        error: function(errorMessage) {
+            console.log("unable to retrieve flunky-messaging-connectionStats");
+            console.log(errorMessage);
+        }
+    };
+    storagejs.get("flunky-messaging-connectionStats", options);
+};
+
+/**
+ * TRANSPORT MANAGER
+ */
 
 /**
  * Manually disable transportManager
@@ -290,41 +313,6 @@ Messaging.prototype.enable = function() {
         this.transportManager.enable();
     };
 };
-
-/**
- * Set profile
- *
- * @param {Object} profile - Profile object of application user. 
- * @param {string} profile.publicKey - Base64 encoded publicKey for use with Nacl libraries
- * @param {String} profile.privateKey - Base64 encoded privateKey for use with Nacl libraries
- * @public
- */
-Messaging.prototype.setProfile = function(profile) {
-    expect(profile).to.exist;
-    expect(profile).to.be.an("object");
-    expect(profile.publicKey).to.be.a("string");
-    expect(profile.privateKey).to.be.a("string");
-    expect(curve.fromBase64(profile.publicKey)).to.have.length(32);
-    expect(curve.fromBase64(profile.privateKey)).to.have.length(32);
-    if(!this.profile || this.profile.privateKey !== profile.privateKey) {
-        this._setupTransportManager(profile);
-    };
-    this.profile = profile;
-};
-
-/**
- * Publish connection info in directory
- *
- * @private
- */
-Messaging.prototype._publishConnectionInfo = function() {
-    //TODO: Implement signature so that we can discard bogus info immediatly from DHT
-    //TODO: Deal with expiration times
-    //TODO: Add random nonce to signature (or do we want increment?) version info ... (timestamp maybe?)
-    //TODO: Also modify retrieve logic (lookupKey) to check for signature
-    directory.put(this.profile.publicKey, JSON.stringify(this.connectionInfo));
-};
-
 
 Messaging.prototype._setupTransportManager = function(profile) {
     var messaging = this;
@@ -376,6 +364,31 @@ Messaging.prototype._setupTransportManager = function(profile) {
 };
 
 /**
+ * PROFILE, CONTACTS, DEVICES
+ */
+
+/**
+ * Set profile
+ *
+ * @param {Object} profile - Profile object of application user. 
+ * @param {string} profile.publicKey - Base64 encoded publicKey for use with Nacl libraries
+ * @param {String} profile.privateKey - Base64 encoded privateKey for use with Nacl libraries
+ * @public
+ */
+Messaging.prototype.setProfile = function(profile) {
+    expect(profile).to.exist;
+    expect(profile).to.be.an("object");
+    expect(profile.publicKey).to.be.a("string");
+    expect(profile.privateKey).to.be.a("string");
+    expect(curve.fromBase64(profile.publicKey)).to.have.length(32);
+    expect(curve.fromBase64(profile.privateKey)).to.have.length(32);
+    if(!this.profile || this.profile.privateKey !== profile.privateKey) {
+        this._setupTransportManager(profile);
+    };
+    this.profile = profile;
+};
+
+/**
  * Set contacts that we consider to be trusted.
  * Messages from these contacts will be triggered in the "Friends" namespace
  *
@@ -396,7 +409,6 @@ Messaging.prototype.setContacts = function(contacts) {
 Messaging.prototype.setDevices = function(devices) {
     this.devices = devices;
 };
-
 
 /**
  * SEND LOGIC
@@ -478,35 +490,6 @@ Messaging.prototype._trigger = function(publicKey) {
     };
 };
 
-/**
- * Lookup connectivity information in directory 
- *
- * @private
- * @param {string} publicKey - publicKey of destination
- */
-Messaging.prototype._lookupKey = function(publicKey) {
-    if(!this.transportAvailable || this.connectionStats[publicKey].lookupInProgress) {
-        return;
-    };
-    this.connectionStats[publicKey].lookupInProgress = true;
-    var messaging = this;
-    var options = {
-        error: function(err) {
-            console.log("lookup error for " + publicKey + ": " + err);
-            messaging.connectionStats[publicKey].lookupInProgress = false;
-        },
-        success: function(key, value) {
-            console.log("lookup success for " + key);
-            messaging.connectionStats[publicKey].lookupInProgress = false;
-            messaging.connectionStats[publicKey].lastUpdate = new Date().toJSON();
-            storagejs.put("flunky-messaging-connectionStats", messaging.connectionStats);
-            messaging.directoryCache[publicKey] = JSON.parse(value);
-            storagejs.put("flunky-messaging-directoryCache", messaging.directoryCache);
-            messaging._trigger(publicKey);
-        },
-    };
-    directory.get(publicKey, options);
-};
 
 /**
  * Flush message queue: send all messages which have not expired
@@ -529,6 +512,54 @@ Messaging.prototype._flushQueue = function(publicKey) {
     }, this);
     delete this.sendQueues[publicKey];
     this._saveSendQueues([publicKey]);
+};
+
+
+/**
+ * CONNECTION INFO
+ */
+
+/**
+ * Publish connection info in directory
+ *
+ * @private
+ */
+Messaging.prototype._publishConnectionInfo = function() {
+    //TODO: Implement signature so that we can discard bogus info immediatly from DHT
+    //TODO: Deal with expiration times
+    //TODO: Add random nonce to signature (or do we want increment?) version info ... (timestamp maybe?)
+    //TODO: Also modify retrieve logic (lookupKey) to check for signature
+    this.send("directory.put", "local", {key: this.profile.publicKey, value: JSON.stringify(this.connectionInfo)});
+};
+
+
+/**
+ * Lookup connectivity information in directory 
+ *
+ * @private
+ * @param {string} publicKey - publicKey of destination
+ */
+Messaging.prototype._lookupKey = function(publicKey) {
+    if(!this.transportAvailable || this.connectionStats[publicKey].lookupInProgress) {
+        return;
+    };
+    var messaging = this;
+    this.connectionStats[publicKey].lookupInProgress = true;
+    setTimeout(function() {
+        messaging.connectionState[publicKey].lookupInProgress = false;
+    }, PUBLISH_CONNECTION_INFO_INTERVAL);
+    this.send("directory.get", "local", {key: publicKey});
+};
+
+Messaging.prototype._processGetReply = function(topic, publicKey, data) {
+    if(_.has(this.connectionStats, data.key)) {
+        this.connectionStats[data.key].lookupInProgress = false;
+        this.connectionStats[data.key].lastUpdate = new Date().toJSON();
+        storagejs.put("flunky-messaging-connectionStats", this.connectionStats);
+        this.directoryCache[data.key] = JSON.parse(data.value);
+        storagejs.put("flunky-messaging-directoryCache", this.directoryCache);
+        this._trigger(data.key); 
+    };
 };
 
 /**

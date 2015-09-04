@@ -6,7 +6,6 @@ var chai = require("chai");
 var curve = require("curve-protocol");
 var useragent = require("useragent");
 var qrImage = require("qr-image");
-var directory = require("../directory/directory.js");
 var SyncEngine = require("../util/mmds/index.js");
 
 var PUBLISH_INTERVAL = 1000 * 60 * 5;
@@ -116,7 +115,7 @@ Profile.prototype.setDefaults = function() {
 Profile.prototype.publishUser = function() {
     _.forEach(this.profile.info.accounts, function(account) {
         var key = account.type + ":" + account.id;
-        directory.put(key, this.profile.publicKey);
+        this.messaging.send("directory.put", "local", {key: key, value: this.profile.publicKey});
     }, this);
 };
 
