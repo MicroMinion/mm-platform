@@ -426,6 +426,7 @@ Messaging.prototype.setDevices = function(devices) {
  * @public
  */
 Messaging.prototype.send = function(topic, publicKey, data, options) {
+    var messaging = this;
     expect(publicKey).to.be.a("string");
     expect(publicKey === "local" || curve.fromBase64(publicKey).length === 32).to.be.true;
     expect(topic).to.be.a("string");
@@ -447,6 +448,11 @@ Messaging.prototype.send = function(topic, publicKey, data, options) {
         this.sendQueues[publicKey] = {};
     };
     this.sendQueues[publicKey][message.id] = message;
+    setTimeout(function() {
+        if(_.has(messaging.sendQueues[publicKey], message.id)) {
+            delete messaging.sendQueues[publicKey][message.id];
+        };
+    }, message.expireAfter);
     this._saveSendQueues([publicKey]);
     if(options.realtime) {
         process.nextTick(this._trigger.bind(this, publicKey));
@@ -546,7 +552,7 @@ Messaging.prototype._lookupKey = function(publicKey) {
     var messaging = this;
     this.connectionStats[publicKey].lookupInProgress = true;
     setTimeout(function() {
-        messaging.connectionState[publicKey].lookupInProgress = false;
+        messaging.connectionStats[publicKey].lookupInProgress = false;
     }, PUBLISH_CONNECTION_INFO_INTERVAL);
     this.send("directory.get", "local", {key: publicKey});
 };
