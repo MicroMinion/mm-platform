@@ -13,6 +13,7 @@ var SENDER_ID = "559190877287";
 
 function GCMTransport(publicKey, privateKey) {
     AbstractTransport.call(this, publicKey, privateKey);
+    this.transportKey = "gcm-curvezmq";
     this.registrationId = undefined;
     // publicKey => registrationId
     this.directoryCache = {};
@@ -43,6 +44,7 @@ GCMTransport.prototype.enable = function() {
             gcm.emit("disable");
         } else {
             gcm.registrationId = registrationId;
+            //TODO: Change to use this.transportKey (after demo on Friday)
             gcm.emit("ready",{"gcm": gcm.registrationId});
         };
     });

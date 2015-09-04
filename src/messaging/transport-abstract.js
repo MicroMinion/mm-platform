@@ -88,10 +88,11 @@ AbstractTransport.prototype.enable = function() {
  * Send a message
  * 
  * @abstract
+ * @param {string} publicKey
  * @param {Object} message
  */
 
-AbstractTransport.prototype.send = function(message) {
+AbstractTransport.prototype.send = function(publicKey, message) {
     throw new Error("must be implemented by subclass");
 };
 
