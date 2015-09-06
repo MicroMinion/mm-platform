@@ -27,6 +27,7 @@
     "lodash": "^3.10.1",
     "multicast-dns": "^3.0.0",
     "node-uuid": "^1.4.3",
+    "q": "^1.4.1",
     "qr-image": "^3.1.0",
     "rate-limit": "^0.1.1",
     "run-parallel": "^1.1.2",

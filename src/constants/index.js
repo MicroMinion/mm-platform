@@ -1,3 +1,3 @@
 module.exports = {
-    verificationState: require("./verificationState.js")
-};
+  verificationState: require('./verificationState.js')
+}

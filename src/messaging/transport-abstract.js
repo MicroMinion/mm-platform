@@ -1,10 +1,9 @@
-var events = require("events");
-var chai = require("chai");
-var curve = require("curve-protocol");
-var inherits = require("inherits");
+var events = require('events')
+var chai = require('chai')
+var curve = require('curve-protocol')
+var inherits = require('inherits')
 
-var expect = chai.expect;
-
+var expect = chai.expect
 
 /**
  * Generic Message Transport
@@ -18,17 +17,17 @@ var expect = chai.expect;
  * @param {string} publicKey
  * @param {string} privateKey
  */
-var AbstractTransport = function(publicKey, privateKey) {
-    expect(publicKey).to.be.a("string");
-    expect(curve.fromBase64(publicKey)).to.have.length(32);
-    expect(privateKey).to.be.a("string");
-    expect(curve.fromBase64(privateKey)).to.have.length(32);
-    events.EventEmitter.call(this);
-    this.publicKey = publicKey;
-    this.privateKey = privateKey;
-};
+var AbstractTransport = function (publicKey, privateKey) {
+  expect(publicKey).to.be.a('string')
+  expect(curve.fromBase64(publicKey)).to.have.length(32)
+  expect(privateKey).to.be.a('string')
+  expect(curve.fromBase64(privateKey)).to.have.length(32)
+  events.EventEmitter.call(this)
+  this.publicKey = publicKey
+  this.privateKey = privateKey
+}
 
-inherits(AbstractTransport, events.EventEmitter);
+inherits(AbstractTransport, events.EventEmitter)
 
 /**
  * ready event
@@ -65,37 +64,40 @@ inherits(AbstractTransport, events.EventEmitter);
  * @type {object} message
  */
 
-
 /**
  * Manually disable transport
  *
  * @abstract
  */
-AbstractTransport.prototype.disable = function() {
-    throw new Error("must be implemented by subclass");
-};
+AbstractTransport.prototype.disable = function () {
+  throw new Error('must be implemented by subclass')
+}
+
+AbstractTransport.prototype.isDisabled = function () {
+  throw new Error('must be implemented by subclass')
+}
 
 /**
  * Enable transport
  *
  * @abstract
  */
-AbstractTransport.prototype.enable = function() {
-    throw new Error("must be implemented by subclass");
-};
+AbstractTransport.prototype.enable = function () {
+  throw new Error('must be implemented by subclass')
+}
 
 /**
  * Send a message
- * 
+ *
  * @abstract
  * @param {string} publicKey
  * @param {Object} message
+ * @return {Promise}
  */
 
-AbstractTransport.prototype.send = function(publicKey, message) {
-    throw new Error("must be implemented by subclass");
-};
-
+AbstractTransport.prototype.send = function (publicKey, message) {
+  throw new Error('must be implemented by subclass')
+}
 
 /**
  * Connect to a peer
@@ -103,10 +105,18 @@ AbstractTransport.prototype.send = function(publicKey, message) {
  * @abstract
  * @param {string} publicKey
  * @param {Object} connectionInfo
+ * @return {Promise}
  */
-AbstractTransport.prototype.connect = function(publicKey, connectionInfo) {
-    throw new Error("must be implemented by subclass");
-};
+AbstractTransport.prototype.connect = function (publicKey, connectionInfo) {
+  throw new Error('must be implemented by subclass')
+}
 
-module.exports = AbstractTransport;
+AbstractTransport.prototype.getconnection = function (publicKey) {
+  throw new Error('must be implemented by subclass')
+}
 
+AbstractTransport.prototype.isConnected = function (publicKey) {
+  return Boolean(this.getConnection(publicKey))
+}
+
+module.exports = AbstractTransport
