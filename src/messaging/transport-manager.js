@@ -34,7 +34,10 @@ var TransportManager = function (messaging, publicKey, privateKey) {
    */
   this.directoryCache = {}
   this._loadDirectoryCache()
-  this.on('self.directory.getReply', this._processGetReply)
+  this.on('self.directory.getReply', this._processGetReply.bind(this))
+  this.on('self.messaging.connectionInfo', function (topic, publicKey, data) {
+    this.directoryCache[data.publicKey] = data
+  }, this)
   /**
    * Our own connection information, to be published in directory
    *
