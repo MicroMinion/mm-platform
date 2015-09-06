@@ -75,6 +75,7 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
     transport.push(this.transports)
     transport.on('ready', function (connectionInfo) {
       extend(manager.connectionInfo, connectionInfo)
+      manager.connectionInfo.publicKey = manager.profile.publicKey
       manager.emit('ready', manager.connectionInfo)
       manager._publishConnectionInfo()
     })
@@ -82,12 +83,6 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
       if (this.isDisabled()) {
         manager.emit('disable')
       }
-    })
-    transport.on('connectionEstablished', function (publicKey) {
-      manager.emit('connectionEstablished', publicKey)
-    })
-    transport.on('connectionStopped', function (publicKey) {
-      manager.emit('connectionStopped', publicKey)
     })
     transport.on('message', function (publicKey, message) {
       manager.emit('message', publicKey, message)

@@ -170,6 +170,7 @@ Messaging.prototype._loadSendQueues = function () {
         parallelFunctions.push(callBackfunction)
       })
       parallel(parallelFunctions, function (err, results) {
+        console.log(err)
         messaging._sendQueuesRetrieved = true
         messaging._saveSendQueues(_.keys(messaging.sendQueues))
       })
@@ -242,11 +243,6 @@ Messaging.prototype._setupTransportManager = function (profile) {
   this.transportManager.on('disable', function () {
     expect(messaging.transportAvailable).to.be.true
     messaging.transportAvailable = false
-  })
-  this.transportManager.on('connectionEstablished', function (publicKey) {
-    expect(publicKey).to.be.a('string')
-    expect(curve.fromBase64(publicKey)).to.have.length(32)
-    messaging._flushQueue(publicKey)
   })
   this.transportManager.on('message', function (publicKey, message) {
     expect(publicKey).to.be.a('string')

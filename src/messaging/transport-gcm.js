@@ -7,6 +7,7 @@ var Duplex = require('stream').Duplex
 var extend = require('extend.js')
 var chai = require('chai')
 var AbstractTransport = require('./transport-abstract')
+var Q = require('q')
 
 var expect = chai.expect
 
@@ -14,25 +15,65 @@ var SENDER_ID = '559190877287'
 
 function GCMTransport (publicKey, privateKey) {
   AbstractTransport.call(this, publicKey, privateKey)
-  this.transportKey = 'gcm-curvezmq'
   this.registrationId = undefined
-  // publicKey => registrationId
-  this.directoryCache = {}
-  // registrationId => CurveCPStream
-  this.connections = {}
-
-  var gcm = this
+  this.gcmConnections = {}
   if (typeof chrome !== 'undefined' && typeof chrome.gcm !== 'undefined') {
-    chrome.gcm.onMessage.addListener(gcm.onMessage.bind(gcm))
-    chrome.gcm.onMessagesDeleted.addListener(gcm.onMessagesDeleted.bind(gcm))
-    chrome.gcm.onSendError.addListener(gcm.onSendError.bind(gcm))
-    this.enable()
+    chrome.gcm.onMessage.addListener(this._onMessage.bind(this))
+    chrome.gcm.onSendError.addListener(this._onSendError.bind(this))
+    process.nextTick(this.enable)
   } else {
-    this.disable()
+    process.nextTick(this.disable)
   }
 }
 
 inherits(GCMTransport, AbstractTransport)
+
+/*
+ * CALLBACK HANDLERS FROM CHROME.GCM
+ */
+
+GCMTransport.prototype._onSendError = function (error) {
+  console.log('GCM: Send error')
+  console.log(error.errorMessage)
+  console.log(error.details)
+  this.disable()
+  _.forEach(this.gcmConnections, function (connection) {
+    connection.error('send error, disabling connection')
+  }, this)
+}
+
+GCMTransport.prototype._onMessage = function (message) {
+  expect(message.data.type).to.be.a('string')
+  expect(this.connections).to.be.an('object')
+  expect(this.registrationId).to.be.a('string')
+  if (message.data.type !== 'MESSAGE') {
+    return
+  }
+  try {
+    expect(message.data.data).to.be.a('string')
+    expect(message.data.destination).to.be.a('string')
+    expect(message.data.source).to.be.a('string')
+  } catch (e) {
+    console.log(e)
+    return
+  }
+  if (message.data.destination !== this.registrationId) {
+    console.log('message received which does not have our registrationId as destination')
+    return
+  }
+  var source = message.data.source
+  if (!_.has(this.gcmConnections, source)) {
+    var gcmConnection = new GCMConnection({
+      source: this.registrationId,
+      destination: source
+    })
+    this.gcmConnections[source] = gcmConnection
+  }
+  this._wrapOutgoingConnection(gcmConnection)
+  this.gcmConnections[source].emit('data', new Buffer(curve.fromBase64(message.data.data)))
+}
+
+/* API IMPLEMENTATION: TRANSPORT STATUS */
 
 GCMTransport.prototype.enable = function () {
   expect(chrome.gcm).to.exist
@@ -44,7 +85,6 @@ GCMTransport.prototype.enable = function () {
       gcm.emit('disable')
     } else {
       gcm.registrationId = registrationId
-      // TODO: Change to use this.transportKey (after demo on Friday)
       gcm.emit('ready', {'gcm': gcm.registrationId})
     }
   })
@@ -52,180 +92,49 @@ GCMTransport.prototype.enable = function () {
 
 GCMTransport.prototype.disable = function () {
   this.registrationId = undefined
-  _.forEach(this.connections, function (stream, key) {
-    this._end(key)
-  }, this)
+  AbstractTransport.disable.call(this)
 }
 
-GCMTransport.prototype.connect = function (publicKey, connectionInfo) {
+GCMTransport.prototype.isDisabled = function () {
+  return _.isUndefined(this.registrationId)
+}
+
+/* API IMPLEMENTATION: CONNECTIONS */
+
+GCMTransport.prototype._connect = function (publicKey, connectionInfo) {
+  expect(this.registrationId).to.be.a('string')
+  expect(this.registrationId).to.have.length.of.at.least(1)
   expect(publicKey).to.be.a('string')
   expect(curve.fromBase64(publicKey)).to.have.length(32)
   expect(connectionInfo).to.be.an('object')
-  expect(connectionInfo).to.have.property('gcm')
-  expect(connectionInfo.gcm).to.be.a('string')
-  expect(this.registrationId).to.be.a('string')
-  expect(this.registrationId).to.have.length.of.at.least(1)
-  this.directoryCache[publicKey] = connectionInfo.gcm
-  if (connectionInfo.gcm in this.connections) {
-    return
+  expect(this.isDisabled()).to.be.false
+  var manager = this
+  var deferred = Q.defer()
+  try {
+    expect(connectionInfo).to.have.property('gcm')
+    expect(connectionInfo.gcm).to.be.a('string')
+  } catch (e) {
+    process.nextTick(function () {
+      deferred.reject(e)
+    })
   }
-  var gcmStream = new GCMStream({
-    source: this.registrationId,
-    destination: connectionInfo.gcm
-  })
-  var stream = new curve.CurveCPStream({
-    stream: gcmStream,
-    is_server: false,
-    serverPublicKey: curve.fromBase64(publicKey),
-    clientPublicKey: curve.fromBase64(this.publicKey),
-    clientPrivateKey: curve.fromBase64(this.privateKey)
-  })
-  this.connections[connectionInfo.gcm] = stream
-  this.connectStream(stream)
-  var gcm = this
-  setTimeout(function () {
-    if (!stream.connected) {
-      gcm._end(connectionInfo.gcm)
-    }
-  }, 5000)
-}
-
-GCMTransport.prototype.connectStream = function (stream) {
-  expect(stream).to.exist
-  expect(stream).to.be.an.instanceof(curve.CurveCPStream)
-  expect(stream.stream).to.exist
-  expect(stream.stream).to.be.an.instanceof(GCMStream)
-  expect(stream.stream.destination).to.be.a('string')
-  var gcm = this
-  stream.on('error', function (error) {
-    console.log('GCMTransport: stream error')
-  // console.log(error)
-  })
-  stream.on('end', function () {
-    console.log('GCMTransport: end stream event')
-    gcm._end(stream.stream.destination)
-  })
-  stream.on('drain', function () {
-    var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey
-    publicKey = curve.toBase64(publicKey)
-    if (!_.has(gcm.directoryCache, publicKey)) {
-      gcm.directoryCache[publicKey] = stream.stream.destination
-    }
-    gcm.emit('connectionEstablished', publicKey)
-  })
-  stream.on('data', function (data) {
-    var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey
-    publicKey = curve.toBase64(publicKey)
-    gcm.emit('message', publicKey, data)
-  })
-}
-
-GCMTransport.prototype.disconnect = function (publicKey) {
-  expect(publicKey).to.be.a('string')
-  expect(curve.fromBase64(publicKey)).to.have.length(32)
-  publicKey = curve.fromBase64(publicKey)
-  _.forEach(this.connections, function (connection, index, collection) {
-    if (publicKey === connection.clientPublicKey || publicKey === connection.serverPublicKey) {
-      this._end(index)
-    }
-  }, this)
-}
-
-GCMTransport.prototype._end = function (destination) {
-  expect(destination).to.be.a('string')
-  // expect(this.connections[destination]).to.exist
-  // expect(this.connections[destination]).to.be.an.instanceof(curve.CurveCPStream)
-  var stream = this.connections[destination]
-  if (stream) {
-    stream.removeAllListeners('end')
-    stream.removeAllListeners('drain')
-    stream.removeAllListeners('data')
-    stream.removeAllListeners('error')
-    delete this.connections[destination]
+  if (!_.has(this.gcmConnections, connectionInfo.gcm)) {
+    var gcmConnection = new GCMConnection({
+      source: this.registrationId,
+      destination: connectionInfo.gcm
+    })
+    this.gcmConnections[connectionInfo.gcm] = gcmConnection
+    gcmConnection.on('close', function () {
+      delete manager.gcmConnections[connectionInfo.gcm]
+    })
   }
-  if (stream) {
-    var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey
-    if (publicKey) {
-      // TODO: Fix since we need to emit connectionStopped
-      publicKey = curve.toBase64(publicKey)
-      this.emit('connectionStopped', publicKey)
-    }
-  }
+  process.nextTick(function () {
+    deferred.resolve(manager.gcmConnections[connectionInfo.gcm])
+  })
+  return deferred.promise
 }
 
-GCMTransport.prototype.send = function (publicKey, message) {
-  expect(message).to.exist
-  expect(publicKey).to.be.a('string')
-  expect(curve.fromBase64(publicKey)).to.have.length(32)
-  expect(this.directoryCache[publicKey]).to.exist
-  expect(this.directoryCache[publicKey]).to.be.a('string')
-  expect(this.connections[this.directoryCache[publicKey]]).to.exist
-  expect(this.connections[this.directoryCache[publicKey]]).to.be.an.instanceof(curve.CurveCPStream)
-  this.connections[this.directoryCache[publicKey]].write(message)
-}
-
-GCMTransport.prototype.onMessage = function (message) {
-  expect(message.data.type).to.be.a('string')
-  expect(this.connections).to.be.an('object')
-  expect(this.registrationId).to.be.a('string')
-  if (message.data.type === 'MESSAGE') {
-    expect(message.data.data).to.be.a('string')
-    if (message.data.destination !== this.registrationId) {
-      console.log('message received which does not have our registrationId as destination')
-    } else {
-      var source = message.data.source
-      var stream
-      if (!this.connections[source]) {
-        stream = new GCMStream({
-          source: this.registrationId,
-          destination: source
-        })
-        this.connections[source] = new curve.CurveCPStream({
-          stream: stream,
-          is_server: true,
-          serverPublicKey: curve.fromBase64(this.publicKey),
-          serverPrivateKey: curve.fromBase64(this.privateKey)
-        })
-        this.connectStream(this.connections[source])
-      }
-      stream = this.connections[source].stream
-      stream.emit('data', new Buffer(curve.fromBase64(message.data.data)))
-    }
-  } else if (message.data.type === 'MESSAGE_DELIVERED') {
-  } else if (message.data.type === 'MESSAGE_NOT_DELIVERED') {
-    /*
-    if(message.data.source !== this.registrationId) {
-        console.log("message received that was not for us")
-    } else {
-        if(this.connections[message.data.destination]) {
-            expect(this.connections[message.data.destination]).to.be.an.instanceof(curve.CurveCPStream)
-            this.connections[message.data.destination].stream.error("Could not deliver message")
-        }
-    }
-    */
-  } else if (message.data.type === 'GET_REPLY') {
-  } else {
-    console.log('GCM: Unknown message type received')
-    console.log(message)
-  }
-}
-
-GCMTransport.prototype.onMessagesDeleted = function () {}
-
-GCMTransport.prototype.onSendError = function (error) {
-  console.log('GCM: Send error')
-  console.log(error.errorMessage)
-  console.log(error.messageId)
-  console.log(error.details)
-  this.disable()
-}
-
-GCMTransport.prototype.disable = function () {
-  this.registrationId = undefined
-  this.emit('disable')
-}
-
-var GCMStream = function (opts) {
+var GCMConnection = function (opts) {
   expect(opts).to.be.an('object')
   expect(opts.source).to.be.a('string')
   expect(opts.destination).to.be.a('string')
@@ -235,14 +144,11 @@ var GCMStream = function (opts) {
   extend(this, opts)
 }
 
-inherits(GCMStream, Duplex)
+inherits(GCMConnection, Duplex)
 
-/*
- * This method should not be called since we are using emit('data') to signal when new data is available
- */
-GCMStream.prototype._read = function (size) {}
+GCMConnection.prototype._read = function (size) {}
 
-GCMStream.prototype._write = function (chunk, encoding, done) {
+GCMConnection.prototype._write = function (chunk, encoding, done) {
   expect(Buffer.isBuffer(chunk)).to.be.true
   expect(chunk).to.have.length.of.at.least(1)
   expect(done).to.be.an.instanceof(Function)
@@ -270,7 +176,7 @@ GCMStream.prototype._write = function (chunk, encoding, done) {
   })
 }
 
-GCMStream.prototype.error = function (errorMessage) {
+GCMConnection.prototype.error = function (errorMessage) {
   expect(errorMessage).to.be.a('string')
   expect(errorMessage).to.have.length.of.at.least(1)
   this.emit('error', new Error(errorMessage))
