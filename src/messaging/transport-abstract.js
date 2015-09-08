@@ -162,7 +162,7 @@ AbstractTransport.prototype._getPeer = function (stream) {
   return publicKey
 }
 
-AbstractTransport.prototype.getconnection = function (publicKey) {
+AbstractTransport.prototype.getConnection = function (publicKey) {
   if (_.has(this.connections, publicKey)) {
     return this.connections[publicKey]
   }

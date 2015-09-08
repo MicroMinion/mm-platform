@@ -96,7 +96,7 @@ Profile.prototype.loadProfile = function () {
       profile.messaging.send('profile.ready', 'local', {})
     }
   }
-  storagejs.get('profile', options)
+  storagejs.get('profile').then(options.success, options.error)
 }
 
 Profile.prototype.setDefaults = function () {

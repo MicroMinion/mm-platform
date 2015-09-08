@@ -94,7 +94,7 @@ Contacts.prototype.loadContacts = function () {
       contacts.update()
     }
   }
-  storagejs.get('contacts', options)
+  storagejs.get('contacts').then(options.success)
 }
 
 Contacts.prototype.update = function () {

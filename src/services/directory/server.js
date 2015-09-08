@@ -1,98 +1,53 @@
-/* global chrome */
-
-var Backoff = require('backoff')
-var uuid = require('node-uuid')
 var _ = require('lodash')
 
-var SENDER_ID = '559190877287'
-var backoff = Backoff.fibonacci({
-  initialDelay: 1,
-  maxDelay: 10000,
-  randomisationFactor: 0
-})
+var DirectoryClient = function (messaging, serverKey, serverConnectionInfo) {
+  this.messaging = messaging
+  this.serverKey = serverKey
+  this.messaging.on('self.directory.get', this.get.bind(this))
+  this.messaging.on('self.directory.put', this.put.bind(this))
+  this.messaging.on('self.directoryServer.getReply', this.getReply.bind(this))
+  this.messaging.on('friends.directoryServer.getReply', this.getReply.bind(this))
+  this.messaging.on('public.directoryServer.getReply', this.getReply.bind(this))
+  serverConnectionInfo.publicKey = serverKey
+  this.messaging.send('messaging.connectionInfo', 'local', serverConnectionInfo)
+}
 
-var pendingMessages = {}
+DirectoryClient.prototype.put = function (topic, publicKey, data) {
+  this.messaging.send('directoryServer.put', this.serverKey, data)
+}
 
-backoff.on('ready', function () {
-  chrome.gcm.register([SENDER_ID], function (id) {
-    if (chrome.runtime.lastError) {
-      console.log('GCM registration failed')
-      console.log(chrome.runtime.lastError)
-      backoff.backoff()
-    } else {
-      console.log('registration succeeded')
-      backoff.reset()
-    }
-  })
-})
+DirectoryClient.prototype.get = function (topic, publicKey, data) {
+  this.messaging.send('directoryServer.get', this.serverKey, data)
+}
 
-var onMessage = function (message) {
-  if (message.data.type === 'GET_REPLY') {
-    if (pendingMessages[message.data.id] && pendingMessages[message.data.id].success) {
-      var values = JSON.parse(message.data.values)
-      _.forEach(values, function (value) {
-        pendingMessages[message.data.id].success(message.data.key, value)
-      })
-    }
-    delete pendingMessages[message.data.id]
+DirectoryClient.prototype.getReply = function (topic, publicKey, data) {
+  if (publicKey === this.serverKey) {
+    this.messaging.send('directory.getReply', 'local', data)
   }
 }
 
-var onSendError = function (error) {
-  console.log('GCM: Send error')
-  console.log(error.errorMessage)
-  console.log(error.messageId)
-  console.log(error.details)
+var DirectoryServer = function (messaging) {
+  this.messaging = messaging
+  this.state = {}
+  this.messaging.on('self.directoryServer.get', this.processGet.bind(this))
+  this.messaging.on('friends.directoryServer.get', this.processGet.bind(this))
+  this.messaging.on('public.directoryServer.get', this.processGet.bind(this))
+  this.messaging.on('self.directoryServer.put', this.processPut.bind(this))
+  this.messaging.on('friends.directoryServer.put', this.processPut.bind(this))
+  this.messaging.on('public.directoryServer.put', this.processPut.bind(this))
 }
 
-chrome.gcm.onMessage.addListener(onMessage)
-chrome.gcm.onSendError.addListener(onSendError)
-
-var get = function (key, options) {
-  _send({type: 'GET', key: key}, options)
-}
-
-var put = function (key, value, options) {
-  _send({type: 'PUT', key: key, value: value}, options)
-}
-
-var _send = function (data, options) {
-  var id = uuid.v4()
-  pendingMessages[id] = options
-  if (data.type === 'GET') {
-    setTimeout(function () {
-      if (pendingMessages[id] && pendingMessages[id].error) {
-        pendingMessages[id].error('operation timed out')
-      }
-      delete pendingMessages[id]
-    }, 1000)
+DirectoryServer.prototype.processGet = function (topic, publicKey, data) {
+  if (_.has(this.state, data.key)) {
+    this.messaging.send('directoryServer.getReply', publicKey, {key: data.key, value: this.state[data.key]})
   }
-  data.id = id
-  chrome.gcm.send({
-    destinationId: SENDER_ID + '@gcm.googleapis.com',
-    messageId: id,
-    timeToLive: 0,
-    data: data
-  }, function (messageId) {
-    if (chrome.runtime.lastError) {
-      // console.log("GCM: problem with sending messages to app server")
-      // console.log(chrome.runtime.lastError)
-      if (pendingMessages[messageId] && pendingMessages[messageId].error) {
-        pendingMessages[messageId].error('GCM: problem with sending messages to app server')
-      }
-      delete pendingMessages[messageId]
-    } else {
-      if (data.type === 'PUT') {
-        if (pendingMessages[messageId] && pendingMessages[messageId].success) {
-          pendingMessages[messageId].success()
-        }
-        delete pendingMessages[messageId]
-      }
-    }
-  })
+}
+
+DirectoryServer.prototype.processPut = function (topic, publicKey, data) {
+  this.state[data.key] = data.value
 }
 
 module.exports = {
-  get: get,
-  put: put
+  DirectoryClient: DirectoryClient,
+  DirectoryServer: DirectoryServer
 }

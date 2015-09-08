@@ -60,7 +60,7 @@ Devices.prototype._loadDevices = function () {
       devices.update(false)
     }
   }
-  storagejs.get('devices', options)
+  storagejs.get('devices').then(options.success)
 }
 
 Devices.prototype.update = function (store) {

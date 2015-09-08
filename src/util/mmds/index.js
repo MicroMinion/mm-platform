@@ -18,8 +18,8 @@ var SyncEngine = function (messaging, service, idAttribute, collection) {
   this.syncStreams = {}
   this.devices = {}
   this.checkpoints = {}
-  storagejs.get(this.service + '-checkpoints', {
-    success: function (value) {
+  storagejs.get(this.service + '-checkpoints').then(
+    function (value) {
       engine.checkpoints = value
       _.forEach(engine.syncStreams, function (stream, key) {
         if (_.has(this.checkpoints, key)) {
@@ -27,7 +27,7 @@ var SyncEngine = function (messaging, service, idAttribute, collection) {
         }
       }, engine)
     }
-  })
+  )
   this.messaging.on('self.devices.update', this.updateDevices.bind(this))
   this.messaging.on('self.' + this.service + '.last_sequence_request', function (topic, publicKey, data) {
     if (_.has(engine.syncStreams, publicKey)) {

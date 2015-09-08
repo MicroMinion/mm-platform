@@ -6,6 +6,7 @@ var Q = require('q')
 var extend = require('extend.js')
 var AbstractTransport = require('./transport-abstract.js')
 
+var TCPTransport = require('./transport-tcp.js')
 var GCMTransport = require('./transport-gcm.js')
 
 var expect = chai.expect
@@ -26,6 +27,7 @@ var DIRECTORY_LOOKUP_TIMEOUT = 1000
 var TransportManager = function (messaging, publicKey, privateKey) {
   AbstractTransport.call(this, publicKey, privateKey)
   this.messaging = messaging
+  var manager = this
   /**
    * Connection information from previously used public keys
    *
@@ -46,9 +48,7 @@ var TransportManager = function (messaging, publicKey, privateKey) {
    */
   this.connectionInfo = {}
   setInterval(function () {
-    if (messaging.transportAvailable) {
-      messaging._publishConnectionInfo()
-    }
+      manager._publishConnectionInfo()
   }, PUBLISH_CONNECTION_INFO_INTERVAL)
   /*
    * Transport objects
@@ -62,7 +62,7 @@ var TransportManager = function (messaging, publicKey, privateKey) {
 inherits(TransportManager, AbstractTransport)
 
 TransportManager.prototype._initializeTransports = function () {
-  var transports = [GCMTransport]
+  var transports = [TCPTransport]
   _.forEach(transports, function (transportClass) {
     this._initializeTransport(transportClass)
   }, this)
@@ -72,13 +72,15 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
   var manager = this
   var transport
   try {
-    transport = new TransportClass(this.messaging.profile.publicKey, this.messaging.profile.privateKey)
-  } catch(e) {}
+    transport = new TransportClass(this.publicKey, this.privateKey)
+  } catch(e) {
+    console.log(e)
+  }
   if (transport) {
-    transport.push(this.transports)
+    this.transports.push(transport)
     transport.on('ready', function (connectionInfo) {
       extend(manager.connectionInfo, connectionInfo)
-      manager.connectionInfo.publicKey = manager.profile.publicKey
+      manager.connectionInfo.publicKey = manager.publicKey
       manager.emit('ready', manager.connectionInfo)
       manager._publishConnectionInfo()
     })
@@ -165,7 +167,7 @@ TransportManager.prototype._loadDirectoryCache = function () {
       })
     }
   }
-  storagejs.get('flunky-transport-directoryCache', options)
+  storagejs.get('flunky-transport-directoryCache').then(options.success)
 }
 
 TransportManager.prototype._saveDirectoryCache = function () {
@@ -178,7 +180,7 @@ TransportManager.prototype._saveDirectoryCache = function () {
  * @private
  */
 TransportManager.prototype._publishConnectionInfo = function () {
-  this.send('directory.put', 'local', {key: this.profile.publicKey, value: JSON.stringify(this.connectionInfo)})
+  this.messaging.send('directory.put', 'local', {key: this.publicKey, value: JSON.stringify(this.connectionInfo)})
 }
 
 /**
@@ -212,7 +214,7 @@ TransportManager.prototype._lookupKey = function (publicKey) {
   expect(this.directoryLookup).to.not.have.ownProperty(publicKey)
   var deferred = Q.defer()
   var manager = this
-  this.send('directory.get', 'local', {key: publicKey})
+  this.messaging.send('directory.get', 'local', {key: publicKey})
   this.directoryLookup[publicKey] = deferred
   setTimeout(function () {
     if (_.has(manager.directoryLookup, publicKey)) {

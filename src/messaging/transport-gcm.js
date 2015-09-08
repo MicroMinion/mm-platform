@@ -69,7 +69,7 @@ GCMTransport.prototype._onMessage = function (message) {
     })
     this.gcmConnections[source] = gcmConnection
   }
-  this._wrapOutgoingConnection(gcmConnection)
+  this._wrapIncomingConnection(gcmConnection)
   this.gcmConnections[source].emit('data', new Buffer(curve.fromBase64(message.data.data)))
 }
 

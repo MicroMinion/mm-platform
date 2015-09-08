@@ -29,7 +29,7 @@ Log.prototype._loadLog = function () {
       log.events = value
     }
   }
-  storagejs.get(log.name, options)
+  storagejs.get(log.name).then(options.success)
 }
 
 /* LOCAL LOG MODIFICATION */
