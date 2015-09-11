@@ -91,7 +91,6 @@ Profile.prototype.loadProfile = function () {
     },
 
     error: function (error) {
-      console.log(error)
       profile.setDefaults()
       profile.messaging.send('profile.ready', 'local', {})
     }

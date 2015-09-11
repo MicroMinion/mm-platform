@@ -6,7 +6,7 @@ var chai = require('chai')
 var curve = require('curve-protocol')
 var TransportManager = require('./transport-manager.js')
 var storagejs = require('storagejs')
-var parallel = require('run-parallel')
+var debug = require('debug')('flunky-platform:messaging:messaging')
 
 var expect = chai.expect
 
@@ -118,8 +118,10 @@ var Messaging = function () {
    * @type {TransportManager}
    *
    */
-  this.transportManager = undefined
+  this.transportManager
+  this._setupTransportManager()
   setInterval(function () {
+    debug('trigger send queues periodically')
     if (messaging.transportAvailable) {
       _.forEach(_.keys(messaging.sendQueues), function (publicKey) {
         messaging._trigger(publicKey)
@@ -135,70 +137,39 @@ inherits(Messaging, EventEmitter)
  */
 
 Messaging.prototype._loadSendQueues = function () {
+  debug('loadSendQueues')
   var messaging = this
   var options = {
     success: function (value) {
-      expect(value).to.be.a('string')
-      value = JSON.parse(value)
-      expect(value).to.be.an('array')
-      var parallelFunctions = []
-      _.forEach(value, function (publicKey) {
+      expect(value).to.be.an('object')
+      _.foreach(value, function (publicKey) {
         expect(publicKey).to.be.a('string')
         expect(curve.fromBase64(publicKey)).to.have.length(32)
         if (!_.has(messaging.sendQueues, publicKey)) {
           messaging.sendQueues[publicKey] = {}
         }
-        var callBackfunction = function (callback) {
-          var publicKeyoptions = {
-            success: function (value) {
-              expect(value).to.be.an('object')
-              _.forEach(value, function (message, uuid) {
-                if (!_.has(messaging.sendQueues[publicKey][uuid])) {
-                  messaging.sendQueues[publicKey][uuid] = message
-                }
-              })
-              callback(null, publicKey)
-            },
-            error: function (errorMessage) {
-              console.log('unable to retrieve sendQueue for ' + publicKey)
-              console.log(errorMessage)
-              callback(errorMessage, null)
-            }
+        _.forEach(value, function (message, uuid) {
+          if (!_.has(messaging.sendQueues[publicKey][uuid])) {
+            messaging.sendQueues[publicKey][uuid] = message
           }
-          storagejs.get('flunky-messaging-sendQueues-' + publicKey, publicKeyoptions)
-        }
-        parallelFunctions.push(callBackfunction)
+        })
       })
-      parallel(parallelFunctions, function (err, results) {
-        console.log(err)
-        messaging._sendQueuesRetrieved = true
-        messaging._saveSendQueues(_.keys(messaging.sendQueues))
-      })
+      messaging._sendQueuesRetrieved = true
     },
     error: function (errorMessage) {
-      console.log('unable to retrieve flunky-messaging-sendQueues')
-      console.log(errorMessage)
       messaging._sendQueuesRetrieved = true
     }
   }
-  storagejs.get('flunky-messaging-sendQueues', options)
+  storagejs.get('flunky-messaging-sendQueues').then(options.success, options.error)
 }
 
 Messaging.prototype._saveSendQueues = function (publicKeys) {
+  debug('saveSendQueues')
   expect(publicKeys).to.be.an('array')
   if (!this._sendQueuesRetrieved) {
     return
   }
-  storagejs.put('flunky-messaging-sendQueues', JSON.stringify(_.keys(this.sendQueues)))
-  _.forEach(publicKeys, function (publicKey) {
-    expect(publicKey).to.be.a('string')
-    expect(curve.fromBase64(publicKey)).to.have.length(32)
-    if (_.has(this.sendQueues, publicKey)) {
-      storagejs.put('flunky-messaging-sendQueues-' + publicKey, this.sendQueues[publicKey])
-    } else {
-      storagejs.delete('flunky-messaging-sendQueues-' + publicKey)
-    }
-  }, this)
+  storagejs.put('flunky-messaging-sendQueues', this.sendQueues)
 }
 
 /**
@@ -211,6 +182,7 @@ Messaging.prototype._saveSendQueues = function (publicKeys) {
  * @public
  */
 Messaging.prototype.disable = function () {
+  debug('disable')
   if (this.transportManager) {
     this.transportManager.disable()
   }
@@ -222,19 +194,21 @@ Messaging.prototype.disable = function () {
  * @public
  */
 Messaging.prototype.enable = function () {
+  debug('enable')
   if (this.transportManager) {
     this.transportManager.enable()
   }
 }
 
-Messaging.prototype._setupTransportManager = function (profile) {
+Messaging.prototype._setupTransportManager = function () {
+  debug('setupTransportManager')
   var messaging = this
   if (this.transportManager) {
     this.transportAvailable = false
     this.transportManager.disable()
     this.transportManager.removeAllListeners()
   }
-  this.transportManager = new TransportManager(this, profile.publicKey, profile.privateKey)
+  this.transportManager = new TransportManager(this)
   this.transportManager.on('ready', function (connectionInfo) {
     expect(connectionInfo).to.be.an('object')
     expect(messaging.transportAvailable).to.be.false
@@ -249,9 +223,7 @@ Messaging.prototype._setupTransportManager = function (profile) {
     expect(curve.fromBase64(publicKey)).to.have.length(32)
     message = JSON.parse(message)
     var scope = messaging._getScope(publicKey)
-    console.log('message received')
-    console.log(scope + '.' + message.topic)
-    console.log(message)
+    debug('message received ' + scope + '.' + message.topic + ' ' + JSON.stringify(message))
     messaging.emit(scope + '.' + message.topic, publicKey, message.data)
   })
 }
@@ -269,15 +241,13 @@ Messaging.prototype._setupTransportManager = function (profile) {
  * @public
  */
 Messaging.prototype.setProfile = function (profile) {
+  debug('setProfile')
   expect(profile).to.exist
   expect(profile).to.be.an('object')
   expect(profile.publicKey).to.be.a('string')
   expect(profile.privateKey).to.be.a('string')
   expect(curve.fromBase64(profile.publicKey)).to.have.length(32)
   expect(curve.fromBase64(profile.privateKey)).to.have.length(32)
-  if (!this.profile || this.profile.privateKey !== profile.privateKey) {
-    this._setupTransportManager(profile)
-  }
   this.profile = profile
 }
 
@@ -289,6 +259,7 @@ Messaging.prototype.setProfile = function (profile) {
  * @public
  */
 Messaging.prototype.setContacts = function (contacts) {
+  debug('setContacts')
   this.contacts = contacts
 }
 
@@ -300,6 +271,7 @@ Messaging.prototype.setContacts = function (contacts) {
  * @public
  */
 Messaging.prototype.setDevices = function (devices) {
+  debug('setDevices')
   this.devices = devices
 }
 
@@ -319,10 +291,12 @@ Messaging.prototype.setDevices = function (devices) {
  * @public
  */
 Messaging.prototype.send = function (topic, publicKey, data, options) {
+  debug('send')
   var messaging = this
   expect(publicKey).to.be.a('string')
   expect(publicKey === 'local' || curve.fromBase64(publicKey).length === 32).to.be.true
   expect(topic).to.be.a('string')
+  debug('queuing message ' + topic + ' to ' + publicKey + '(' + JSON.stringify(data) + ')')
   if (options) { expect(options).to.be.an('object') } else { options = {} }
   if (options.realtime) { expect(options.realtime).to.be.a('boolean') }
   if (options.expireAfter) { expect(options.expireAfter).to.be.a('number') }
@@ -334,7 +308,9 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
     expireAfter: options.expireAfter ? options.expireAfter : MAX_EXPIRE_TIME
   }
   if (this._isLocal(publicKey)) {
-    this.emit('self.' + topic, publicKey, data)
+    process.nextTick(function () {
+      messaging.emit('self.' + topic, publicKey, data)
+    })
     return
   }
   if (!this.sendQueues[publicKey]) {
@@ -353,6 +329,7 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
 }
 
 Messaging.prototype._isLocal = function (publicKey) {
+  debug('isLocal')
   if (publicKey === 'local') {
     return true
   }
@@ -369,6 +346,7 @@ Messaging.prototype._isLocal = function (publicKey) {
  * @param {string} publicKey - publicKey of destination for which messages need to be send
  */
 Messaging.prototype._trigger = function (publicKey) {
+  debug('trigger')
   expect(publicKey).to.be.a('string')
   expect(curve.fromBase64(publicKey)).to.have.length(32)
   if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0 && this.transportAvailable) {
@@ -376,7 +354,12 @@ Messaging.prototype._trigger = function (publicKey) {
       this._flushQueue(publicKey)
     } else {
       this.transportManager.connect(publicKey)
-        .then(this._flushQueue.bind(publicKey))
+        .then(this._flushQueue.bind(this, publicKey))
+        .fail(function (error) {
+          debug('connect failed')
+          debug(error)
+        })
+        .done()
     }
   }
 }
@@ -388,6 +371,7 @@ Messaging.prototype._trigger = function (publicKey) {
  * @private
  */
 Messaging.prototype._flushQueue = function (publicKey) {
+  debug('flushQueue')
   // TODO: take Promise returned from send into account to make sure that message can actually be deleted
   expect(publicKey).to.be.a('string')
   expect(curve.fromBase64(publicKey)).to.have.length(32)
@@ -395,9 +379,6 @@ Messaging.prototype._flushQueue = function (publicKey) {
   expect(this.transportManager.isConnected(publicKey)).to.be.true
   _.forEach(this.sendQueues[publicKey], function (message) {
     if (Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
-      console.log('send messsage')
-      console.log(message.topic)
-      console.log(message)
       this.transportManager.send(publicKey, JSON.stringify(message))
     }
   }, this)
@@ -417,6 +398,7 @@ Messaging.prototype._flushQueue = function (publicKey) {
  * @private
  */
 Messaging.prototype._getScope = function (publicKey) {
+  debug('getScope')
   expect(publicKey).to.be.a('string')
   expect(curve.fromBase64(publicKey)).to.have.length(32)
   if (this._inScope(publicKey, this.devices)) {
@@ -440,6 +422,7 @@ Messaging.prototype._getScope = function (publicKey) {
  * @return {boolean} true or false if the publicKey is a property of searchObject and it's verificationState is verified
  */
 Messaging.prototype._inScope = function (publicKey, searchObject) {
+  debug('inScope')
   return _.any(searchObject, function (value, index, collection) {
     return index === publicKey && value.verificationState >= verificationState.VERIFIED
   })

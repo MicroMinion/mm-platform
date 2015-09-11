@@ -4,25 +4,40 @@ var inherits = require('inherits')
 var net = require('net')
 var os = require('os')
 var _ = require('lodash')
-var expect = require('chai').expect
+var storagejs = require('storagejs')
+var debug = require('debug')('flunky-platform:messaging:transport-tcp')
 
 var TCPTransport = function (publicKey, privateKey) {
-  console.log('initializing TCPTransport')
+  debug('initialize')
   AbstractTransport.call(this, publicKey, privateKey)
   this.enabled = false
+  var transport = this
   this._server = net.createServer()
   this._server.on('listening', this._onListening.bind(this))
   this._server.on('close', this._onClose.bind(this))
   this._server.on('connection', this._onConnection.bind(this))
   this._server.on('error', function (err) {
-    console.log(err)
+    if (err.code === 'EADDRINUSE') {
+      transport._server.close()
+      transport._listen(0)
+    } else {
+      debug(err)
+    }
   })
-  this._server.listen()
+  storagejs.get('flunky-messaging-transport-tcp').then(this._listen.bind(this), function (err) {
+    transport._listen(0)
+  })
 }
 
 inherits(TCPTransport, AbstractTransport)
 
+TCPTransport.prototype._listen = function (port) {
+  debug('_listen')
+  this._server.listen(port)
+}
+
 TCPTransport.prototype._listAddresses = function () {
+  debug('_listAddresses')
   var result = []
   var interfaces = os.networkInterfaces()
   _.forEach(interfaces, function (interface_) {
@@ -36,7 +51,9 @@ TCPTransport.prototype._listAddresses = function () {
 }
 
 TCPTransport.prototype._onListening = function () {
+  debug('_onListening')
   this.enabled = true
+  storagejs.put('flunky-messaging-transport-tcp', this._server.address().port)
   this.emit('ready', {
     'tcp': {
       'addresses': this._listAddresses(),
@@ -46,61 +63,64 @@ TCPTransport.prototype._onListening = function () {
 }
 
 TCPTransport.prototype._onClose = function () {
+  debug('_onClose')
   this.enabled = false
   this.emit('disable')
 }
 
 TCPTransport.prototype._onConnection = function (connection) {
+  debug('_onConnection')
   this._wrapIncomingConnection(connection)
 }
 
 TCPTransport.prototype.enable = function () {
+  debug('enable')
   if (!this.enabled) {
     this._server.listen()
   }
 }
 
 TCPTransport.prototype.disable = function () {
+  debug('disable')
   this._server.close()
 }
 
 TCPTransport.prototype.isDisabled = function () {
+  debug('isDisabled')
   return !this.enabled
 }
 
-TCPTransport.prototype._connect = function (publicKey, connectionInfo) {
+TCPTransport.prototype._connect = function (connectionInfo) {
+  debug('_connect')
+  var transport = this
   var deferred = Q.defer()
-  try {
-    console.log('connect')
-    expect(connectionInfo).to.have.property('tcp')
-    expect(connectionInfo.tcp).to.be.an('Object')
-    expect(connectionInfo.tcp).to.have.property('addresses')
-    expect(connectionInfo.tcp).to.have.property('port')
-  } catch (e) {
-    process.nextTick(function () {
-      deferred.reject(e)
+  var promise = deferred.promise
+  if (this._hasConnectionInfo(connectionInfo)) {
+    _.forEach(connectionInfo.tcp.addresses, function (address) {
+      promise = promise.then(undefined, transport._connectToAddress.bind(transport, address, connectionInfo.tcp.port))
     })
-    return deferred.promise
   }
-  _.forEach(connectionInfo.tcp.addresses, function (address) {
-    deferred = deferred.then(undefined, this._connectToAddress.bind(this, address, connectionInfo.tcp.port))
-  }, this)
   process.nextTick(function () {
     deferred.reject()
   })
-  return deferred.promise
+  return promise
+}
+
+TCPTransport.prototype._hasConnectionInfo = function (connectionInfo) {
+  return _.isObject(connectionInfo) && _.has(connectionInfo, 'tcp') && _.isObject(connectionInfo.tcp) &&
+  _.has(connectionInfo.tcp, 'addresses') && _.has(connectionInfo.tcp, 'port')
 }
 
 TCPTransport.prototype._connectToAddress = function (address, port) {
+  debug('_connectToAddress')
   var deferred = Q.defer()
   var connection = net.createConnection(port, address)
   var err = function (err) {
-    console.log(err)
-    deferred.reject()
+    deferred.reject(err)
   }
   connection.on('connect', function () {
     connection.removeListener('error', err)
-    deferred.resolve()
+    deferred.resolve(connection)
   })
   connection.once('error', err)
   return deferred.promise

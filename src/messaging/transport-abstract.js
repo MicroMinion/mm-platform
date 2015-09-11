@@ -4,6 +4,7 @@ var curve = require('curve-protocol')
 var inherits = require('inherits')
 var _ = require('lodash')
 var Q = require('q')
+var debug = require('debug')('flunky-platform:messaging:transport-abstract')
 
 var expect = chai.expect
 
@@ -20,6 +21,7 @@ var expect = chai.expect
  * @param {string} privateKey
  */
 var AbstractTransport = function (publicKey, privateKey) {
+  debug('initialize')
   expect(publicKey).to.be.a('string')
   expect(curve.fromBase64(publicKey)).to.have.length(32)
   expect(privateKey).to.be.a('string')
@@ -33,7 +35,7 @@ var AbstractTransport = function (publicKey, privateKey) {
    * @type Object.{string, Object}
    */
   this.connections = {}
-  this.inProgressconnections = {}
+  this.inProgressConnections = {}
 }
 
 inherits(AbstractTransport, events.EventEmitter)
@@ -59,12 +61,14 @@ inherits(AbstractTransport, events.EventEmitter)
  * @abstract
  */
 AbstractTransport.prototype.disable = function () {
+  debug('disable')
   _.forEach(this.connections, function (connection) {
     connection.end()
   })
 }
 
 AbstractTransport.prototype.isDisabled = function () {
+  debug('isDisabled')
   throw new Error('must be implemented by subclass')
 }
 
@@ -74,6 +78,7 @@ AbstractTransport.prototype.isDisabled = function () {
  * @abstract
  */
 AbstractTransport.prototype.enable = function () {
+  debug('enable')
   throw new Error('must be implemented by subclass')
 }
 
@@ -87,12 +92,13 @@ AbstractTransport.prototype.enable = function () {
  * @param {Object} connectionInfo
  * @return {Promise}
  */
-AbstractTransport.prototype.connect = function (publicKey, connectionInfo) {
-  if (_.has(this.inProgressConnections, publicKey)) {
-    return this.inProgressConnections[publicKey].promise
+AbstractTransport.prototype.connect = function (connectionInfo) {
+  debug('connect')
+  if (_.has(this.inProgressConnections, connectionInfo.publicKey)) {
+    return this.inProgressConnections[connectionInfo.publicKey].promise
   } else {
-    return this._connect(publicKey, connectionInfo)
-      .then(this._wrapOutgoingConnection.bind(publicKey))
+    return this._connect(connectionInfo)
+      .then(this._wrapOutgoingConnection.bind(this, connectionInfo.publicKey))
   }
 }
 
@@ -101,11 +107,13 @@ AbstractTransport.prototype.connect = function (publicKey, connectionInfo) {
  *
  * @return {Promise}
  */
-AbstractTransport.prototype._connect = function (publicKey, connectionInfo) {
+AbstractTransport.prototype._connect = function (connectionInfo) {
+  debug('_connect')
   throw new Error('must be implemented by subclass')
 }
 
 AbstractTransport.prototype._wrapIncomingConnection = function (connection) {
+  debug('wrapIncomingConnection')
   var curveConnection = new curve.CurveCPStream({
     stream: connection,
     is_server: true,
@@ -116,6 +124,7 @@ AbstractTransport.prototype._wrapIncomingConnection = function (connection) {
 }
 
 AbstractTransport.prototype._wrapOutgoingConnection = function (publicKey, connection) {
+  debug('wrapOutgoingConnection')
   var curveConnection = new curve.CurveCPStream({
     stream: connection,
     is_server: false,
@@ -128,12 +137,13 @@ AbstractTransport.prototype._wrapOutgoingConnection = function (publicKey, conne
   return this.inProgressConnections[publicKey].promise
 }
 
-AbstractTransport.prototype._connectevents = function (stream) {
+AbstractTransport.prototype._connectEvents = function (stream) {
+  debug('_connectEvents')
   expect(stream).to.exist
   expect(stream).to.be.an.instanceof(curve.CurveCPStream)
   var transport = this
   stream.on('error', function (error) {
-    console.log(error)
+    debug(error)
   })
   stream.on('end', function () {
     delete transport.connections[transport._getPeer(stream)]
@@ -157,18 +167,21 @@ AbstractTransport.prototype._connectevents = function (stream) {
 }
 
 AbstractTransport.prototype._getPeer = function (stream) {
+  debug('getPeer')
   var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey
   publicKey = curve.toBase64(publicKey)
   return publicKey
 }
 
 AbstractTransport.prototype.getConnection = function (publicKey) {
+  debug('getConnection')
   if (_.has(this.connections, publicKey)) {
     return this.connections[publicKey]
   }
 }
 
 AbstractTransport.prototype.isConnected = function (publicKey) {
+  debug('isConnected')
   return Boolean(this.getConnection(publicKey))
 }
 
@@ -194,6 +207,7 @@ AbstractTransport.prototype.isConnected = function (publicKey) {
  */
 
 AbstractTransport.prototype.send = function (publicKey, message) {
+  debug('send')
   expect(message).to.exist
   expect(publicKey).to.be.a('string')
   expect(curve.fromBase64(publicKey)).to.have.length(32)

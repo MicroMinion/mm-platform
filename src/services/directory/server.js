@@ -1,4 +1,5 @@
 var _ = require('lodash')
+var debug = require('debug')('flunky-platform:services:directory')
 
 var DirectoryClient = function (messaging, serverKey, serverConnectionInfo) {
   this.messaging = messaging
@@ -9,7 +10,7 @@ var DirectoryClient = function (messaging, serverKey, serverConnectionInfo) {
   this.messaging.on('friends.directoryServer.getReply', this.getReply.bind(this))
   this.messaging.on('public.directoryServer.getReply', this.getReply.bind(this))
   serverConnectionInfo.publicKey = serverKey
-  this.messaging.send('messaging.connectionInfo', 'local', serverConnectionInfo)
+  this.messaging.send('messaging.connectionInfo', 'local', {publicKey: serverKey, connectionInfo: serverConnectionInfo})
 }
 
 DirectoryClient.prototype.put = function (topic, publicKey, data) {
@@ -44,6 +45,7 @@ DirectoryServer.prototype.processGet = function (topic, publicKey, data) {
 }
 
 DirectoryServer.prototype.processPut = function (topic, publicKey, data) {
+  debug('processPut ' + data.key + ' ' + data.value)
   this.state[data.key] = data.value
 }
 
