@@ -2,6 +2,7 @@ var _ = require('lodash')
 var chai = require('chai')
 var events = require('events')
 var inherits = require('inherits')
+var debug = require('debug')('flunky-platform:util:authentication')
 
 var expect = chai.expect
 
@@ -22,7 +23,9 @@ var AuthenticationManager = function (options) {
   this.scope = options.scope
   this.ongoingVerifications = {}
   this.messaging.on('public.' + this.name + '.initiate', this.onInitiate.bind(this))
+  this.messaging.on(this.scope + '.' + this.name + '.initiate', this.onInitiate.bind(this))
   this.messaging.on('public.' + this.name + '.code', this.onCode.bind(this))
+  this.messaging.on(this.scope + '.' + this.name + '.code', this.onCode.bind(this))
   this.messaging.on(this.scope + '.' + this.name + '.confirmation', this.onConfirmation.bind(this))
 }
 
@@ -48,6 +51,7 @@ AuthenticationManager.prototype.connectProtocol = function (publicKey, state) {
 }
 
 AuthenticationManager.prototype.onInitiate = function (topic, publicKey, data) {
+  debug('onInitiate')
   this.emit('newInstance', publicKey, data)
 }
 
@@ -106,8 +110,8 @@ PublicKeyVerificationProtocol.prototype.start = function () {
     this.ongoing = setInterval(this.start.bind(this), RESEND_INTERVAL)
   }
   if (!this.state.verification.initiateReceived) {
-    this.sendInitiate()
-  } else if (!this.state.verification.codeReceived && this.state.verification.otherCode) {
+    this.sendInitiate(true)
+  } else if (!this.state.verification.codeReceived && this.state.code) {
     this.sendCode()
   } else if (this.state.verification.codeReceived && this.state.verification.codeSend && !this.state.verification.confirmationReceived) {
     this.sendConfirmation()
@@ -123,12 +127,10 @@ PublicKeyVerificationProtocol.prototype.setProfile = function (profile) {
 }
 
 PublicKeyVerificationProtocol.prototype.sendInitiate = function (reply) {
+  debug('PublicKeyVerificationProtocol.sendInitiate reply:' + reply)
   var options = {
     realtime: true,
     expireAfter: 1000 * 60
-  }
-  if (!reply) {
-    reply = false
   }
   var data = {
     info: this.profile.info,
@@ -139,9 +141,10 @@ PublicKeyVerificationProtocol.prototype.sendInitiate = function (reply) {
 }
 
 PublicKeyVerificationProtocol.prototype.onInitiate = function (data) {
+  debug('PublicKeyVerificationProtocol.onInitiate')
   this.set('initiateReceived')
-  if (!data.reply) {
-    this.sendInitiate(true)
+  if (data.reply) {
+    this.sendInitiate(false)
   }
   if (this.state.verification.initiateSend && this.state.verification.initiateReceived && this.state.code) {
     this.sendCode()
@@ -179,7 +182,8 @@ PublicKeyVerificationProtocol.prototype.sendCode = function () {
 }
 
 PublicKeyVerificationProtocol.prototype.onCode = function (data) {
-  if (this.state.verification.initiateSend && this.state.verification.initiateReceived && !this.state.verification.codeReceived) {
+  debug('PublicKeyVerificationProtocol.onCode')
+  if (this.state.verification.initiateSend && this.state.verification.initiateReceived)  {
     var codeValid = false
     if (data.codeType === 'qr') {
       codeValid = (data.code === this.profile.code)
@@ -203,8 +207,9 @@ PublicKeyVerificationProtocol.prototype.onCode = function (data) {
       } else if (this.state.code) {
         this.sendCode()
       } else if (data.noCodeRequired) {
-        this.state.code = ''
+        this.state.code = 'none'
         this.state.codeType = 'none'
+        this.sendCode()
       }
     }
   }

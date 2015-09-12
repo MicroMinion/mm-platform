@@ -209,11 +209,13 @@ AbstractTransport.prototype._connectEvents = function (stream) {
 
 AbstractTransport.prototype._deleteStream = function (stream) {
   var publicKey = this._getPeer(stream)
-  _.remove(this.connections[publicKey], function (streamInArray) {
-    return streamInArray === stream
-  })
+  if(publicKey) {
+    _.remove(this.connections[publicKey], function (streamInArray) {
+      return streamInArray === stream
+    })
+  }
   stream.removeAllListeners()
-  if (_.has(this.inProgressConnections, publicKey)) {
+  if (publicKey && _.has(this.inProgressConnections, publicKey)) {
     this.inProgressConnections[publicKey].reject()
     delete this.inProgressConnections[publicKey]
   }
@@ -222,6 +224,9 @@ AbstractTransport.prototype._deleteStream = function (stream) {
 AbstractTransport.prototype._getPeer = function (stream) {
   debug('getPeer')
   var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey
+  if (!publicKey) {
+    return
+  }
   publicKey = curve.toBase64(publicKey)
   return publicKey
 }

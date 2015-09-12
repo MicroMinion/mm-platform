@@ -43,9 +43,18 @@ var Profile = function (messaging) {
     profile.update(false)
   })
   this.messaging.on('self.profile.updateInfo', function (topic, publicKey, data) {
-    profile.profile.info = data.info
-    profile.collection['profile'].name = data.info.name
-    profile.collection['profile'].accounts = data.info.accounts
+    if (_.has(data.info, 'name')) {
+      profile.profile.info.name = data.info.name
+      profile.collection['profile'].name = data.info.name
+    }
+    if (_.has(data.info, 'accounts')) {
+      profile.profile.info.accounts = data.info.accounts
+      profile.collection['profile'].accounts = data.info.accounts
+    }
+    if (_.has(data.info, 'device')) {
+      profile.profile.info.device = data.info.device
+      profile.collection['profile'].device = data.info.device
+    }
     profile.syncEngine.update('profile')
     profile.updateAuthenticationState()
     profile.update(true)

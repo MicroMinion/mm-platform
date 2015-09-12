@@ -99,6 +99,7 @@ Devices.prototype.add = function (topic, publicKey, data) {
 }
 
 Devices.prototype.setCode = function (topic, publicKey, data) {
+  if(publicKey !== "local") { return }
   expect(this.ongoingVerifications).to.have.property(data.publicKey)
   var device = this.devices[data.publicKey]
   device.code = data.code
