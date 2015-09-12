@@ -23,7 +23,7 @@ var expect = chai.expect
  */
 var PUBLISH_CONNECTION_INFO_INTERVAL = 1000 * 60 * 5
 
-var DIRECTORY_LOOKUP_TIMEOUT = 1000
+var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
 var TransportManager = function (messaging) {
   debug('initialize')
@@ -39,12 +39,14 @@ var TransportManager = function (messaging) {
   this.directoryLookup = {}
   this._loadDirectoryCache()
   this.messaging.once('self.profile.update', function (topic, publicKey, data) {
+    debug('profile update event')
     manager.publicKey = data.publicKey
     manager.privateKey = data.privateKey
     manager._initializeTransports()
   })
   this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
   this.messaging.on('self.messaging.connectionInfo', function (topic, publicKey, data) {
+    debug('connectionInfo event')
     if (!manager.directoryCache[data.publicKey]) {
       manager.directoryCache[data.publicKey] = {}
     }
@@ -75,7 +77,7 @@ inherits(TransportManager, AbstractTransport)
 
 TransportManager.prototype._initializeTransports = function () {
   debug('initializeTransports')
-  var transports = [TCPTransport]
+  var transports = [GCMTransport, TCPTransport]
   _.forEach(transports, function (transportClass) {
     this._initializeTransport(transportClass)
   }, this)
@@ -94,17 +96,20 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
   if (transport) {
     this.transports.push(transport)
     transport.on('ready', function (connectionInfo) {
+      debug('ready event')
       extend(manager.connectionInfo, connectionInfo)
       manager.connectionInfo.publicKey = manager.publicKey
       manager.emit('ready', manager.connectionInfo)
       manager._publishConnectionInfo()
     })
     transport.on('disable', function () {
+      debug('disable event')
       if (this.isDisabled()) {
         manager.emit('disable')
       }
     })
     transport.on('message', function (publicKey, message) {
+      debug('message event ' + message)
       manager.emit('message', publicKey, message)
     })
   }
@@ -168,7 +173,9 @@ TransportManager.prototype._connect = function (connectionInfo) {
   var deferred = Q.defer()
   var promise = deferred.promise
   _.forEach(this.transports, function (transport) {
-    promise = promise.then(undefined, transport.connect.bind(transport, connectionInfo))
+    if (!transport.isDisabled()) {
+      promise = promise.then(undefined, transport.connect.bind(transport, connectionInfo))
+    }
   }, this)
   deferred.reject()
   return promise
@@ -255,12 +262,15 @@ TransportManager.prototype._lookupKey = function (publicKey) {
 TransportManager.prototype._processGetReply = function (topic, publicKey, data) {
   debug('_processGetReply')
   if (_.has(this.directoryLookup, data.key)) {
-    delete this.directoryLookup[data.key]
+    if (!_.has(this.directoryCache, data.key)) {
+      this.directoryCache[data.key] = {}
+    }
     this.directoryCache[data.key].lastUpdate = new Date().toJSON()
     this.directoryCache[data.key].connectionInfo = JSON.parse(data.value)
     this.directoryCache[data.key].publicKey = data.key
     this._saveDirectoryCache()
     this.directoryLookup[data.key].resolve(this.directoryCache[data.key].connectionInfo)
+    delete this.directoryLookup[data.key]
   }
 }
 

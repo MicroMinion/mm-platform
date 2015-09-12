@@ -124,7 +124,9 @@ SyncStream.prototype.setSequenceCheckpoint = function (checkpoint) {
   var deleteKeys = _.filter(_.keys[this.events], function (sequence) {
     return sequence <= checkpoint
   }, this)
-  _.forEach(deleteKeys, function (key) { delete this.events[key]}, this)
+  _.forEach(deleteKeys, function (key) {
+    delete this.events[key]
+  }, this)
 }
 
 module.exports = SyncStream

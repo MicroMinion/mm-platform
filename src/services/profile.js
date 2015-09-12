@@ -6,6 +6,7 @@ var curve = require('curve-protocol')
 var useragent = require('useragent')
 var qrImage = require('qr-image')
 var SyncEngine = require('../util/mmds/index.js')
+var debug = require('debug')('flunky-platform:services:profile')
 
 var PUBLISH_INTERVAL = 1000 * 60 * 5
 
@@ -91,6 +92,7 @@ Profile.prototype.loadProfile = function () {
     },
 
     error: function (error) {
+      debug(error)
       profile.setDefaults()
       profile.messaging.send('profile.ready', 'local', {})
     }

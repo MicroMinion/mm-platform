@@ -19,6 +19,7 @@
   "dependencies": {
     "ak-eventemitter": "0.0.5",
     "chai": "^3.2.0",
+    "chrome-net": "^3.0.1",
     "curve-protocol": "git+ssh://git@bitbucket.org:nodatacenter/curve-protocol.git",
     "debug": "^2.2.0",
     "extend.js": "0.0.2",

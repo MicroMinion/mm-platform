@@ -22,7 +22,7 @@ var Contacts = function (messaging) {
   messaging.on('self.contacts.enterCode', this.enterCode.bind(this))
   messaging.on('self.directory.getReply', function (topic, publicKey, data) {
     var contact = _.find(contacts.contacts, function (contact) {
-      return _.any(contact.accounts, function (account) {
+      return _.any(contact.info.accounts, function (account) {
         var key = account.type + ':' + account.id
         return key === data.key
       })
@@ -182,7 +182,7 @@ Contacts.prototype.searchKeys = function (uuid) {
 Contacts.prototype.searchKey = function (uuid, account) {
   var key = account.type + ':' + account.id
   this.messaging.send('directory.get', 'local', {key: key})
-},
+}
 
 /* AUTHENTICATION HELPER METHODS */
 
@@ -204,6 +204,9 @@ Contacts.prototype.createProtocol = function (publicKey, contact) {
 
 Contacts.prototype.updateVerificationState = function (publicKey) {
   var contact = this.getContact(publicKey)
+  if (_.isUndefined(contact.verificationState)) {
+    contact.verificationState = verificationState.UNKNOWN
+  }
   this.updateVerificationStateKey(contact, publicKey)
   this.updateVerificationStateContact(contact, publicKey)
   this.update()

@@ -1,3 +1,5 @@
+/* global chrome */
+
 var events = require('events')
 var chai = require('chai')
 var curve = require('curve-protocol')
@@ -5,6 +7,7 @@ var inherits = require('inherits')
 var _ = require('lodash')
 var Q = require('q')
 var debug = require('debug')('flunky-platform:messaging:transport-abstract')
+var os = require('os')
 
 var expect = chai.expect
 
@@ -82,6 +85,36 @@ AbstractTransport.prototype.enable = function () {
   throw new Error('must be implemented by subclass')
 }
 
+AbstractTransport.prototype._listAddresses = function () {
+  debug('_listAddresses')
+  var deferred = Q.defer()
+  var result = []
+  if (_.isUndefined(window.chrome) || _.isUndefined(window.chrome.system) || _.isUndefined(window.chrome.system.network)) {
+    process.nextTick(function () {
+      var interfaces = os.networkInterfaces()
+      _.forEach(interfaces, function (interface_) {
+        _.forEach(interface_, function (face) {
+          if (!face.internal) {
+            result.push(face.address)
+          }
+        })
+      })
+      debug(result)
+      deferred.resolve(result)
+    })
+  } else {
+    chrome.system.network.getNetworkInterfaces(function (networkIfaceArray) {
+      for (var i = 0; i < networkIfaceArray.length; i++) {
+        var iface = networkIfaceArray[i]
+        result.push(iface.address)
+      }
+      debug(result)
+      deferred.resolve(result)
+    })
+  }
+  return deferred.promise
+}
+
 /* CONNECTIONS */
 
 /**
@@ -145,25 +178,45 @@ AbstractTransport.prototype._connectEvents = function (stream) {
   stream.on('error', function (error) {
     debug(error)
   })
+  stream.on('finish', function () {
+    transport._deleteStream(stream)
+  })
   stream.on('end', function () {
-    delete transport.connections[transport._getPeer(stream)]
-    stream.removeAllListeners()
-    if (_.has(transport.inProgressConnections, transport._getPeer(stream))) {
-      transport.inProgressConnections[transport._getPeer(stream)].reject()
-      delete transport.inProgressConnections[transport._getPeer(stream)]
-    }
+    transport._deleteStream(stream)
   })
   stream.on('drain', function () {
-    expect(transport.connections).to.not.have.ownProperty(transport._getPeer(stream))
-    transport.connections[transport._getPeer(stream)] = stream
-    if (_.has(transport.inProgressConnections, transport._getPeer(stream))) {
-      transport.inProgressConnections[transport._getPeer(stream)].resolve(stream)
-      delete transport.inProgressConnections[transport._getPeer(stream)]
+    var publicKey = transport._getPeer(stream)
+    if (!_.has(transport.connections, publicKey)) {
+      transport.connections[publicKey] = []
     }
+    var removedStreams = _.filter(transport.connections[publicKey], function (streamInArray) {
+      return streamInArray !== stream
+    })
+    transport.connections[publicKey].push(stream)
+    if (_.has(transport.inProgressConnections, publicKey)) {
+      transport.inProgressConnections[publicKey].resolve(stream)
+      delete transport.inProgressConnections[publicKey]
+    }
+    _.forEach(removedStreams, function (stream) {
+      stream.end()
+    })
   })
   stream.on('data', function (data) {
+    debug('data event ' + data)
     transport.emit('message', transport._getPeer(stream), data)
   })
+}
+
+AbstractTransport.prototype._deleteStream = function (stream) {
+  var publicKey = this._getPeer(stream)
+  _.remove(this.connections[publicKey], function (streamInArray) {
+    return streamInArray === stream
+  })
+  stream.removeAllListeners()
+  if (_.has(this.inProgressConnections, publicKey)) {
+    this.inProgressConnections[publicKey].reject()
+    delete this.inProgressConnections[publicKey]
+  }
 }
 
 AbstractTransport.prototype._getPeer = function (stream) {
@@ -176,7 +229,7 @@ AbstractTransport.prototype._getPeer = function (stream) {
 AbstractTransport.prototype.getConnection = function (publicKey) {
   debug('getConnection')
   if (_.has(this.connections, publicKey)) {
-    return this.connections[publicKey]
+    return _.first(this.connections[publicKey])
   }
 }
 
@@ -212,8 +265,8 @@ AbstractTransport.prototype.send = function (publicKey, message) {
   expect(publicKey).to.be.a('string')
   expect(curve.fromBase64(publicKey)).to.have.length(32)
   expect(this.connections[publicKey]).to.exist
-  expect(this.connections[publicKey]).to.be.an.instanceof(curve.CurveCPStream)
-  this.connections[publicKey].write(message)
+  expect(_.first(this.connections[publicKey])).to.be.an.instanceof(curve.CurveCPStream)
+  _.first(this.connections[publicKey]).write(message)
 }
 
 module.exports = AbstractTransport

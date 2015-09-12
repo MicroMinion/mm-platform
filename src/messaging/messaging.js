@@ -211,7 +211,6 @@ Messaging.prototype._setupTransportManager = function () {
   this.transportManager = new TransportManager(this)
   this.transportManager.on('ready', function (connectionInfo) {
     expect(connectionInfo).to.be.an('object')
-    expect(messaging.transportAvailable).to.be.false
     messaging.transportAvailable = true
   })
   this.transportManager.on('disable', function () {
@@ -221,7 +220,16 @@ Messaging.prototype._setupTransportManager = function () {
   this.transportManager.on('message', function (publicKey, message) {
     expect(publicKey).to.be.a('string')
     expect(curve.fromBase64(publicKey)).to.have.length(32)
-    message = JSON.parse(message)
+    if (message.length === 0) {
+      debug('empty string received')
+      return
+    }
+    try {
+      message = JSON.parse(message)
+    } catch (e) {
+      debug(e)
+      return
+    }
     var scope = messaging._getScope(publicKey)
     debug('message received ' + scope + '.' + message.topic + ' ' + JSON.stringify(message))
     messaging.emit(scope + '.' + message.topic, publicKey, message.data)

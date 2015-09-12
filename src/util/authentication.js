@@ -5,6 +5,8 @@ var inherits = require('inherits')
 
 var expect = chai.expect
 
+var RESEND_INTERVAL = 60 * 1000
+
 var _generateCode = function () {
   var text = ''
   var possible = '0123456789'
@@ -67,6 +69,7 @@ var PublicKeyVerificationProtocol = function (publicKey, state, name, messaging)
   this.messaging = messaging
   this.publicKey = publicKey
   this.state = state
+  this.ongoing
   if (!this.state.verification) {
     this.state.verification = {}
   }
@@ -99,6 +102,9 @@ PublicKeyVerificationProtocol.prototype.set = function (attribute) {
 
 PublicKeyVerificationProtocol.prototype.start = function () {
   if (!this.profile) { return }
+  if (!this.ongoing) {
+    this.ongoing = setInterval(this.start.bind(this), RESEND_INTERVAL)
+  }
   if (!this.state.verification.initiateReceived) {
     this.sendInitiate()
   } else if (!this.state.verification.codeReceived && this.state.verification.otherCode) {
@@ -229,6 +235,7 @@ PublicKeyVerificationProtocol.prototype.onConfirmation = function (data) {
   if (data.reply) {
     this.sendConfirmation(false)
   }
+  clearInterval(this.ongoing)
   this.set('confirmationReceived')
 }
 

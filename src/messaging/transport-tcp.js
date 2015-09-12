@@ -1,11 +1,17 @@
 var AbstractTransport = require('./transport-abstract.js')
 var Q = require('q')
 var inherits = require('inherits')
-var net = require('net')
-var os = require('os')
 var _ = require('lodash')
 var storagejs = require('storagejs')
 var debug = require('debug')('flunky-platform:messaging:transport-tcp')
+
+var net
+
+if (_.isUndefined(window.chrome)) {
+  net = require('net')
+} else {
+  net = require('chrome-net')
+}
 
 var TCPTransport = function (publicKey, privateKey) {
   debug('initialize')
@@ -17,14 +23,11 @@ var TCPTransport = function (publicKey, privateKey) {
   this._server.on('close', this._onClose.bind(this))
   this._server.on('connection', this._onConnection.bind(this))
   this._server.on('error', function (err) {
-    if (err.code === 'EADDRINUSE') {
-      transport._server.close()
-      transport._listen(0)
-    } else {
-      debug(err)
-    }
+    debug(err)
+    transport._listen(0)
   })
   storagejs.get('flunky-messaging-transport-tcp').then(this._listen.bind(this), function (err) {
+    debug(err)
     transport._listen(0)
   })
 }
@@ -36,27 +39,19 @@ TCPTransport.prototype._listen = function (port) {
   this._server.listen(port)
 }
 
-TCPTransport.prototype._listAddresses = function () {
-  debug('_listAddresses')
-  var result = []
-  var interfaces = os.networkInterfaces()
-  _.forEach(interfaces, function (interface_) {
-    _.forEach(interface_, function (face) {
-      if (!face.internal) {
-        result.push(face.address)
-      }
-    })
-  })
-  return result
-}
-
 TCPTransport.prototype._onListening = function () {
   debug('_onListening')
   this.enabled = true
   storagejs.put('flunky-messaging-transport-tcp', this._server.address().port)
+  var addresses = this._listAddresses()
+  addresses.then(this._emitReady.bind(this)).done()
+}
+
+TCPTransport.prototype._emitReady = function (addresses) {
+  debug('_emitReady')
   this.emit('ready', {
     'tcp': {
-      'addresses': this._listAddresses(),
+      'addresses': addresses,
       'port': this._server.address().port
     }
   })
@@ -83,6 +78,7 @@ TCPTransport.prototype.enable = function () {
 TCPTransport.prototype.disable = function () {
   debug('disable')
   this._server.close()
+  AbstractTransport.prototype.disable.call(this)
 }
 
 TCPTransport.prototype.isDisabled = function () {
