@@ -69,7 +69,7 @@ TCPTransport.prototype._onConnection = function (connection) {
   debug(connection.remoteAddress)
   debug(connection.remotePort)
   connection.on('timeout', function() {
-    connection.close()
+    connection.end()
     connection.destroy()
   })
   connection.setTimeout(60 * 1000)
