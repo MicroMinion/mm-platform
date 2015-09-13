@@ -41,7 +41,12 @@ ProtocolDispatcher.prototype._setupTransportManager = function () {
     } else {
       dispatcher.buffers[publicKey] = message
     }
-    dispatcher.processBuffer(publicKey)
+    try {
+        dispatcher.processBuffer(publicKey)
+    } catch (e) {
+        debug(e)
+        delete dispatcher.buffers[publicKey]
+    }
   })
 }
 
