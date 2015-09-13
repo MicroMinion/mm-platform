@@ -30,9 +30,16 @@ var Profile = function (messaging) {
   this.syncEngine = new SyncEngine(messaging, 'profile', 'id', this.collection)
   this.syncEngine.on('processEvent', function (action, document) {
     if (action === 'update') {
-      profile.collection['profile'] = document
-      profile.profile.info.name = document.name
-      profile.profile.info.accounts = document.accounts
+      if(document.name) {
+        profile.profile.info.name = document.name
+        profile.collection['profile'].name = document.name
+        profile.syncEngine.update('profile')
+      }
+      if(document.accounts) {
+        profile.profile.info.accounts = document.accounts
+        profile.collection['profile']
+        profile.syncEngine.update('profile')
+      }
       profile.update(true)
     }
   })

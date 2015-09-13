@@ -29,6 +29,7 @@
     "node-uuid": "^1.4.3",
     "q": "^1.4.1",
     "qr-image": "^3.1.0",
+    "request": "^2.61.0",
     "storagejs": "^1.0.7",
     "useragent": "^2.1.7",
     "yamlparser": "0.0.2"

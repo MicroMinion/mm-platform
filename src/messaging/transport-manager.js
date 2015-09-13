@@ -77,7 +77,7 @@ inherits(TransportManager, AbstractTransport)
 
 TransportManager.prototype._initializeTransports = function () {
   debug('initializeTransports')
-  var transports = [TCPTransport, GCMTransport]
+  var transports = [TCPTransport]
   _.forEach(transports, function (transportClass) {
     this._initializeTransport(transportClass)
   }, this)

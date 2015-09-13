@@ -8,6 +8,7 @@ var ProtocolDispatcher = require('./protocol-dispatcher.js')
 // var TransportManager = require('./transport-manager.js')
 var storagejs = require('storagejs')
 var debug = require('debug')('flunky-platform:messaging:messaging')
+var debugMessage = require('debug')('flunky-platform:messages')
 
 var expect = chai.expect
 
@@ -200,7 +201,7 @@ Messaging.prototype._setupDispatcher = function () {
       return
     }
     var scope = messaging._getScope(publicKey)
-    debug('message received ' + scope + '.' + message.topic + ' ' + JSON.stringify(message))
+    debugMessage('message received ' + scope + '.' + message.topic + ' for ' + publicKey + ' (' + JSON.stringify(message) + ')')
     messaging.emit(scope + '.' + message.topic, publicKey, message.data)
   })
 }
@@ -273,7 +274,6 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
   expect(publicKey).to.be.a('string')
   expect(publicKey === 'local' || curve.fromBase64(publicKey).length === 32).to.be.true
   expect(topic).to.be.a('string')
-  debug('queuing message ' + topic + ' to ' + publicKey + '(' + JSON.stringify(data) + ')')
   if (options) { expect(options).to.be.an('object') } else { options = {} }
   if (options.realtime) { expect(options.realtime).to.be.a('boolean') }
   if (options.expireAfter) { expect(options.expireAfter).to.be.a('number') }
@@ -290,6 +290,7 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
     })
     return
   }
+  debugMessage('queuing message ' + topic + ' to ' + publicKey + '(' + JSON.stringify(data) + ')')
   if (!this.sendQueues[publicKey]) {
     this.sendQueues[publicKey] = {}
   }
@@ -330,7 +331,7 @@ Messaging.prototype._trigger = function (publicKey) {
     this.dispatcher.connect(publicKey)
       .then(this._flushQueue.bind(this, publicKey))
       .fail(function (error) {
-        debug('connect failed')
+        debug('connect failed for ' + publicKey)
         debug(error)
       })
       .done()

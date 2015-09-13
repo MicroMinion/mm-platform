@@ -1,10 +1,12 @@
 var events = require('events')
 var inherits = require('inherits')
 var _ = require('lodash')
+var debug = require('debug')('flunky-platform:util:mmds:sync-stream')
 
 var SYNC_INTERVAL = 30000
 
 var SyncStream = function (publicKey, service, log, messaging) {
+  debug('initialize ' + publicKey)
   events.EventEmitter.call(this)
   this.publicKey = publicKey
   this.service = service
@@ -29,10 +31,12 @@ SyncStream.prototype.stop = function () {
 /* LAST SEQUENCE REQUEST */
 
 SyncStream.prototype.send_last_sequence_request = function () {
+    debug('send_last_sequence_request ' + this.publicKey)
   this.messaging.send(this.service + '.last_sequence_request', this.publicKey, {}, {expireAfter: 15000, realtime: false})
 }
 
 SyncStream.prototype.on_last_sequence_request = function (message) {
+    debug('on_last_sequence_request ' + this.publicKey)
   var data = {
     'lastSequence': this.log.getLastSequence()
   }
@@ -42,6 +46,7 @@ SyncStream.prototype.on_last_sequence_request = function (message) {
 /* LAST SEQUENCE */
 
 SyncStream.prototype.on_last_sequence = function (data) {
+  debug('on_last_sequence ' + this.publicKey)
   var lastSequence = data.lastSequence
   this.lastKnownSequence = lastSequence
   this.sendEventRequests(this.sequenceCheckpoint)
@@ -50,6 +55,7 @@ SyncStream.prototype.on_last_sequence = function (data) {
 /* EVENTS REQUEST */
 
 SyncStream.prototype.sendEventRequests = function (startSequence) {
+  debug('sendEventRequests ' + this.publicKey)
   var sequences = []
   var events = this.afterCheckpointEvents
   var i = startSequence + 1
@@ -67,10 +73,12 @@ SyncStream.prototype.sendEventRequests = function (startSequence) {
 }
 
 SyncStream.prototype.send_event_request = function (sequences) {
+  debug('send_event_request ' + this.publicKey)
   this.messaging.send(this.service + '.event_request', this.publicKey, {sequences: sequences}, {expireAfter: 15000, realtime: true})
 }
 
 SyncStream.prototype.on_event_request = function (receivedData) {
+  debug('on_event_request ' + this.publicKey)
   var data = []
   for (var i = 0; i < receivedData.sequences.length; i++) {
     data.push(this.log.getEvent(receivedData.sequences[i]))
@@ -81,10 +89,12 @@ SyncStream.prototype.on_event_request = function (receivedData) {
 /* EVENTS */
 
 SyncStream.prototype.sendEvent = function (event) {
+  debug('sendEvent ' + this.publicKey)
   this.messaging.send(this.service + '.events', this.publicKey, [event], {expireAfter: 15000, realtime: true})
 }
 
 SyncStream.prototype.on_events = function (events) {
+  debug('on_events ' + this.publicKey)
   for (var i = 0; i < events.length; i++) {
     this.on_event(events[i])
   }
