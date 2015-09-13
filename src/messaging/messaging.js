@@ -4,11 +4,14 @@ var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
 var chai = require('chai')
 var curve = require('curve-protocol')
-var TransportManager = require('./transport-manager.js')
+var ProtocolDispatcher = require('./protocol-dispatcher.js')
+// var TransportManager = require('./transport-manager.js')
 var storagejs = require('storagejs')
 var debug = require('debug')('flunky-platform:messaging:messaging')
 
 var expect = chai.expect
+
+var PROTOCOL = 'ms'
 
 // TODO: Filter out only trusted keys when receicing devices or contacts so that receive logic becomes simpeler
 
@@ -103,30 +106,19 @@ var Messaging = function () {
   this._sendQueuesRetrieved = false
   this._loadSendQueues()
   /**
-   * Flag to indicate whether the transport for sending messages is available or not
+   * Interface for actually sending/receiving messages
    *
    * @access private
-   * @type {boolean}
-   */
-  this.transportAvailable = false
-  /**
-   * Interface for actually sending/receiving messages. This can be either an aggregator object that dispaches between
-   * different transport mechanisms or one transport mechanism (as long as they use the same interface / generate the same
-   * events
-   *
-   * @access private
-   * @type {TransportManager}
+   * @type {ProtocolDispatcher}
    *
    */
-  this.transportManager
-  this._setupTransportManager()
+  this.dispatcher
+  this._setupDispatcher()
   setInterval(function () {
     debug('trigger send queues periodically')
-    if (messaging.transportAvailable) {
-      _.forEach(_.keys(messaging.sendQueues), function (publicKey) {
-        messaging._trigger(publicKey)
-      })
-    }
+    _.forEach(_.keys(messaging.sendQueues), function (publicKey) {
+      messaging._trigger(publicKey)
+    })
   }, SEND_INTERVAL)
 }
 
@@ -173,59 +165,36 @@ Messaging.prototype._saveSendQueues = function (publicKeys) {
 }
 
 /**
- * TRANSPORT MANAGER
+ * DISPATCHER
  */
 
 /**
- * Manually disable transportManager
+ * Manually disable dispatcher
  *
  * @public
  */
 Messaging.prototype.disable = function () {
-  debug('disable')
-  if (this.transportManager) {
-    this.transportManager.disable()
-  }
+  this.dispatcher.disable()
 }
 
 /**
- * Manually enable transportManager
+ * Manually enable dispatcher
  *
  * @public
  */
 Messaging.prototype.enable = function () {
-  debug('enable')
-  if (this.transportManager) {
-    this.transportManager.enable()
-  }
+  this.dispatcher.enable()
 }
 
-Messaging.prototype._setupTransportManager = function () {
-  debug('setupTransportManager')
+Messaging.prototype._setupDispatcher = function () {
   var messaging = this
-  if (this.transportManager) {
-    this.transportAvailable = false
-    this.transportManager.disable()
-    this.transportManager.removeAllListeners()
-  }
-  this.transportManager = new TransportManager(this)
-  this.transportManager.on('ready', function (connectionInfo) {
-    expect(connectionInfo).to.be.an('object')
-    messaging.transportAvailable = true
-  })
-  this.transportManager.on('disable', function () {
-    expect(messaging.transportAvailable).to.be.true
-    messaging.transportAvailable = false
-  })
-  this.transportManager.on('message', function (publicKey, message) {
+  this.dispatcher = new ProtocolDispatcher(this)
+  // this.dispatcher = new TransportManager(this)
+  this.dispatcher.on(PROTOCOL, function (publicKey, message) {
     expect(publicKey).to.be.a('string')
     expect(curve.fromBase64(publicKey)).to.have.length(32)
-    if (message.length === 0) {
-      debug('empty string received')
-      return
-    }
     try {
-      message = JSON.parse(message)
+      message = JSON.parse(message.toString())
     } catch (e) {
       debug(e)
       return
@@ -357,18 +326,14 @@ Messaging.prototype._trigger = function (publicKey) {
   debug('trigger')
   expect(publicKey).to.be.a('string')
   expect(curve.fromBase64(publicKey)).to.have.length(32)
-  if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0 && this.transportAvailable) {
-    if (this.transportManager.isConnected(publicKey)) {
-      this._flushQueue(publicKey)
-    } else {
-      this.transportManager.connect(publicKey)
-        .then(this._flushQueue.bind(this, publicKey))
-        .fail(function (error) {
-          debug('connect failed')
-          debug(error)
-        })
-        .done()
-    }
+  if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0) {
+    this.dispatcher.connect(publicKey)
+      .then(this._flushQueue.bind(this, publicKey))
+      .fail(function (error) {
+        debug('connect failed')
+        debug(error)
+      })
+      .done()
   }
 }
 
@@ -380,18 +345,23 @@ Messaging.prototype._trigger = function (publicKey) {
  */
 Messaging.prototype._flushQueue = function (publicKey) {
   debug('flushQueue')
-  // TODO: take Promise returned from send into account to make sure that message can actually be deleted
   expect(publicKey).to.be.a('string')
   expect(curve.fromBase64(publicKey)).to.have.length(32)
-  expect(this.transportAvailable).to.be.true
-  expect(this.transportManager.isConnected(publicKey)).to.be.true
+  var messaging = this
   _.forEach(this.sendQueues[publicKey], function (message) {
     if (Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
-      this.transportManager.send(publicKey, JSON.stringify(message))
+      this.dispatcher.send(PROTOCOL, publicKey, new Buffer(JSON.stringify(message)))
+        .then(function () {
+          delete messaging.sendQueues[publicKey][message.id]
+          messaging._saveSendQueues([publicKey])
+        })
+        .fail(function (error) {
+          debug('message sending failed')
+          debug(error)
+        })
+        .done()
     }
   }, this)
-  delete this.sendQueues[publicKey]
-  this._saveSendQueues([publicKey])
 }
 
 /**

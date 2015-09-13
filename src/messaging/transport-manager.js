@@ -99,14 +99,7 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
       debug('ready event')
       extend(manager.connectionInfo, connectionInfo)
       manager.connectionInfo.publicKey = manager.publicKey
-      manager.emit('ready', manager.connectionInfo)
       manager._publishConnectionInfo()
-    })
-    transport.on('disable', function () {
-      debug('disable event')
-      if (this.isDisabled()) {
-        manager.emit('disable')
-      }
     })
     transport.on('message', function (publicKey, message) {
       debug('message event ' + message)
@@ -138,9 +131,26 @@ TransportManager.prototype.isDisabled = function () {
 
 TransportManager.prototype.send = function (publicKey, message) {
   debug('send')
-  expect(this.isConnected(publicKey)).to.be.true
   var connection = this.getConnection(publicKey)
-  return connection.write(message)
+  if (connection) {
+    return this._send(message, connection)
+  } else {
+    var result = this.connect(publicKey)
+      .then(this._send.bind(this, message))
+    return result
+  }
+}
+
+TransportManager.prototype._send = function (message, connection) {
+  var deferred = Q.defer()
+  connection.write(message, function (err) {
+    if (err) {
+      deferred.reject(err)
+    } else {
+      deferred.resolve()
+    }
+  })
+  return deferred.promise
 }
 
 TransportManager.prototype.connect = function (publicKey) {

@@ -176,7 +176,9 @@ AbstractTransport.prototype._connectEvents = function (stream) {
   expect(stream).to.be.an.instanceof(curve.CurveCPStream)
   var transport = this
   stream.on('error', function (error) {
+    debug('handling error of curve stream')
     debug(error)
+    transport._deleteStream(stream)
   })
   stream.on('finish', function () {
     transport._deleteStream(stream)
@@ -198,6 +200,7 @@ AbstractTransport.prototype._connectEvents = function (stream) {
       delete transport.inProgressConnections[publicKey]
     }
     _.forEach(removedStreams, function (stream) {
+      stream.stream.end()
       stream.end()
     })
   })
@@ -209,11 +212,12 @@ AbstractTransport.prototype._connectEvents = function (stream) {
 
 AbstractTransport.prototype._deleteStream = function (stream) {
   var publicKey = this._getPeer(stream)
-  if(publicKey) {
+  if (publicKey) {
     _.remove(this.connections[publicKey], function (streamInArray) {
       return streamInArray === stream
     })
   }
+  stream.stream.end()
   stream.removeAllListeners()
   if (publicKey && _.has(this.inProgressConnections, publicKey)) {
     this.inProgressConnections[publicKey].reject()

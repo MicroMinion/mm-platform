@@ -65,6 +65,14 @@ TCPTransport.prototype._onClose = function () {
 
 TCPTransport.prototype._onConnection = function (connection) {
   debug('_onConnection')
+  debug(connection.localAddress)
+  debug(connection.remoteAddress)
+  debug(connection.remotePort)
+  connection.on('timeout', function() {
+    connection.close()
+    connection.destroy()
+  })
+  connection.setTimeout(60 * 1000)
   this._wrapIncomingConnection(connection)
 }
 
@@ -109,16 +117,20 @@ TCPTransport.prototype._hasConnectionInfo = function (connectionInfo) {
 
 TCPTransport.prototype._connectToAddress = function (address, port) {
   debug('_connectToAddress')
+  debug(address)
+  debug(port)
   var deferred = Q.defer()
   var connection = net.createConnection(port, address)
   var err = function (err) {
-    deferred.reject(err)
+    if(!deferred.promise.isFulfilled()) {
+      deferred.reject(err)
+    }
   }
   connection.on('connect', function () {
     connection.removeListener('error', err)
     deferred.resolve(connection)
   })
-  connection.once('error', err)
+  connection.on('error', err)
   return deferred.promise
 }
 
