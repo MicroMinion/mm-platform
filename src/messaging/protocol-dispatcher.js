@@ -4,7 +4,7 @@ var inherits = require('inherits')
 var TransportManager = require('./transport-manager.js')
 var debug = require('debug')('flunky-platform:messaging:protocol-dispatcher')
 var isBuffer = require('is-buffer')
-var ns = require('netstring')
+var ns = require('../util/ns.js')
 
 var expect = require('chai').expect
 

@@ -1,5 +1,6 @@
 'use strict'
 var _ = require('lodash')
+var debug = require('debug')('flunky-platform:services:events')
 
 var SUBSCRIPTION_TIMEOUT = 1000 * 60 * 5
 
@@ -24,15 +25,19 @@ var Events = function (messaging) {
 }
 
 Events.prototype.processEvent = function (topic, publicKey, data) {
+  //debug('processEvent')
   if (publicKey !== 'local') { return }
   if (_.has(this.subscribers, topic)) {
+      debug('processEvent - has subscribers')
     _.forEach(this.subscribers[topic], function (date, subscriberKey) {
-      this.messaging.send(topic, subscriberKey, data)
+        debug('send message to subscriber ' + subscriberKey)
+        this.messaging.send(topic, subscriberKey, data)
     }, this)
   }
 }
 
 Events.prototype.subscribe = function (topic, publicKey, data) {
+  debug('subscribe')
   if (topic !== 'self.events.subscribe') { return }
   data.topic = 'self.' + data.topic
   if (!_.has(this.subscribers, data.topic)) {
