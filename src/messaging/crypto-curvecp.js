@@ -77,7 +77,7 @@ CurveCPStream.prototype._write = function (chunk, encoding, done) {
 CurveCPStream.prototype.connectionFail = function (message) {
   debug('connectionFail')
   debug(message)
-  //this.emit('error', new Error(message))
+  // this.emit('error', new Error(message))
   this.emit('end')
   this.emit('close')
 }

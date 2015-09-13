@@ -25,13 +25,13 @@ var Events = function (messaging) {
 }
 
 Events.prototype.processEvent = function (topic, publicKey, data) {
-  //debug('processEvent')
+  // debug('processEvent')
   if (publicKey !== 'local') { return }
   if (_.has(this.subscribers, topic)) {
-      debug('processEvent - has subscribers')
+    debug('processEvent - has subscribers')
     _.forEach(this.subscribers[topic], function (date, subscriberKey) {
-        debug('send message to subscriber ' + subscriberKey)
-        this.messaging.send(topic, subscriberKey, data)
+      debug('send message to subscriber ' + subscriberKey)
+      this.messaging.send(topic, subscriberKey, data)
     }, this)
   }
 }

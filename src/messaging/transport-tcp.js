@@ -68,7 +68,7 @@ TCPTransport.prototype._onConnection = function (connection) {
   debug(connection.localAddress)
   debug(connection.remoteAddress)
   debug(connection.remotePort)
-  connection.on('timeout', function() {
+  connection.on('timeout', function () {
     connection.end()
     connection.destroy()
   })
@@ -122,7 +122,7 @@ TCPTransport.prototype._connectToAddress = function (address, port) {
   var deferred = Q.defer()
   var connection = net.createConnection(port, address)
   var err = function (err) {
-    if(!deferred.promise.isFulfilled()) {
+    if (!deferred.promise.isFulfilled()) {
       deferred.reject(err)
     }
   }

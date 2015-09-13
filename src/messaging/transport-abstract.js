@@ -2,7 +2,7 @@
 
 var events = require('events')
 var chai = require('chai')
-var curve = require('curve-protocol')
+var curve = require('./crypto-curvecp.js')
 var inherits = require('inherits')
 var _ = require('lodash')
 var Q = require('q')

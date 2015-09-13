@@ -31,12 +31,12 @@ SyncStream.prototype.stop = function () {
 /* LAST SEQUENCE REQUEST */
 
 SyncStream.prototype.send_last_sequence_request = function () {
-    debug('send_last_sequence_request ' + this.publicKey)
+  debug('send_last_sequence_request ' + this.publicKey)
   this.messaging.send(this.service + '.last_sequence_request', this.publicKey, {}, {expireAfter: 15000, realtime: false})
 }
 
 SyncStream.prototype.on_last_sequence_request = function (message) {
-    debug('on_last_sequence_request ' + this.publicKey)
+  debug('on_last_sequence_request ' + this.publicKey)
   var data = {
     'lastSequence': this.log.getLastSequence()
   }

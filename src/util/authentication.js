@@ -183,7 +183,7 @@ PublicKeyVerificationProtocol.prototype.sendCode = function () {
 
 PublicKeyVerificationProtocol.prototype.onCode = function (data) {
   debug('PublicKeyVerificationProtocol.onCode')
-  if (this.state.verification.initiateSend && this.state.verification.initiateReceived)  {
+  if (this.state.verification.initiateSend && this.state.verification.initiateReceived) {
     var codeValid = false
     if (data.codeType === 'qr') {
       codeValid = (data.code === this.profile.code)

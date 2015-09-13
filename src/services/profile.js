@@ -2,7 +2,7 @@
 
 var _ = require('lodash')
 var storagejs = require('storagejs')
-var curve = require('curve-protocol')
+var curve = require('../messaging/crypto-curvecp.js')
 var useragent = require('useragent')
 var qrImage = require('qr-image')
 var SyncEngine = require('../util/mmds/index.js')
@@ -30,12 +30,12 @@ var Profile = function (messaging) {
   this.syncEngine = new SyncEngine(messaging, 'profile', 'id', this.collection)
   this.syncEngine.on('processEvent', function (action, document) {
     if (action === 'update') {
-      if(document.name) {
+      if (document.name) {
         profile.profile.info.name = document.name
         profile.collection['profile'].name = document.name
         profile.syncEngine.update('profile')
       }
-      if(document.accounts) {
+      if (document.accounts) {
         profile.profile.info.accounts = document.accounts
         profile.collection['profile']
         profile.syncEngine.update('profile')
