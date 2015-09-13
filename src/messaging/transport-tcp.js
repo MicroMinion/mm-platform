@@ -65,14 +65,6 @@ TCPTransport.prototype._onClose = function () {
 
 TCPTransport.prototype._onConnection = function (connection) {
   debug('_onConnection')
-  debug(connection.localAddress)
-  debug(connection.remoteAddress)
-  debug(connection.remotePort)
-  connection.on('timeout', function () {
-    connection.end()
-    connection.destroy()
-  })
-  connection.setTimeout(60 * 1000)
   this._wrapIncomingConnection(connection)
 }
 
@@ -85,6 +77,7 @@ TCPTransport.prototype.enable = function () {
 
 TCPTransport.prototype.disable = function () {
   debug('disable')
+  this.enabled = false
   this._server.close()
   AbstractTransport.prototype.disable.call(this)
 }
@@ -97,17 +90,41 @@ TCPTransport.prototype.isDisabled = function () {
 TCPTransport.prototype._connect = function (connectionInfo) {
   debug('_connect')
   var transport = this
-  var deferred = Q.defer()
-  var promise = deferred.promise
   if (this._hasConnectionInfo(connectionInfo)) {
+    var promises = []
     _.forEach(connectionInfo.tcp.addresses, function (address) {
-      promise = promise.then(undefined, transport._connectToAddress.bind(transport, address, connectionInfo.tcp.port))
+      promises.push(transport._connectToAddress(address, connectionInfo.tcp.port))
+    }, transport)
+    return Q.any(promises)
+  } else {
+    var deferred = Q.defer()
+    process.nextTick(function () {
+      deferred.reject()
+    })
+    return deferred.promise
+  }
+}
+
+TCPTransport.prototype._pickConnection = function (stateSnapshots) {
+  var connection
+  var deferred = Q.defer()
+  _.forEach(stateSnapshots, function (snapshot) {
+    if (snapshot.state === 'fulfilled') {
+      if (connection) {
+        connection.destroy()
+      } else {
+        connection = snapshot.value
+      }
+    }
+  }, this)
+  if (connection) {
+    return connection
+  } else {
+    process.nextTick(function () {
+      deferred.reject()
     })
   }
-  process.nextTick(function () {
-    deferred.reject()
-  })
-  return promise
+  return deferred.promise
 }
 
 TCPTransport.prototype._hasConnectionInfo = function (connectionInfo) {
@@ -117,8 +134,6 @@ TCPTransport.prototype._hasConnectionInfo = function (connectionInfo) {
 
 TCPTransport.prototype._connectToAddress = function (address, port) {
   debug('_connectToAddress')
-  debug(address)
-  debug(port)
   var deferred = Q.defer()
   var connection = net.createConnection(port, address)
   var err = function (err) {
@@ -126,7 +141,7 @@ TCPTransport.prototype._connectToAddress = function (address, port) {
       deferred.reject(err)
     }
   }
-  connection.on('connect', function () {
+  connection.once('connect', function () {
     connection.removeListener('error', err)
     deferred.resolve(connection)
   })

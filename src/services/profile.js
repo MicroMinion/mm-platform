@@ -33,12 +33,10 @@ var Profile = function (messaging) {
       if (document.name) {
         profile.profile.info.name = document.name
         profile.collection['profile'].name = document.name
-        profile.syncEngine.update('profile')
       }
       if (document.accounts) {
         profile.profile.info.accounts = document.accounts
-        profile.collection['profile']
-        profile.syncEngine.update('profile')
+        profile.collection['profile'].accounts = document.accounts
       }
       profile.update(true)
     }

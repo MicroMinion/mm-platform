@@ -66,7 +66,7 @@ inherits(AbstractTransport, events.EventEmitter)
 AbstractTransport.prototype.disable = function () {
   debug('disable')
   _.forEach(this.connections, function (connection) {
-    connection.end()
+    connection.destroy()
   })
 }
 
@@ -167,6 +167,7 @@ AbstractTransport.prototype._wrapOutgoingConnection = function (publicKey, conne
   })
   this.inProgressConnections[publicKey] = Q.defer()
   this._connectEvents(curveConnection)
+  curveConnection.connect()
   return this.inProgressConnections[publicKey].promise
 }
 
@@ -175,39 +176,44 @@ AbstractTransport.prototype._connectEvents = function (stream) {
   expect(stream).to.exist
   expect(stream).to.be.an.instanceof(curve.CurveCPStream)
   var transport = this
-  stream.on('error', function (error) {
-    debug('handling error of curve stream')
-    debug(error)
-    transport._deleteStream(stream)
-  })
-  stream.on('finish', function () {
-    transport._deleteStream(stream)
-  })
-  stream.on('end', function () {
-    transport._deleteStream(stream)
-  })
-  stream.on('drain', function () {
-    var publicKey = transport._getPeer(stream)
-    if (!_.has(transport.connections, publicKey)) {
-      transport.connections[publicKey] = []
+  var functions = {
+    connect: function () {
+      var publicKey = transport._getPeer(stream)
+      if (!_.has(transport.connections, publicKey)) {
+        transport.connections[publicKey] = []
+      }
+      var removedStreams = _.filter(transport.connections[publicKey], function (streamInArray) {
+        return streamInArray !== stream
+      })
+      transport.connections[publicKey].push(stream)
+      if (_.has(transport.inProgressConnections, publicKey)) {
+        transport.inProgressConnections[publicKey].resolve(stream)
+        delete transport.inProgressConnections[publicKey]
+      }
+      _.forEach(removedStreams, function (stream) {
+        stream.destroy()
+      })
+    },
+    data: function (data) {
+      debug('data event' + data)
+      transport.emit('message', transport._getPeer(stream), data)
+    },
+    error: function (error) {
+      debug('handling error of curve stream')
+      debug(error)
+    },
+    close: function () {
+      stream.removeListener('connect', functions.connect)
+      stream.removeListener('data', functions.data)
+      stream.removeListener('error', functions.error)
+      stream.removeListener('close', functions.close)
+      transport._deleteStream(stream)
     }
-    var removedStreams = _.filter(transport.connections[publicKey], function (streamInArray) {
-      return streamInArray !== stream
-    })
-    transport.connections[publicKey].push(stream)
-    if (_.has(transport.inProgressConnections, publicKey)) {
-      transport.inProgressConnections[publicKey].resolve(stream)
-      delete transport.inProgressConnections[publicKey]
-    }
-    _.forEach(removedStreams, function (stream) {
-      stream.stream.end()
-      stream.end()
-    })
-  })
-  stream.on('data', function (data) {
-    debug('data event ' + data)
-    transport.emit('message', transport._getPeer(stream), data)
-  })
+  }
+  stream.on('connect', functions.connect)
+  stream.on('data', functions.data)
+  stream.on('error', functions.error)
+  stream.on('close', functions.close)
 }
 
 AbstractTransport.prototype._deleteStream = function (stream) {
@@ -217,8 +223,6 @@ AbstractTransport.prototype._deleteStream = function (stream) {
       return streamInArray === stream
     })
   }
-  stream.stream.end()
-  stream.removeAllListeners()
   if (publicKey && _.has(this.inProgressConnections, publicKey)) {
     this.inProgressConnections[publicKey].reject()
     delete this.inProgressConnections[publicKey]
@@ -238,44 +242,13 @@ AbstractTransport.prototype._getPeer = function (stream) {
 AbstractTransport.prototype.getConnection = function (publicKey) {
   debug('getConnection')
   if (_.has(this.connections, publicKey)) {
-    return _.first(this.connections[publicKey])
+    return _.last(this.connections[publicKey])
   }
 }
 
 AbstractTransport.prototype.isConnected = function (publicKey) {
   debug('isConnected')
   return Boolean(this.getConnection(publicKey))
-}
-
-/* RECEIVING MESSAGES */
-
-/**
- * message event
- *
- * @event AbstractTransport#message
- * @type {string} publicKey
- * @type {object} message
- */
-
-/* SENDING MESSAGES */
-
-/**
- * Send a message
- *
- * @abstract
- * @param {string} publicKey
- * @param {Object} message
- * @return {Promise}
- */
-
-AbstractTransport.prototype.send = function (publicKey, message) {
-  debug('send')
-  expect(message).to.exist
-  expect(publicKey).to.be.a('string')
-  expect(curve.fromBase64(publicKey)).to.have.length(32)
-  expect(this.connections[publicKey]).to.exist
-  expect(_.first(this.connections[publicKey])).to.be.an.instanceof(curve.CurveCPStream)
-  _.first(this.connections[publicKey]).write(message)
 }
 
 module.exports = AbstractTransport

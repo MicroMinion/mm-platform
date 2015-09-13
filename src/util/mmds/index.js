@@ -5,6 +5,7 @@ var Log = require('./collection.js')
 var events = require('events')
 var inherits = require('inherits')
 var _ = require('lodash')
+var debug = require('debug')('flunky-platform:util:mmds:syncEngine')
 
 var SyncEngine = function (messaging, service, idAttribute, collection) {
   var engine = this
@@ -16,7 +17,6 @@ var SyncEngine = function (messaging, service, idAttribute, collection) {
   })
   this.service = service
   this.syncStreams = {}
-  this.devices = {}
   this.checkpoints = {}
   storagejs.get(this.service + '-checkpoints').then(
     function (value) {
@@ -61,28 +61,34 @@ SyncEngine.prototype.setCollection = function (collection) {
 
 /* MESSAGE HANDLERS */
 
-SyncEngine.prototype.updateDevices = function (topic, publicKey, data) {
+SyncEngine.prototype.updateDevices = function (topic, local, data) {
+  debug('updateDevices ' + this.service)
   var engine = this
-  this.devices = data
-  var toAdd = _.filter(_.keys(this.devices), function (publicKey) {
-    return !_.has(this.syncStreams, publicKey) && this.devices[publicKey].verificationState === verificationState.CONFIRMED
+  var devices = data
+  debug(_.keys(engine.syncStreams))
+  var toAdd = _.filter(_.keys(devices), function (publicKey) {
+    return !_.has(engine.syncStreams, publicKey) && devices[publicKey].verificationState === verificationState.CONFIRMED
   }, this)
+  debug(toAdd)
   var toDelete = _.filter(_.keys(this.syncStreams), function (publicKey) {
-    return !_.has(this.devices, publicKey) || this.devices[publicKey].verificationState < verificationState.CONFIRMED
+    return !_.has(devices, publicKey) || devices[publicKey].verificationState < verificationState.CONFIRMED
   }, this)
+  debug(toDelete)
   _.forEach(toAdd, function (publicKey) {
-    this.syncStreams[publicKey] = new SyncStream(publicKey, this.service, this.log, this.messaging)
+    engine.syncStreams[publicKey] = new SyncStream(publicKey, this.service, this.log, this.messaging)
+    debug("engine.syncStreams after add " + _.keys(engine.syncStreams))
     if (_.has(this.checkpoints, publicKey)) {
-      this.syncStreams[publicKey].setSequenceCheckpoint(this.checkpoints[publicKey])
+      engine.syncStreams[publicKey].setSequenceCheckpoint(this.checkpoints[publicKey])
     }
-    this.syncStreams[publicKey].on('sequenceCheckpointUpdate', function (sequence) {
+    engine.syncStreams[publicKey].on('sequenceCheckpointUpdate', function (sequence) {
       engine.checkpoints[publicKey] = sequence
       storagejs.put(engine.service + '-checkpoints', engine.checkpoints)
     })
   }, this)
   _.forEach(toDelete, function (publicKey) {
-    this.syncStreams[publicKey].stop()
-    delete this.syncStreams[publicKey]
+    debug('deleting ' + publicKey)
+    engine.syncStreams[publicKey].stop()
+    delete engine.syncStreams[publicKey]
   }, this)
 }
 

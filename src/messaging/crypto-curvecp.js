@@ -38,25 +38,52 @@ var CurveCPStream = function (opts) {
     serverCookie: null,
     clientAuthenticated: function (clientPublicKey) { return true }
   }, opts)
-  if (!this.is_server) {
-    this.sendHello()
-    this.nextMessage = this.onWelcome
-  } else {
+  if (this.is_server) {
     this.nextMessage = this.onHello
+  } else {
+    this.nextMessage = this.onWelcome
   }
-  var curveStream = this
-  this.stream.on('data', function (data) {
-    expect(Buffer.isBuffer(data)).to.be.true
-    expect(data.length).to.be.at.least(30)
-    curveStream.nextMessage(new Uint8Array(data))
-  })
-  this.stream.on('error', function (err) {
-    curveStream.connectionFail(err)
-  })
-  this.connected = false
+  this._connectStream(this.stream)
 }
 
 inherits(CurveCPStream, Duplex)
+
+CurveCPStream.prototype._connectStream = function (stream) {
+  var curveStream = this
+  var functions = {
+    data: function (data) {
+      expect(Buffer.isBuffer(data)).to.be.true
+      if (data.length < 30) {
+        return
+      }
+      curveStream.nextMessage(new Uint8Array(data))
+    },
+    error: function (err) {
+      curveStream.emit('error', err)
+    },
+    connect: function () {},
+    close: function () {
+      stream.removeListener('data', functions.data)
+      stream.removeListener('error', functions.error)
+      stream.removeListener('close', functions.close)
+      curveStream.emit('close')
+    }
+  }
+  stream.on('data', functions.data)
+  stream.on('error', functions.error)
+  stream.on('close', functions.close)
+}
+
+CurveCPStream.prototype.connect = function () {
+  debug('connect')
+  if (!this.is_server) {
+    this.sendHello()
+  }
+}
+
+CurveCPStream.prototype.destroy = function () {
+  this.stream.destroy()
+}
 
 CurveCPStream.prototype._read = function (size) {
   debug('_read')
@@ -65,22 +92,17 @@ CurveCPStream.prototype._read = function (size) {
 CurveCPStream.prototype._write = function (chunk, encoding, done) {
   debug('_write')
   if (this.nextMessage === this.onMessage) {
-    this.sendMessage(chunk)
-    done()
+    this.sendMessage(chunk, done)
   } else {
     done(new Error('Stream not ready for writing'))
   }
 }
 
-// utility functions
-
-CurveCPStream.prototype.connectionFail = function (message) {
-  debug('connectionFail')
-  debug(message)
-  // this.emit('error', new Error(message))
-  this.emit('end')
-  this.emit('close')
+CurveCPStream.prototype.connectionFail = function (msg) {
+  debug(msg)
 }
+
+// utility functions
 
 CurveCPStream.prototype.isEqual = function (a, b) {
   debug('isEqual')
@@ -288,7 +310,6 @@ CurveCPStream.prototype.onInitiate = function (initiate_message) {
   }
   if (this.clientAuthenticated(this.clientPublicKey)) {
     this.nextMessage = this.onMessage
-    this.connected = true
     this.sendReady()
   } else {
     this.connectionFail('Initiate command unable to authenticate client')
@@ -303,7 +324,7 @@ CurveCPStream.prototype.sendReady = function () {
   result.set(nacl.util.decodeUTF8('READY   '))
   result.set(this.encrypt(new Uint8Array(0), 'CurveZMQREADY---', this.serverConnectionPrivateKey, this.clientConnectionPublicKey), 8)
   this.stream.write(new Buffer(result))
-  this.emit('drain')
+  this.emit('connect')
 }
 
 CurveCPStream.prototype.onReady = function (ready_message) {
@@ -326,13 +347,12 @@ CurveCPStream.prototype.onReady = function (ready_message) {
     return
   }
   this.nextMessage = this.onMessage
-  this.connected = true
-  this.emit('drain')
+  this.emit('connect')
 }
 
 // Message command
 
-CurveCPStream.prototype.sendMessage = function (message) {
+CurveCPStream.prototype.sendMessage = function (message, done) {
   debug('sendMessage')
   var from = null
   var to = null
@@ -347,7 +367,7 @@ CurveCPStream.prototype.sendMessage = function (message) {
   var result = new Uint8Array(8 + message_box.length)
   result.set(nacl.util.decodeUTF8('MESSAGE '))
   result.set(message_box, 8)
-  this.stream.write(new Buffer(result))
+  this.stream.write(new Buffer(result), done)
 }
 
 CurveCPStream.prototype.onMessage = function (message) {

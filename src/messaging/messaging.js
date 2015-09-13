@@ -201,7 +201,7 @@ Messaging.prototype._setupDispatcher = function () {
       return
     }
     var scope = messaging._getScope(publicKey)
-    debugMessage('message received ' + scope + '.' + message.topic + ' for ' + publicKey + ' (' + JSON.stringify(message) + ')')
+    debugMessage('RECEIVED ' + scope + '.' + message.topic + ' from ' + publicKey + ' (' + JSON.stringify(message) + ')')
     messaging.emit(scope + '.' + message.topic, publicKey, message.data)
   })
 }
@@ -290,7 +290,7 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
     })
     return
   }
-  debugMessage('queuing message ' + topic + ' to ' + publicKey + '(' + JSON.stringify(data) + ')')
+  //debugMessage('queuing message ' + topic + ' to ' + publicKey + '(' + JSON.stringify(data) + ')')
   if (!this.sendQueues[publicKey]) {
     this.sendQueues[publicKey] = {}
   }
@@ -331,8 +331,8 @@ Messaging.prototype._trigger = function (publicKey) {
     this.dispatcher.connect(publicKey)
       .then(this._flushQueue.bind(this, publicKey))
       .fail(function (error) {
-        debug('connect failed for ' + publicKey)
-        debug(error)
+        debugMessage('connect failed for ' + publicKey)
+        debugMessage(error)
       })
       .done()
   }
@@ -351,14 +351,15 @@ Messaging.prototype._flushQueue = function (publicKey) {
   var messaging = this
   _.forEach(this.sendQueues[publicKey], function (message) {
     if (Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
+      debugMessage('SEND: ' + JSON.stringify(message))
       this.dispatcher.send(PROTOCOL, publicKey, new Buffer(JSON.stringify(message)))
         .then(function () {
           delete messaging.sendQueues[publicKey][message.id]
           messaging._saveSendQueues([publicKey])
         })
         .fail(function (error) {
-          debug('message sending failed')
-          debug(error)
+          debugMessage('message sending failed')
+          debugMessage(error)
         })
         .done()
     }
