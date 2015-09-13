@@ -5,6 +5,7 @@ var chai = require('chai')
 var AuthenticationManager = require('../util/authentication.js')
 var verificationState = require('../constants/verificationState.js')
 var SyncEngine = require('../util/mmds/index.js')
+var debug = require('debug')('flunky-platform:util:devices')
 
 var expect = chai.expect
 
@@ -32,6 +33,7 @@ var Devices = function (messaging) {
   })
   this.syncEngine = new SyncEngine(messaging, 'devices', 'publicKey', this.devices)
   this.syncEngine.on('processEvent', function (action, document) {
+    debug('processEvent', document)
     if (action === 'remove') {
       delete devices.devices[document.publicKey]
     } else {
