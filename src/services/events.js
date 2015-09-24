@@ -25,21 +25,23 @@ var Events = function (messaging) {
 }
 
 Events.prototype.processEvent = function (topic, publicKey, data) {
-  // debug('processEvent')
+  //debug('processEvent')
+  topic = topic.replace('self.', '')
   if (publicKey !== 'local') { return }
   if (_.has(this.subscribers, topic)) {
     debug('processEvent - has subscribers')
     _.forEach(this.subscribers[topic], function (date, subscriberKey) {
       debug('send message to subscriber ' + subscriberKey)
-      this.messaging.send(topic, subscriberKey, data)
+      this.messaging.send(topic, subscriberKey, data, {realtime: true, expireAfter: 2000})
     }, this)
   }
 }
 
 Events.prototype.subscribe = function (topic, publicKey, data) {
   debug('subscribe')
+  debug(publicKey)
+  debug(data)
   if (topic !== 'self.events.subscribe') { return }
-  data.topic = 'self.' + data.topic
   if (!_.has(this.subscribers, data.topic)) {
     this.subscribers[data.topic] = {}
   }
