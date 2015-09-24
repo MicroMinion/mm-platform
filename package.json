@@ -34,5 +34,9 @@
     "tweetnacl": "^0.13.1",
     "useragent": "^2.1.7",
     "yamlparser": "0.0.2"
+  },
+  "devDependencies": {
+    "node-localstorage": "^0.6.0",
+    "proxyquire": "^1.7.2"
   }
 }
