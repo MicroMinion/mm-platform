@@ -83,6 +83,18 @@ Log.prototype.getLastSequence = function () {
   return lastSequence
 }
 
+Log.prototype.getLowestSequence = function () {
+  var lowestSequence = _.min(this.events, function (event) {
+    return event.sequence
+  })
+  if (lowestSequence === Infinity) {
+    lowestSequence = 0
+  } else {
+    lowestSequence = lowestSequence.sequence
+  }
+  return lowestSequence
+}
+
 Log.prototype.getEvent = function (sequence) {
   var result = _.find(this.events, function (event) {
     return event.sequence === sequence
@@ -95,6 +107,12 @@ Log.prototype.getEvent = function (sequence) {
     }
   }
   return result
+}
+
+Log.prototype.getEvents = function (checkpoint, afterCheckpoint) {
+  return _.filter(this.events, function (event) {
+    return event.sequence > checkpoint && _.every(afterCheckpoint, function (sequence) { return sequence !== event.sequence })
+  }, this)
 }
 
 Log.prototype.processEvent = function (event) {

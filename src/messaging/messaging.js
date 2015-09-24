@@ -290,7 +290,7 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
     })
     return
   }
-  //debugMessage('queuing message ' + topic + ' to ' + publicKey + '(' + JSON.stringify(data) + ')')
+  // debugMessage('queuing message ' + topic + ' to ' + publicKey + '(' + JSON.stringify(data) + ')')
   if (!this.sendQueues[publicKey]) {
     this.sendQueues[publicKey] = {}
   }

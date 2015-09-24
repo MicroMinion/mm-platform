@@ -7,6 +7,8 @@ var inherits = require('inherits')
 var _ = require('lodash')
 var debug = require('debug')('flunky-platform:util:mmds:syncEngine')
 
+var SYNC_INTERVAL = 1000 * 60
+
 var SyncEngine = function (messaging, service, idAttribute, collection) {
   var engine = this
   events.EventEmitter.call(this)
@@ -49,7 +51,27 @@ var SyncEngine = function (messaging, service, idAttribute, collection) {
       engine.syncStreams[publicKey].on_events(data)
     }
   })
+  this.messaging.on('self.' + this.service + '.checkpoint', function (topic, publicKey, data) {
+    if (_.has(engine.syncStreams, publicKey)) {
+      engine.syncStreams[publicKey].on_checkpoint(data)
+    }
+  })
+  this.messaging.on('self.' + this.service + '.obsolete', function (topic, publicKey, data) {
+    if (_.has(engine.syncStreams, publicKey)) {
+      engine.syncStreams[publicKey].on_obsolete(data)
+    }
+  })
+  this.messaging.on('self.' + this.service + '.lowest_sequence', function (topic, publicKey, data) {
+    if (_.has(engine.syncStreams, publicKey)) {
+      engine.syncStreams[publicKey].on_lowest_sequence(data)
+    }
+  })
   this.messaging.send('self.devices.updateRequest', 'local', {})
+  this.interval = setInterval(function () {
+    _.forEach(_.sample(engine.syncStreams, 2), function (syncStream) {
+      syncStream.send_checkpoint()
+    }, engine)
+  }, SYNC_INTERVAL)
 }
 
 inherits(SyncEngine, events.EventEmitter)
@@ -76,7 +98,7 @@ SyncEngine.prototype.updateDevices = function (topic, local, data) {
   debug(toDelete)
   _.forEach(toAdd, function (publicKey) {
     engine.syncStreams[publicKey] = new SyncStream(publicKey, this.service, this.log, this.messaging)
-    debug("engine.syncStreams after add " + _.keys(engine.syncStreams))
+    debug('engine.syncStreams after add ' + _.keys(engine.syncStreams))
     if (_.has(this.checkpoints, publicKey)) {
       engine.syncStreams[publicKey].setSequenceCheckpoint(this.checkpoints[publicKey])
     }
@@ -84,6 +106,7 @@ SyncEngine.prototype.updateDevices = function (topic, local, data) {
       engine.checkpoints[publicKey] = sequence
       storagejs.put(engine.service + '-checkpoints', engine.checkpoints)
     })
+    engine.syncStreams[publicKey].send_checkpoint()
   }, this)
   _.forEach(toDelete, function (publicKey) {
     debug('deleting ' + publicKey)

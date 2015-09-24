@@ -105,6 +105,12 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
       debug('message event ' + message)
       manager.emit('message', publicKey, message)
     })
+    transport.on('connection', function (publicKey) {
+      manager.messaging.send('transport.connection', 'local', publicKey)
+    })
+    transport.on('disconnection', function (publicKey) {
+      manager.messaging.send('transport.disconnection', 'local', publicKey)
+    })
   }
 }
 

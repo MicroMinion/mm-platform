@@ -186,6 +186,7 @@ AbstractTransport.prototype._connectEvents = function (stream) {
         return streamInArray !== stream
       })
       transport.connections[publicKey].push(stream)
+      transport.emit('connection', publicKey)
       if (_.has(transport.inProgressConnections, publicKey)) {
         transport.inProgressConnections[publicKey].resolve(stream)
         delete transport.inProgressConnections[publicKey]
@@ -222,6 +223,9 @@ AbstractTransport.prototype._deleteStream = function (stream) {
     _.remove(this.connections[publicKey], function (streamInArray) {
       return streamInArray === stream
     })
+    if (_.size(this.connections[publicKey]) === 0) {
+      this.emit('disconnection', publicKey)
+    }
   }
   if (publicKey && _.has(this.inProgressConnections, publicKey)) {
     this.inProgressConnections[publicKey].reject()
