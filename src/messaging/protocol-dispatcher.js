@@ -12,9 +12,11 @@ var ProtocolDispatcher = function (messaging) {
   expect(messaging).to.be.an('object')
   debug('initialize')
   EventEmitter.call(this)
-  this.messaging = messaging
   this.transportManager
   this._setupTransportManager()
+  if(messaging) {
+    this.transportManager.setMessaging(messaging)
+  }
   this.buffers = {}
 }
 
@@ -30,7 +32,7 @@ ProtocolDispatcher.prototype.enable = function () {
 
 ProtocolDispatcher.prototype._setupTransportManager = function () {
   var dispatcher = this
-  this.transportManager = new TransportManager(this.messaging)
+  this.transportManager = new TransportManager()
   this.transportManager.on('message', function (publicKey, message) {
     expect(publicKey).to.be.a('string')
     expect(isBuffer(message)).to.be.true

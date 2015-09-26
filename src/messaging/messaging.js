@@ -56,7 +56,7 @@ var verificationState = require('../constants/verificationState.js')
  * @constructor
  * @public
  */
-var Messaging = function () {
+var Messaging = function (dispatcher) {
   EventEmitter.call(this, {
     delimiter: '.'
   })
@@ -113,7 +113,7 @@ var Messaging = function () {
    * @type {ProtocolDispatcher}
    *
    */
-  this.dispatcher
+  this.dispatcher = dispatcher
   this._setupDispatcher()
   setInterval(function () {
     debug('trigger send queues periodically')
@@ -189,8 +189,9 @@ Messaging.prototype.enable = function () {
 
 Messaging.prototype._setupDispatcher = function () {
   var messaging = this
-  this.dispatcher = new ProtocolDispatcher(this)
-  // this.dispatcher = new TransportManager(this)
+  if(_.isUndefined(this.dispatcher)) {
+    this.dispatcher = new ProtocolDispatcher(this)
+  }
   this.dispatcher.on(PROTOCOL, function (publicKey, message) {
     expect(publicKey).to.be.a('string')
     expect(curve.fromBase64(publicKey)).to.have.length(32)

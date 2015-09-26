@@ -25,10 +25,9 @@ var PUBLISH_CONNECTION_INFO_INTERVAL = 1000 * 60 * 5
 
 var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
-var TransportManager = function (messaging) {
+var TransportManager = function () {
   debug('initialize')
-  this.messaging = messaging
-  var manager = this
+  this.messaging
   /**
    * Connection information from previously used public keys
    *
@@ -38,23 +37,6 @@ var TransportManager = function (messaging) {
   this.directoryCache = {}
   this.directoryLookup = {}
   this._loadDirectoryCache()
-  this.messaging.once('self.profile.update', function (topic, publicKey, data) {
-    debug('profile update event')
-    manager.publicKey = data.publicKey
-    manager.privateKey = data.privateKey
-    manager._initializeTransports()
-  })
-  this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
-  this.messaging.on('self.messaging.connectionInfo', function (topic, publicKey, data) {
-    debug('connectionInfo event')
-    if (!manager.directoryCache[data.publicKey]) {
-      manager.directoryCache[data.publicKey] = {}
-    }
-    manager.directoryCache[data.publicKey].connectionInfo = data.connectionInfo
-    manager.directoryCache[data.publicKey].publicKey = data.publicKey
-    manager.directoryCache[data.publicKey].lastUpdate = new Date().toJSON()
-    manager._saveDirectoryCache()
-  })
   /**
    * Our own connection information, to be published in directory
    *
@@ -74,6 +56,28 @@ var TransportManager = function (messaging) {
 }
 
 inherits(TransportManager, AbstractTransport)
+
+TransportManager.prototype.setMessaging = function(messaging) {
+  this.messaging = messaging
+  var manager = this
+  this.messaging.once('self.profile.update', function (topic, publicKey, data) {
+    debug('profile update event')
+    manager.publicKey = data.publicKey
+    manager.privateKey = data.privateKey
+    manager._initializeTransports()
+  })
+  this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
+  this.messaging.on('self.messaging.connectionInfo', function (topic, publicKey, data) {
+    debug('connectionInfo event')
+    if (!manager.directoryCache[data.publicKey]) {
+      manager.directoryCache[data.publicKey] = {}
+      manager.directoryCache[data.publicKey].connectionInfo = data.connectionInfo
+      manager.directoryCache[data.publicKey].publicKey = data.publicKey
+      manager.directoryCache[data.publicKey].lastUpdate = new Date().toJSON()
+      manager._saveDirectoryCache()
+    }
+  })
+}
 
 TransportManager.prototype._initializeTransports = function () {
   debug('initializeTransports')
