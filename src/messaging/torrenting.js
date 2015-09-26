@@ -3,12 +3,19 @@
 var curve = require('./crypto-curvecp.js')
 var expect = require('chai').expect
 var isBuffer = require('is-buffer')
+var EventEmitter = require('ak-eventemitter')
+var inherits = require('inherits')
 
-var PROTOCOL = 'to'
+var PROTOCOL = 'bt'
 
 var Torrenting = function (dispatcher) {
+  EventEmitter.call(this, {
+    delimiter: '.'
+  })
   this.dispatcher = dispatcher
 }
+
+inherits(Torrenting, EventEmitter)
 
 Torrenting.prototype._setupDispatcher = function () {
   var torrenting = this
@@ -30,3 +37,5 @@ Torrenting.prototype.send = function (infoHash, publicKey, message) {
   message = message
   this.dispatcher.send(PROTOCOL, publicKey, buffer)
 }
+
+module.exports = Torrenting

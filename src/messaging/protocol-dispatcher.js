@@ -23,7 +23,6 @@ var expect = require('chai').expect
 var verificationState = require('../constants/verificationState.js')
 
 var ProtocolDispatcher = function (messaging) {
-  expect(messaging).to.be.an('object')
   debug('initialize')
   EventEmitter.call(this)
   this.transportManager
