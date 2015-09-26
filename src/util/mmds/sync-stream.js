@@ -12,7 +12,6 @@ var SyncStream = function (publicKey, service, log, messaging) {
   this.messaging = messaging
   this.sequenceCheckpoint = 0
   this.afterCheckpointEvents = {}
-  this.lastKnownSequence = 0
   var stream = this
   this.log.on('newEvent', this.sendEvent.bind(stream))
 }
@@ -23,64 +22,6 @@ SyncStream.prototype.stop = function () {
   debug('stop')
 }
 
-/* LAST SEQUENCE REQUEST */
-
-SyncStream.prototype.send_last_sequence_request = function () {
-  debug(this.service + ' send_last_sequence_request ' + this.publicKey)
-  this.messaging.send(this.service + '.last_sequence_request', this.publicKey, {}, {expireAfter: 15000, realtime: false})
-}
-
-SyncStream.prototype.on_last_sequence_request = function (message) {
-  debug(this.service + ' on_last_sequence_request ' + this.publicKey)
-  var data = {
-    'lastSequence': this.log.getLastSequence()
-  }
-  this.messaging.send(this.service + '.last_sequence', this.publicKey, data, {expireAfter: 15000, realtime: false})
-}
-
-/* LAST SEQUENCE */
-
-SyncStream.prototype.on_last_sequence = function (data) {
-  debug(this.service + ' on_last_sequence ' + this.publicKey)
-  var lastSequence = data.lastSequence
-  this.lastKnownSequence = lastSequence
-  this.sendEventRequests(this.sequenceCheckpoint)
-}
-
-/* EVENTS REQUEST */
-
-SyncStream.prototype.sendEventRequests = function (startSequence) {
-  debug(this.service + ' sendEventRequests ' + this.publicKey)
-  var sequences = []
-  var events = this.afterCheckpointEvents
-  var i = startSequence + 1
-  for (; i <= this.lastKnownSequence && sequences.length <= 10; i++) {
-    if (!events[i]) {
-      sequences.push(i)
-    }
-  }
-  if (sequences.length > 0) {
-    this.send_event_request(sequences)
-  }
-  if (i < this.lastKnownSequence) {
-    this.sendEventRequests(i - 1)
-  }
-}
-
-SyncStream.prototype.send_event_request = function (sequences) {
-  debug(this.service + ' send_event_request ' + this.publicKey)
-  this.messaging.send(this.service + '.event_request', this.publicKey, {sequences: sequences}, {expireAfter: 15000, realtime: true})
-}
-
-SyncStream.prototype.on_event_request = function (receivedData) {
-  debug(this.service + ' on_event_request ' + this.publicKey)
-  var data = []
-  for (var i = 0; i < receivedData.sequences.length; i++) {
-    data.push(this.log.getEvent(receivedData.sequences[i]))
-  }
-  this.messaging.send(this.service + '.events', this.publicKey, data, {expireAfter: 15000, realtime: true})
-}
-
 /* EVENTS */
 
 SyncStream.prototype.sendEvent = function (event) {
@@ -89,7 +30,6 @@ SyncStream.prototype.sendEvent = function (event) {
 }
 
 SyncStream.prototype.on_events = function (events) {
-  debug(this.service + ' on_events ' + this.publicKey)
   for (var i = 0; i < events.length; i++) {
     this.on_event(events[i])
   }
@@ -126,7 +66,7 @@ SyncStream.prototype.updateCheckpoint = function () {
 
 SyncStream.prototype.setSequenceCheckpoint = function (checkpoint) {
   this.sequenceCheckpoint = checkpoint
-  var deleteKeys = _.filter(_.keys[this.afterCheckpointEvents], function (sequence) {
+  var deleteKeys = _.filter(_.keys(this.afterCheckpointEvents), function (sequence) {
     return sequence <= checkpoint
   }, this)
   _.forEach(deleteKeys, function (key) {
@@ -149,7 +89,7 @@ SyncStream.prototype.on_checkpoint = function (receivedData) {
     this.messaging.send(this.service + '.lowest_sequence', this.publicKey, {lowestSequence: lowestSequence}, {expireAfter: 15000, realtime: false})
   }
   // If there are holes for which we do not have an event anymore because it is obsolete => send obsolet message
-  var checkpoint = _.max(lowestSequence, receivedData.checkpoint)
+  var checkpoint = _.max([lowestSequence, receivedData.checkpoint])
   var sequenceArray = []
   var lastSequence = this.log.getLastSequence()
 

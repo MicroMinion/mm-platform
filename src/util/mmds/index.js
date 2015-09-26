@@ -31,21 +31,8 @@ var SyncEngine = function (messaging, service, idAttribute, collection) {
     }
   )
   this.messaging.on('self.devices.update', this.updateDevices.bind(this))
-  this.messaging.on('self.' + this.service + '.last_sequence_request', function (topic, publicKey, data) {
-    if (_.has(engine.syncStreams, publicKey)) {
-      engine.syncStreams[publicKey].on_last_sequence_request(data)
-    }
-  })
-  this.messaging.on('self.' + this.service + '.last_sequence', function (topic, publicKey, data) {
-    if (_.has(engine.syncStreams, publicKey)) {
-      engine.syncStreams[publicKey].on_last_sequence(data)
-    }
-  })
-  this.messaging.on('self.' + this.service + '.event_request', function (topic, publicKey, data) {
-    if (_.has(engine.syncStreams, publicKey)) {
-      engine.syncStreams[publicKey].on_event_request(data)
-    }
-  })
+  this.messaging.on('self.profile.update', this.updateProfile.bind(this))
+  this.messaging.send('self.profile.updateRequest', 'local', {})
   this.messaging.on('self.' + this.service + '.events', function (topic, publicKey, data) {
     if (_.has(engine.syncStreams, publicKey)) {
       engine.syncStreams[publicKey].on_events(data)
@@ -83,13 +70,19 @@ SyncEngine.prototype.setCollection = function (collection) {
 
 /* MESSAGE HANDLERS */
 
+SyncEngine.prototype.updateProfile = function(topic, local, data) {
+  this.publicKey = data.publicKey
+}
+
 SyncEngine.prototype.updateDevices = function (topic, local, data) {
   debug('updateDevices ' + this.service)
   var engine = this
   var devices = data
   debug(_.keys(engine.syncStreams))
   var toAdd = _.filter(_.keys(devices), function (publicKey) {
-    return !_.has(engine.syncStreams, publicKey) && devices[publicKey].verificationState === verificationState.CONFIRMED
+    return !_.has(engine.syncStreams, publicKey)
+    && devices[publicKey].verificationState === verificationState.CONFIRMED
+    && publicKey !== this.publicKey
   }, this)
   debug(toAdd)
   var toDelete = _.filter(_.keys(this.syncStreams), function (publicKey) {
