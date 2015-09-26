@@ -25,7 +25,7 @@ var Events = function (messaging) {
 }
 
 Events.prototype.processEvent = function (topic, publicKey, data) {
-  //debug('processEvent')
+  // debug('processEvent')
   topic = topic.replace('self.', '')
   if (publicKey !== 'local') { return }
   if (_.has(this.subscribers, topic)) {

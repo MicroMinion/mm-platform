@@ -70,7 +70,7 @@ SyncEngine.prototype.setCollection = function (collection) {
 
 /* MESSAGE HANDLERS */
 
-SyncEngine.prototype.updateProfile = function(topic, local, data) {
+SyncEngine.prototype.updateProfile = function (topic, local, data) {
   this.publicKey = data.publicKey
 }
 
@@ -80,9 +80,9 @@ SyncEngine.prototype.updateDevices = function (topic, local, data) {
   var devices = data
   debug(_.keys(engine.syncStreams))
   var toAdd = _.filter(_.keys(devices), function (publicKey) {
-    return !_.has(engine.syncStreams, publicKey)
-    && devices[publicKey].verificationState === verificationState.CONFIRMED
-    && publicKey !== this.publicKey
+    return !_.has(engine.syncStreams, publicKey) &&
+    devices[publicKey].verificationState === verificationState.CONFIRMED &&
+    publicKey !== this.publicKey
   }, this)
   debug(toAdd)
   var toDelete = _.filter(_.keys(this.syncStreams), function (publicKey) {
