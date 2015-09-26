@@ -4,6 +4,10 @@ var mosca = require('mosca')
 var ProtocolDispatcher = require('../messaging/protocol-dispatcher.js')
 var Messaging = require('../messaging/messaging.js')
 var Torrenting = require('../messaging/torrenting.js')
+var _ = require('lodash')
+var debug = require('debug')('flunky-platform:proxy:server')
+
+var MQTT_PORT = 65432
 
 var Server = function () {
   this.dispatcher = new ProtocolDispatcher()
@@ -20,7 +24,7 @@ var Server = function () {
 
 Server.prototype._setupMosca = function () {
   var moscaSettings = {
-    port: 65432,
+    port: MQTT_PORT,
     backend: {}
   }
   this.server = new mosca.Server(moscaSettings)
@@ -28,11 +32,19 @@ Server.prototype._setupMosca = function () {
 }
 
 Server.prototype.onPublish = function (packet, client) {
+  if (!_.isUndefined(client) && client.id === 'server') {
+    return
+  }
   var topicSplit = packet.topic.split('/')
   var protocol = topicSplit[1]
+  if (protocol === 'MS') {
+    packet.payload = JSON.parse(packet.payload)
+  }
   var topic = topicSplit[2]
   var publicKey = topicSplit[3]
-  this.protocols[protocol].send(topic, publicKey, packet.payload)
+  if (_.has(this.protocols, protocol)) {
+    this.protocols[protocol].send(topic, publicKey, packet.payload)
+  }
 }
 
 Server.prototype.dispatchTorrent = function (topic, publicKey, data) {
@@ -40,7 +52,17 @@ Server.prototype.dispatchTorrent = function (topic, publicKey, data) {
 }
 
 Server.prototype.dispatchMessage = function (topic, publicKey, data) {
-  this._dispatch('MS', topic, publicKey, data)
+  debug('dispatchMessage' + topic)
+  this._dispatch('MS', topic, publicKey, JSON.stringify(data))
+}
+
+var logger = {
+  debug: debug
+}
+
+var fakeClient = {
+  id: 'server',
+  logger: logger
 }
 
 Server.prototype._dispatch = function (protocol, topic, publicKey, data) {
@@ -50,7 +72,7 @@ Server.prototype._dispatch = function (protocol, topic, publicKey, data) {
     qos: 0,
     retain: false
   }
-  this.server.publish(message)
+  this.server.publish(message, fakeClient)
 }
 
 module.exports = Server
