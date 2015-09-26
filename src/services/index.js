@@ -4,5 +4,6 @@ module.exports = {
   Contacts: require('./contacts.js'),
   DirectoryClient: require('./directory/index.js').DirectoryClient,
   DirectoryServer: require('./directory/index.js').DirectoryServer,
-  Events: require('./events.js')
+  Events: require('./events.js'),
+  ServiceManager: require('./service-manager.js')
 }
