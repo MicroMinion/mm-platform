@@ -14,8 +14,6 @@ var expect = chai.expect
 
 var PROTOCOL = 'ms'
 
-// TODO: Filter out only trusted keys when receicing devices or contacts so that receive logic becomes simpeler
-
 /**
  * Interval for triggering send queues in milliseconds
  *
@@ -37,17 +35,6 @@ var SEND_INTERVAL = 1000 * 10
  * @readonly
  */
 var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
-
-/**
- * Enum for potential verification states of users or keys
- *
- * @readonly
- * @enum {number}
- * @constant
- * @default
- * @public
- */
-var verificationState = require('../constants/verificationState.js')
 
 /**
  * Messaging API that allows to send/receive messages using only a public key as identifier
@@ -76,26 +63,7 @@ var Messaging = function (dispatcher) {
   this.on('self.profile.update', function (topic, publicKey, data) {
     messaging.setProfile(data)
   })
-  /**
-   * List of devices that belong to the current user
-   *
-   * @access private
-   * @type {Object.<string, Object>}
-   */
-  this.devices = {}
-  this.on('self.devices.update', function (topic, publicKey, data) {
-    messaging.setDevices(data)
-  })
-  /**
-   * List of trusted contacts
-   *
-   * @access private
-   * @type {Object.<string, Object>}
-   */
-  this.contacts = {}
-  this.on('self.contacts.update', function (topic, publicKey, data) {
-    messaging.setContacts(data)
-  })
+
   /**
    * Queue of messages that still need to be send, key is publicKey of destination
    * Per destination, messages are indexed by message id
@@ -189,10 +157,10 @@ Messaging.prototype.enable = function () {
 
 Messaging.prototype._setupDispatcher = function () {
   var messaging = this
-  if(_.isUndefined(this.dispatcher)) {
+  if (_.isUndefined(this.dispatcher)) {
     this.dispatcher = new ProtocolDispatcher(this)
   }
-  this.dispatcher.on(PROTOCOL, function (publicKey, message) {
+  this.dispatcher.on(PROTOCOL, function (scope, publicKey, message) {
     expect(publicKey).to.be.a('string')
     expect(curve.fromBase64(publicKey)).to.have.length(32)
     try {
@@ -201,14 +169,13 @@ Messaging.prototype._setupDispatcher = function () {
       debug(e)
       return
     }
-    var scope = messaging._getScope(publicKey)
     debugMessage('RECEIVED ' + scope + '.' + message.topic + ' from ' + publicKey + ' (' + JSON.stringify(message) + ')')
     messaging.emit(scope + '.' + message.topic, publicKey, message.data)
   })
 }
 
 /**
- * PROFILE, CONTACTS, DEVICES
+ * PROFILE
  */
 
 /**
@@ -228,30 +195,6 @@ Messaging.prototype.setProfile = function (profile) {
   expect(curve.fromBase64(profile.publicKey)).to.have.length(32)
   expect(curve.fromBase64(profile.privateKey)).to.have.length(32)
   this.profile = profile
-}
-
-/**
- * Set contacts that we consider to be trusted.
- * Messages from these contacts will be triggered in the "Friends" namespace
- *
- * @param {Object.<string, Object>} contacts
- * @public
- */
-Messaging.prototype.setContacts = function (contacts) {
-  debug('setContacts')
-  this.contacts = contacts
-}
-
-/**
- * Set devices that we consider to be trusted
- * Messages from these devices will be triggered in the 'Self' namespace
- *
- * @param {Object.<string, Object>} devices
- * @public
- */
-Messaging.prototype.setDevices = function (devices) {
-  debug('setDevices')
-  this.devices = devices
 }
 
 /**
@@ -365,48 +308,6 @@ Messaging.prototype._flushQueue = function (publicKey) {
         .done()
     }
   }, this)
-}
-
-/**
- * RECEIVE LOGIC
- */
-
-/**
- * Get scope of a publicKey
- *
- * @param {string} publicKey
- * @return {string} one of "self", "friends", "public"
- * @private
- */
-Messaging.prototype._getScope = function (publicKey) {
-  debug('getScope')
-  expect(publicKey).to.be.a('string')
-  expect(curve.fromBase64(publicKey)).to.have.length(32)
-  if (this._inScope(publicKey, this.devices)) {
-    return 'self'
-  } else {
-    var friends = _.any(_.values(this.contacts), function (value, index, collection) {
-      return this._inScope(publicKey, value.keys)
-    }, this)
-    if (friends) {
-      return 'friends'
-    } else {
-      return 'public'
-    }
-  }
-}
-
-/**
- * @private
- * @param {string} publicKey
- * @param {Object} searchObject
- * @return {boolean} true or false if the publicKey is a property of searchObject and it's verificationState is verified
- */
-Messaging.prototype._inScope = function (publicKey, searchObject) {
-  debug('inScope')
-  return _.any(searchObject, function (value, index, collection) {
-    return index === publicKey && value.verificationState >= verificationState.VERIFIED
-  })
 }
 
 module.exports = Messaging

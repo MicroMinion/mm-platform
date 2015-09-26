@@ -27,6 +27,7 @@ var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
 var TransportManager = function () {
   debug('initialize')
+  var manager = this
   this.messaging
   /**
    * Connection information from previously used public keys
@@ -57,7 +58,7 @@ var TransportManager = function () {
 
 inherits(TransportManager, AbstractTransport)
 
-TransportManager.prototype.setMessaging = function(messaging) {
+TransportManager.prototype.setMessaging = function (messaging) {
   this.messaging = messaging
   var manager = this
   this.messaging.once('self.profile.update', function (topic, publicKey, data) {
