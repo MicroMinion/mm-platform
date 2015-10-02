@@ -1,13 +1,20 @@
 'use strict'
 var Server = require('./server.js')
+var createTorrent = require('create-torrent')
+var parseTorrent = require('parse-torrent')
+var mkdirp = require('mkdirp')
+var fs = require('fs')
 var Downloader = require('./downloader.js')
 var _ = require('lodash')
+var Q = require('q')
 
-var TorrentingEngine = function (torrenting) {
+var TorrentingEngine = function (torrenting, storageRoot) {
   this.torrenting = torrenting
+  this.storageRoot = storageRoot + '/torrents'
   this.downloaders = {}
   this.server = new Server(this.torrenting)
   this._subscribeToFiles()
+  mkdirp.sync(this.storageRoot)
 }
 
 /**
@@ -28,7 +35,40 @@ TorrentingEngine.prototype._addDownloader = function (infoHash) {
   }
 }
 
-TorrentingEngine.prototype.put = function (storageLocation) {}
+TorrentingEngine.prototype.put = function (storageLocation) {
+  var options = {
+    name: '',
+    comment: '',
+    createdBy: 'FlunkyPlatform v1',
+    private: true,
+    urlList: [[]]
+  }
+  return Q.nfcall(createTorrent, storageLocation, options)
+    .then(parseTorrent)
+    .then(this._writeFiles.bind(this, storageLocation))
+}
+
+TorrentingEngine.prototype._writeFiles = function (storageLocation, torrentData) {
+  return Q.all([
+    this._renameFile(storageLocation, torrentData),
+    this._writeTorrent(torrentData)
+  ])
+    .then(function () {
+      return torrentData.infoHash
+    })
+}
+
+TorrentingEngine.prototype._writeTorrent = function (torrentData) {
+  var torrentLocation = this.storageRoot + '/' + torrentData.infoHash + '.torrent'
+  torrentData = parseTorrent.toTorrentFile(torrentData)
+  return Q.nfcall(fs.writeFile, torrentLocation, torrentData)
+}
+
+TorrentingEngine.prototype._renameFile = function (storageLocation, torrentData) {
+  var dataLocation = this.storageRoot + '/' + torrentData.infoHash
+  console.log(dataLocation)
+  return Q.nfcall(fs.rename, storageLocation, dataLocation)
+}
 
 TorrentingEngine.prototype.has = function (infoHash) {}
 
