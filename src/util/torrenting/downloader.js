@@ -1,8 +1,14 @@
 'use strict'
+var Q = require('q')
 
-var Downloader = function (infoHash, torrenting) {
+var Downloader = function (infoHash, startIncomplete, engine) {
+  var engine = this
+  this.defer = Q.defer()
   this.torrenting = torrenting
-  this.infoHash = infoHash
+}
+
+Downloader.prototype.getPromise = function () {
+  return this.defer.promise
 }
 
 Downloader.prototype.onMessage = function (scope, publicKey, message) {}
