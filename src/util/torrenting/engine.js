@@ -19,20 +19,33 @@ var TorrentingEngine = function (torrenting, storageRoot) {
 
 /**
  * Retrieve a file
- * @param stream {boolean}: return stream as soon as we downloaded part of file
+ * @param startIncomplete {boolean}: return stream as soon as we downloaded part of file
  */
-TorrentingEngine.prototype.get = function (infoHash, stream) {
+TorrentingEngine.prototype.get = function (infoHash, startIncomplete) {
   if (this.has(infoHash)) {
-    // TODO
+    var defer = Q.defer()
+    process.nextTick(function () {
+      defer.resolve(this._getLocation(infoHash))
+    })
+    return defer.promise
   } else {
-    this._addDownloader(infoHash)
+    return this._download(infoHash, startIncomplete)
   }
 }
 
-TorrentingEngine.prototype._addDownloader = function (infoHash) {
+TorrentingEngine.prototype._getLocation = function (infoHash, torrent) {
+  var location = this.storageRoot + '/' + infoHash
+  if (torrent) {
+    location = location + '.torrent'
+  }
+  return location
+}
+
+TorrentingEngine.prototype._download = function (infoHash, startIncomplete) {
   if (!_.has(this.downloaders, infoHash)) {
     this.downloaders[infoHash] = new Downloader(infoHash, this.torrenting)
   }
+  return this.downloaders[infoHash].getPromise()
 }
 
 TorrentingEngine.prototype.put = function (storageLocation) {
@@ -59,15 +72,12 @@ TorrentingEngine.prototype._writeFiles = function (storageLocation, torrentData)
 }
 
 TorrentingEngine.prototype._writeTorrent = function (torrentData) {
-  var torrentLocation = this.storageRoot + '/' + torrentData.infoHash + '.torrent'
-  torrentData = parseTorrent.toTorrentFile(torrentData)
-  return Q.nfcall(fs.writeFile, torrentLocation, torrentData)
+  var torrentBuffer = parseTorrent.toTorrentFile(torrentData)
+  return Q.nfcall(fs.writeFile, this._getLocation(torrentData.infoHash, true), torrentBuffer)
 }
 
 TorrentingEngine.prototype._renameFile = function (storageLocation, torrentData) {
-  var dataLocation = this.storageRoot + '/' + torrentData.infoHash
-  console.log(dataLocation)
-  return Q.nfcall(fs.rename, storageLocation, dataLocation)
+  return Q.nfcall(fs.rename, storageLocation, this._getLocation(torrentData.infoHash))
 }
 
 TorrentingEngine.prototype.has = function (infoHash) {}
