@@ -2,13 +2,18 @@
 var inherits = require('inherits')
 var Duplex = require('stream').Duplex
 
-// TODO: Implement Duplex connection
-
-var Connection = function (publicKey) {
+var Connection = function (infoHash, publicKey, torrenting) {
   Duplex.call(this)
+  this.infoHash = infoHash
   this.publicKey = publicKey
+  this.torrenting = torrenting
 }
 
-inherits(Conncetion, Duplex)
+Connection.prototype._write = function (chunk, encoding, done) {
+  this.torrenting.send(this.infoHash, this.publicKey, chunk)
+  done()
+}
+
+inherits(Connection, Duplex)
 
 module.exports = Connection
