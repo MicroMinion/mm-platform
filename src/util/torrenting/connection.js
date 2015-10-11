@@ -9,11 +9,13 @@ var Connection = function (infoHash, publicKey, torrenting) {
   this.torrenting = torrenting
 }
 
+inherits(Connection, Duplex)
+
 Connection.prototype._write = function (chunk, encoding, done) {
   this.torrenting.send(this.infoHash, this.publicKey, chunk)
   done()
 }
 
-inherits(Connection, Duplex)
+Connection.prototype._read = function (size) {}
 
 module.exports = Connection

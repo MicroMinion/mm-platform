@@ -13,6 +13,7 @@ var piece = require('torrent-piece')
 var FSChunkStore = require('fs-chunk-store')
 var ImmediateChunkStore = require('immediate-chunk-store')
 var inherits = require('inherits')
+var debug = require('debug')('flunky-platform:util:torrenting:TorrentStream')
 
 var exchangeMetadata = require('./exchange-metadata.js')
 var fileStream = require('./file-stream.js')
@@ -42,19 +43,18 @@ var toNumber = function (val) {
   return val === true ? 1 : (val || 0)
 }
 
-var TorrentStream = function (link, path) {
+var TorrentStream = function (infoHash, storagePath, torrenting) {
+  debug('initialize')
   events.EventEmitter.call(this)
 
-  this.link = parseTorrent(link)
-
-  this.metadata = this.link.infoBuffer || null
-  this.infoHash = this.link.infoHash
+  this.metadata = null
+  this.infoHash = infoHash
   this.id = '-TS0008-' + hat(48)
 
   this.destroyed = false
 
-  this.path = path
-  this.torrentPath = path + '.torrent'
+  this.path = storagePath
+  this.torrentPath = storagePath + '.torrent'
 
   this._critical = []
   this._flood = 0
@@ -66,61 +66,57 @@ var TorrentStream = function (link, path) {
   this.rechokeIntervalId
 
   this.timeout = REQUEST_TIMEOUT
-  this.verify = true
+  this._verify = true
   this.files = []
   this.selection = []
   this.torrent = null
   this.bitfield = null
   this.amInterested = false
   this.store = null
-  this.swarm = new PeerWireSwarm(this.infoHash, this.id, this.torrenting)
+  this.swarm = new PeerWireSwarm(this.infoHash, this.id, torrenting)
   this.wires = this.swarm.wires
   this._initializeSwarm()
-  this.verify()
 }
 
 inherits(TorrentStream, events.EventEmitter)
 
 TorrentStream.prototype._initializeSwarm = function () {
+  debug('_initializeSwarm')
   var torrentStream = this
   this.swarm.on('wire', function (wire) {
+    debug('onwire')
     torrentStream.emit('wire', wire)
-    torrentStream.exchangeMetadata(wire)
+    torrentStream.exchangeMetadata()(wire)
     if (torrentStream.bitfield) wire.bitfield(torrentStream.bitfield)
   })
   this.swarm.pause()
-  if (this.link.files && this.metadata) {
-    this.swarm.resume()
-    this.torrent = this.link
-    this.ontorrent(this.link)
-  } else {
-    fs.readFile(this.torrentPath, function (_, buf) {
-      if (this.destroyed) return
-      this.swarm.resume()
+  fs.readFile(this.torrentPath, function (_, buf) {
+    if (torrentStream.destroyed) return
+    torrentStream.swarm.resume()
 
-      // We know only infoHash here, not full infoDictionary.
-      if (!buf) return
+    // We know only infoHash here, not full infoDictionary.
+    if (!buf) return
 
-      var torrent = parseTorrent(buf)
+    var torrent = parseTorrent(buf)
 
-      // Bad cache file - fetch it again
-      if (torrent.infoHash !== this.infoHash) return
+    // Bad cache file - fetch it again
+    if (torrent.infoHash !== torrentStream.infoHash) return
 
-      this.metadata = torrent.infoBuffer
-      this.torrent = torrent
-      this.ontorrent()
-    })
-  }
+    torrentStream.metadata = torrent.infoBuffer
+    torrentStream.torrent = torrent
+    torrentStream.ontorrent()
+  })
 }
 
 TorrentStream.prototype.ontorrent = function () {
+  debug('ontorrent')
   var torrentStream = this
   var torrent = this.torrent
   var storage = this.storage || FSChunkStore
   this.store = ImmediateChunkStore(storage(torrent.pieceLength, {
     files: torrent.files.map(function (file) {
       return {
-        path: path.join(this.path, file.path),
+        path: path.join(torrentStream.path, file.path),
         length: file.length,
         offset: file.offset
       }
@@ -164,9 +160,11 @@ TorrentStream.prototype.ontorrent = function () {
 
     return file
   })
+  this.verify()
 }
 
 TorrentStream.prototype.oninterestchange = function () {
+  debug('oninterestchange')
   var prev = this.amInterested
   this.amInterested = !!this.selection.length
 
@@ -181,6 +179,7 @@ TorrentStream.prototype.oninterestchange = function () {
 }
 
 TorrentStream.prototype.gc = function () {
+  debug('gc')
   for (var i = 0; i < this.selection.length; i++) {
     var s = this.selection[i]
     var oldOffset = s.offset
@@ -201,6 +200,7 @@ TorrentStream.prototype.gc = function () {
 }
 
 TorrentStream.prototype.onpiececomplete = function (index, buffer) {
+  debug('onpiececomplete')
   if (!this.pieces[index]) return
 
   this.pieces[index] = null
@@ -217,6 +217,7 @@ TorrentStream.prototype.onpiececomplete = function (index, buffer) {
 }
 
 TorrentStream.prototype.onhotswap = function (wire, index) {
+  debug('onhotswap')
   var speed = wire.downloadSpeed()
   if (speed < piece.BLOCK_LENGTH) return
   if (!this.reservations[index] || !this.pieces[index]) return
@@ -254,10 +255,12 @@ TorrentStream.prototype.onhotswap = function (wire, index) {
 }
 
 TorrentStream.prototype.onupdatetick = function () {
+  debug('onupdatetick')
   process.nextTick(this.onupdate.bind(this))
 }
 
 TorrentStream.prototype.onrequest = function (wire, index, hotswap) {
+  debug('onrequest')
   if (!this.pieces[index]) return false
 
   var p = this.pieces[index]
@@ -276,31 +279,33 @@ TorrentStream.prototype.onrequest = function (wire, index, hotswap) {
   if (i === -1) i = r.length
   r[i] = wire
 
+  var torrentStream = this
+
   wire.request(index, offset, size, function (err, block) {
     if (r[i] === wire) r[i] = null
 
-    if (p !== this.pieces[index]) {
-      this.onupdatetick()
+    if (p !== torrentStream.pieces[index]) {
+      torrentStream.onupdatetick()
       return
     }
     if (err) {
       p.cancel(reservation)
-      this.onupdatetick()
+      torrentStream.onupdatetick()
       return
     }
 
     if (!p.set(reservation, block, wire)) {
-      this.onupdatetick()
+      torrentStream.onupdatetick()
       return
     }
 
     var sources = p.sources
     var buffer = p.flush()
 
-    if (sha1(buffer) !== this.torrent.pieces[index]) {
-      this.pieces[index] = piece(p.length)
-      this.emit('invalid-piece', index, buffer)
-      this.onupdatetick()
+    if (sha1(buffer) !== torrentStream.torrent.pieces[index]) {
+      torrentStream.pieces[index] = piece(p.length)
+      torrentStream.emit('invalid-piece', index, buffer)
+      torrentStream.onupdatetick()
 
       sources.forEach(function (wire) {
         var now = Date.now()
@@ -312,27 +317,29 @@ TorrentStream.prototype.onrequest = function (wire, index, hotswap) {
         wire.badPieceStrikes.push(now)
 
         if (wire.badPieceStrikes.length > BAD_PIECE_STRIKES_MAX) {
-          this.block(wire.peerAddress)
+          torrentStream.block(wire.peerAddress)
         }
       })
 
       return
     }
 
-    this.onpiececomplete(index, buffer)
-    this.onupdatetick()
+    torrentStream.onpiececomplete(index, buffer)
+    torrentStream.onupdatetick()
   })
 
   return true
 }
 
 TorrentStream.prototype.block = function (publicKey) {
+  debug('block')
   this._blocked.push(publicKey)
   this.disconnect(publicKey)
   this.emit('blocking', publicKey)
 }
 
 TorrentStream.prototype.onvalidatewire = function (wire) {
+  debug('onvalidatewire')
   if (wire.requests.length) return
 
   for (var i = this.selection.length - 1; i >= 0; i--) {
@@ -345,6 +352,8 @@ TorrentStream.prototype.onvalidatewire = function (wire) {
 }
 
 TorrentStream.prototype.speedRanker = function (wire) {
+  debug('speedRanker')
+  var torrentStream = this
   var speed = wire.downloadSpeed() || 1
   if (speed > SPEED_THRESHOLD) return thruthy
 
@@ -353,11 +362,11 @@ TorrentStream.prototype.speedRanker = function (wire) {
   var ptr = 0
 
   return function (index) {
-    if (!tries || !this.pieces[index]) return true
+    if (!tries || !torrentStream.pieces[index]) return true
 
-    var missing = this.pieces[index].missing
-    for (; ptr < this.wires.length; ptr++) {
-      var other = this.wires[ptr]
+    var missing = torrentStream.pieces[index].missing
+    for (; ptr < torrentStream.wires.length; ptr++) {
+      var other = torrentStream.wires[ptr]
       var otherSpeed = other.downloadSpeed()
 
       if (otherSpeed < SPEED_THRESHOLD) continue
@@ -373,6 +382,7 @@ TorrentStream.prototype.speedRanker = function (wire) {
 }
 
 TorrentStream.prototype.shufflePriority = function (i) {
+  debug('shufflePriority')
   var last = i
   for (var j = i; j < this.selection.length && this.selection[j].priority; j++) {
     last = j
@@ -382,7 +392,8 @@ TorrentStream.prototype.shufflePriority = function (i) {
   this.selection[last] = tmp
 }
 
-TorrentStream.prototype.select = function (wire, hotswap) {
+TorrentStream.prototype._select = function (wire, hotswap) {
+  debug('select')
   if (wire.requests.length >= MAX_REQUESTS) return true
 
   // Pulse, or flood (default)
@@ -407,16 +418,19 @@ TorrentStream.prototype.select = function (wire, hotswap) {
 }
 
 TorrentStream.prototype.onupdatewire = function (wire) {
+  debug('onupdatewire')
   if (wire.peerChoking) return
   if (!wire.downloaded) return this.onvalidatewire(wire)
-  this.select(wire, false) || this.select(wire, true)
+  this._select(wire, false) || this._select(wire, true)
 }
 
 TorrentStream.prototype.onupdate = function () {
+  debug('onupdate')
   this.wires.forEach(this.onupdatewire.bind(this))
 }
 
 TorrentStream.prototype.onwire = function (wire) {
+  debug('onwire')
   var torrentStream = this
   wire.setTimeout(this.timeout || REQUEST_TIMEOUT, function () {
     torrentStream.emit('timeout', wire)
@@ -437,19 +451,23 @@ TorrentStream.prototype.onwire = function (wire) {
   }
 
   wire.on('close', function () {
+    debug('close event received on wire')
     clearTimeout(id)
   })
 
   wire.on('choke', function () {
+    debug('choke event received on wire')
     clearTimeout(id)
     id = setTimeout(onchoketimeout.bind(torrentStream), timeout)
   })
 
   wire.on('unchoke', function () {
+    debug('unchoke event received on wire')
     clearTimeout(id)
   })
 
   wire.on('request', function (index, offset, length, cb) {
+    debug('request event received on wire')
     if (torrentStream.pieces[index]) return
     torrentStream.store.get(index, { offset: offset, length: length }, function (err, buffer) {
       if (err) return cb(err)
@@ -483,6 +501,7 @@ TorrentStream.prototype.onwire = function (wire) {
 }
 
 TorrentStream.prototype.rechokeSort = function (a, b) {
+  debug('rechokeSort')
   // Prefer higher download speed
   if (a.downSpeed !== b.downSpeed) return a.downSpeed > b.downSpeed ? -1 : 1
   // Prefer higher upload speed
@@ -494,6 +513,7 @@ TorrentStream.prototype.rechokeSort = function (a, b) {
 }
 
 TorrentStream.prototype.onrechoke = function () {
+  debug('onrechoke')
   if (this.rechokeOptimisticTime > 0) --this.rechokeOptimisticTime
   else this.rechokeOptimistic = null
 
@@ -544,6 +564,7 @@ TorrentStream.prototype.onrechoke = function () {
 }
 
 TorrentStream.prototype.refresh = function () {
+  debug('refresh')
   var torrentStream = this
   process.nextTick(torrentStream.gc.bind(torrentStream))
   torrentStream.oninterestchange()
@@ -551,6 +572,7 @@ TorrentStream.prototype.refresh = function () {
 }
 
 TorrentStream.prototype.onready = function () {
+  debug('onready')
   this.swarm.on('wire', this.onwire.bind(this))
   this.swarm.wires.forEach(this.onwire.bind(this))
   this.rechokeIntervalId = setInterval(this.onrechoke.bind(this), RECHOKE_INTERVAL)
@@ -560,7 +582,9 @@ TorrentStream.prototype.onready = function () {
 }
 
 TorrentStream.prototype.verify = function () {
-  if (this.verify === false) {
+  var torrentStream = this
+  debug('verify')
+  if (this._verify === false) {
     this.onready()
     return
   }
@@ -568,15 +592,15 @@ TorrentStream.prototype.verify = function () {
   this.emit('verifying')
 
   var loop = function (i) {
-    if (i >= this.torrent.pieces.length) {
-      this.onready()
+    if (i >= torrentStream.torrent.pieces.length) {
+      torrentStream.onready()
       return
     }
-    this.store.get(i, function (_, buf) {
-      if (!buf || sha1(buf) !== this.torrent.pieces[i] || !this.pieces[i]) return loop(i + 1)
-      this.pieces[i] = null
-      this.bitfield.set(i, true)
-      this.emit('verify', i)
+    torrentStream.store.get(i, function (_, buf) {
+      if (!buf || sha1(buf) !== torrentStream.torrent.pieces[i] || !torrentStream.pieces[i]) return loop(i + 1)
+      torrentStream.pieces[i] = null
+      torrentStream.bitfield.set(i, true)
+      torrentStream.emit('verify', i)
       loop(i + 1)
     })
   }
@@ -584,13 +608,14 @@ TorrentStream.prototype.verify = function () {
 }
 
 TorrentStream.prototype.exchangeMetadata = function () {
+  debug('exchangeMetadata')
   var torrentStream = this
   return exchangeMetadata(torrentStream, function (metadata) {
     var buf = bncode.encode({
       info: bncode.decode(metadata),
       'announce-list': []
     })
-    this.torrent = parseTorrent(buf)
+    torrentStream.torrent = parseTorrent(buf)
     torrentStream.ontorrent()
     mkdirp(path.dirname(torrentStream.torrentPath), function (err) {
       if (err) return torrentStream.emit('error', err)
@@ -603,10 +628,12 @@ TorrentStream.prototype.exchangeMetadata = function () {
 }
 
 TorrentStream.prototype.critical = function (piece, width) {
+  debug('critical')
   for (var i = 0; i < (width || 1); i++) this._critical[piece + i] = true
 }
 
 TorrentStream.prototype.select = function (from, to, priority, notify) {
+  debug('select')
   this.selection.push({
     from: from,
     to: to,
@@ -623,6 +650,7 @@ TorrentStream.prototype.select = function (from, to, priority, notify) {
 }
 
 TorrentStream.prototype.deselect = function (from, to, priority, notify) {
+  debug('deselect')
   notify = notify || noop
   for (var i = 0; i < this.selection.length; i++) {
     var s = this.selection[i]
@@ -638,6 +666,7 @@ TorrentStream.prototype.deselect = function (from, to, priority, notify) {
 }
 
 TorrentStream.prototype.setPulse = function (bps) {
+  debug('setPulse')
   // Set minimum byte/second pulse starting now (dynamic)
   // Eg. Start pulsing at minimum 312 KBps:
   // engine.setPulse(312*1024)
@@ -646,6 +675,7 @@ TorrentStream.prototype.setPulse = function (bps) {
 }
 
 TorrentStream.prototype.setFlood = function (b) {
+  debug('setFlood')
   // Set bytes to flood starting now (dynamic)
   // Eg. Start flooding for next 10 MB:
   // engine.setFlood(10*1024*1024)
@@ -672,14 +702,17 @@ TorrentStream.prototype.flood = function () {
 }
 
 TorrentStream.prototype.connect = function (publicKey) {
+  debug('connect')
   this.swarm.add(publicKey)
 }
 
 TorrentStream.prototype.disconnect = function (publicKey) {
+  debug('disconnect')
   this.swarm.remove(publicKey)
 }
 
 TorrentStream.prototype.removeTorrent = function (cb) {
+  debug('removeTorrent')
   var torrentStream = this
   fs.unlink(this.torrentPath, function (err) {
     if (err) return cb(err)
@@ -691,6 +724,7 @@ TorrentStream.prototype.removeTorrent = function (cb) {
 }
 
 TorrentStream.prototype.remove = function (keepPieces, cb) {
+  debug('remove')
   var torrentStream = this
   if (typeof keepPieces === 'function') {
     cb = keepPieces
@@ -709,6 +743,7 @@ TorrentStream.prototype.remove = function (keepPieces, cb) {
 }
 
 TorrentStream.prototype.destroy = function (cb) {
+  debug('destroy')
   this.destroyed = true
   this.swarm.destroy()
   clearInterval(this.rechokeIntervalId)
@@ -720,6 +755,7 @@ TorrentStream.prototype.destroy = function (cb) {
 }
 
 TorrentStream.prototype.listen = function () {
+  debug('listen')
   this.swarm.listen()
 }
 

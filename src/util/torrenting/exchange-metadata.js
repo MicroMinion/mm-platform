@@ -42,7 +42,6 @@ module.exports = function (engine, callback) {
         } catch (err) {
           return
         }
-
         if (piece < 0) return
         if (message.msg_type === 2) return
 
@@ -67,7 +66,6 @@ module.exports = function (engine, callback) {
             metadata = null
             return
           }
-
           callback(engine.metadata = metadata)
         }
       })

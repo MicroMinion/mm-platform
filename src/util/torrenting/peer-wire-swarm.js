@@ -6,6 +6,7 @@ var EventEmitter = require('events').EventEmitter
 var util = require('util')
 var Connection = require('./connection.js')
 var _ = require('lodash')
+var debug = require('debug')('flunky-platform:util:torrenting:PeerWireSwarm')
 
 var HANDSHAKE_TIMEOUT = 25000
 var CONNECTION_TIMEOUT = 3000
@@ -22,8 +23,8 @@ var toAddress = function (wire) {
 }
 
 var Swarm = function (infoHash, peerId, torrenting, options) {
+  debug('initialize')
   EventEmitter.call(this)
-
   this.torrenting = torrenting
 
   options = options || {}
@@ -59,6 +60,7 @@ var Swarm = function (infoHash, peerId, torrenting, options) {
   this._queues = [fifo()]
   this._peers = {}
   this._pwp = {speed: options.speed}
+  debug('end initialize')
 }
 
 util.inherits(Swarm, EventEmitter)
@@ -70,15 +72,18 @@ Swarm.prototype.__defineGetter__('queued', function () {
 })
 
 Swarm.prototype.pause = function () {
+  debug('pause')
   this.paused = true
 }
 
 Swarm.prototype.resume = function () {
+  debug('resume')
   this.paused = false
   this._drain()
 }
 
 Swarm.prototype.priority = function (publicKey, level) {
+  debug('priority')
   publicKey = toAddress(publicKey)
   var peer = this._peers[publicKey]
 
@@ -96,6 +101,7 @@ Swarm.prototype.priority = function (publicKey, level) {
 }
 
 Swarm.prototype.add = function (publicKey) {
+  debug('add')
   if (this._destroyed || this._peers[publicKey]) return
 
   this._peers[publicKey] = {
@@ -110,24 +116,33 @@ Swarm.prototype.add = function (publicKey) {
 }
 
 Swarm.prototype.remove = function (publicKey) {
+  debug('remove')
   this._remove(toAddress(publicKey))
   this._drain()
 }
 
 Swarm.prototype.listen = function () {
-  this.torrenting.on('self.' + this.infoHash, this._onMessage.bind(this))
-  this.torrenting.on('friends.' + this.infoHash, this._onMessage.bind(this))
-  this.torrenting.on('public.' + this.infoHash, this._onMessage.bind(this))
+  debug('listen')
+  var infoHash = this.infoHash.toString('hex')
+  this.torrenting.on('self.' + infoHash, this._onMessage.bind(this))
+  this.torrenting.on('friends.' + infoHash, this._onMessage.bind(this))
+  this.torrenting.on('public.' + infoHash, this._onMessage.bind(this))
 }
 
 Swarm.prototype._onMessage = function (scope, publicKey, message) {
+  debug('_onMessage')
+  debug(scope)
+  debug(publicKey)
+  debug(message)
   if (!_.has(this.connections, publicKey)) {
     this._onincoming(publicKey)
   }
+  debug(_.keys(this.connections))
   this.connections[publicKey].emit('data', message)
 }
 
 Swarm.prototype.destroy = function () {
+  debug('destroy')
   this._destroyed = true
 
   var self = this
@@ -145,6 +160,7 @@ Swarm.prototype.destroy = function () {
 }
 
 Swarm.prototype._remove = function (publicKey) {
+  debug('_remove')
   var peer = this._peers[publicKey]
   if (!peer) return
   delete this._peers[publicKey]
@@ -154,6 +170,7 @@ Swarm.prototype._remove = function (publicKey) {
 }
 
 Swarm.prototype._drain = function () {
+  debug('_drain')
   if (_.size(this.connections) >= this.size || this.paused) return
 
   var self = this
@@ -203,6 +220,7 @@ Swarm.prototype._drain = function () {
 }
 
 Swarm.prototype._shift = function () {
+  debug('_shift')
   for (var i = this._queues.length - 1; i >= 0; i--) {
     if (this._queues[i] && this._queues[i].length) return this._queues[i].shift()
   }
@@ -210,18 +228,20 @@ Swarm.prototype._shift = function () {
 }
 
 Swarm.prototype._onincoming = function (publicKey) {
+  debug('_onincoming')
   var connection = new Connection(this.infoHash.toString('hex'), publicKey, this.torrenting)
   var swarm = this
+  swarm._onconnection(publicKey, connection)
   var wire = this._create_wire_protocol(connection)
   wire.once('handshake', function (infoHash, peerId) {
     wire.peerAddress = connection.publicKey
     wire.handshake(swarm.infoHash, swarm.peerId, swarm.handshake)
-    swarm._onconnection(publicKey, connection)
     swarm._onhandshake(connection, wire)
   })
 }
 
 Swarm.prototype._onconnection = function (publicKey, connection) {
+  debug('_onconnection')
   var self = this
   connection.once('close', function () {
     delete self.connections[publicKey]
@@ -231,6 +251,7 @@ Swarm.prototype._onconnection = function (publicKey, connection) {
 }
 
 Swarm.prototype._onhandshake = function (connection, wire) {
+  debug('_onhandshake')
   var self = this
 
   wire.on('download', function (downloaded) {
@@ -263,9 +284,11 @@ Swarm.prototype._onhandshake = function (connection, wire) {
 }
 
 Swarm.prototype._create_wire_protocol = function (connection) {
+  debug('_create_wire_protocol')
   var wire = peerWireProtocol(this._pwp)
 
   var destroy = function () {
+    debug('destroy in _create_wire_protocol')
     connection.destroy()
     connection.emit('timeout')
   }
@@ -282,7 +305,8 @@ Swarm.prototype._create_wire_protocol = function (connection) {
     connection.destroy()
   })
 
-  connection.on('error', function () {
+  connection.on('error', function (error) {
+    debug(error)
     connection.destroy()
   })
 
@@ -290,7 +314,6 @@ Swarm.prototype._create_wire_protocol = function (connection) {
     clearTimeout(handshakeTimeout)
     wire.destroy()
   })
-
   connection.pipe(wire).pipe(connection)
   return wire
 }
