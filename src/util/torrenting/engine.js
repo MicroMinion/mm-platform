@@ -35,16 +35,21 @@ var TorrentingEngine = function (torrenting, storageRoot) {
  * Retrieve a file
  * @param startIncomplete {boolean}: return stream as soon as we downloaded part of file
  */
-TorrentingEngine.prototype.get = function (infoHash, startIncomplete) {
+TorrentingEngine.prototype.get = function (infoHash, fileName, startIncomplete) {
   debug('get ' + infoHash)
-  if (this.has(infoHash)) {
+  if (this.has(infoHash) && !_.has(this.downloaders, infoHash)) {
     var defer = Q.defer()
     process.nextTick(function () {
-      defer.resolve(this._getLocation(infoHash))
+      var filePath = path.join(this._getLocation(infoHash), fileName)
+      if (startIncomplete) {
+        defer.resolve(fs.createReadStream(filePath))
+      } else {
+        defer.resolve(filePath)
+      }
     })
     return defer.promise
   } else {
-    return this._download(infoHash, startIncomplete)
+    return this._download(infoHash, fileName, startIncomplete)
   }
 }
 
@@ -58,11 +63,13 @@ TorrentingEngine.prototype._getLocation = function (infoHash, torrent) {
   return location
 }
 
-TorrentingEngine.prototype._download = function (infoHash, startIncomplete) {
+TorrentingEngine.prototype._download = function (infoHash, fileName, startIncomplete) {
   if (!_.has(this.downloaders, infoHash)) {
-    this.downloaders[infoHash] = new Downloader(infoHash, startIncomplete, this)
+    this.downloaders[infoHash] = new Downloader(infoHash, this)
   }
-  return this.downloaders[infoHash].getPromise()
+  var defer = Q.defer()
+  this.downloaders[infoHash].addRequest(fileName, startIncomplete, defer)
+  return defer.promise
 }
 
 TorrentingEngine.prototype.put = function (storageLocation) {
