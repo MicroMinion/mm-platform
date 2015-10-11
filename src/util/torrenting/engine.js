@@ -115,9 +115,7 @@ TorrentingEngine.prototype._subscribeToFiles = function () {
 TorrentingEngine.prototype._onMessage = function (topic, publicKey, message) {
   var scope = topic.split('.')[0]
   var infoHash = topic.split('.')[1]
-  if (_.has(this.downloaders, infoHash)) {
-    this.downloaders[infoHash].onMessage(scope, publicKey, message)
-  } else {
+  if (!_.has(this.downloaders, infoHash)) {
     this.server.onMessage(scope, infoHash, publicKey, message)
   }
 }
