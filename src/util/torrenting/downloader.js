@@ -23,6 +23,10 @@ var Downloader = function (infoHash, engine) {
   this.torrentStream.listen()
 }
 
+Downloader.prototype.addSource = function (publicKey) {
+  this.torrentStream.connect(publicKey)
+}
+
 Downloader.prototype.addRequest = function (fileName, startIncomplete, defer) {
   var downloader = this
   if (!this.isReady) {

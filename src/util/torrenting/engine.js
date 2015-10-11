@@ -53,6 +53,12 @@ TorrentingEngine.prototype.get = function (infoHash, fileName, startIncomplete) 
   }
 }
 
+TorrentingEngine.prototype.addSource = function (infoHash, publicKey) {
+  if (_.has(this.downloaders, infoHash)) {
+    this.downloaders[infoHash].addSource(publicKey)
+  }
+}
+
 TorrentingEngine.prototype._getLocation = function (infoHash, torrent) {
   var location = path.join(this.storageRoot, infoHash)
   if (torrent) {
