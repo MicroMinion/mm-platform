@@ -5,20 +5,38 @@ var parseTorrent = require('parse-torrent')
 var Q = require('q')
 var fs = require('fs')
 var path = require('path')
+var FSChunkStore = require('fs-chunk-store')
+var _ = require('lodash')
 
 var PSTR = new Buffer([0x13, 0x42, 0x69, 0x74, 0x54, 0x6f, 0x72, 0x72, 0x65, 0x6e, 0x74, 0x20, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c])
 var HANDSHAKE_LENGTH = 48
 var MESSAGE_RESERVED = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 var MESSAGE_UNCHOKE = new Buffer([0x00, 0x00, 0x00, 0x01, 0x01])
 
+var STORE_PURGE_INTERVAL = 1000 * 60 * 5
+
 var toBuffer = function (str, encoding) {
   return Buffer.isBuffer(str) ? str : new Buffer(str, encoding)
 }
 
 var Server = function (torrenting, storageRoot) {
+  var server = this
   this.torrenting = torrenting
   this.storageroot = storageRoot
   this.peerId = toBuffer('-TS0008-' + hat(48), 'utf-8')
+  /*
+   * store cache with infoHash as key
+   * Every key contains the following object:
+   * {lastAccess: Date, requests: [requestArray], store: store}
+   */
+  this.stores = {}
+  setInterval(function () {
+    _.forEach(_.keys(server.stores), function (infoHash) {
+      if (Math.abs(new Date() - server.stores[infoHash].lastAccess) > STORE_PURGE_INTERVAL) {
+        delete server.stores[infoHash]
+      }
+    })
+  }, STORE_PURGE_INTERVAL)
 }
 
 Server.prototype.onMessage = function (scope, infoHash, publicKey, message) {
@@ -33,7 +51,7 @@ Server.prototype.onMessage = function (scope, infoHash, publicKey, message) {
 }
 
 Server.prototype.isHandshake = function (message) {
-  var pstrlen = message.readUInt8(message)
+  var pstrlen = message.readUInt8(0)
   if (pstrlen !== HANDSHAKE_LENGTH + PSTR.length) {
     return false
   }
@@ -81,7 +99,73 @@ Server.prototype.sendBitfield = function (infoHash, publicKey) {
 
 Server.prototype.isExtendedMetadata = function (message) {}
 Server.prototype.sendMetadata = function (infoHash, publicKey, message) {}
-Server.prototype.isRequest = function (message) {}
-Server.prototype.sendPiece = function (infoHash, publicKey, message) {}
+
+Server.prototype.isRequest = function (message) {
+  var len = message.readUInt8(0)
+  var id = message.readUInt8(1)
+  return len === 13 && id === 6
+}
+
+Server.prototype.createStore = function (infoHash) {
+  var torrentLocation = path.join(this.storageLocation, infoHash + '.torrent')
+  var storageLocation = path.join(this.storageLocation, infoHash)
+  var server = this
+  var stores = this.stores
+  Q.nfcall(fs.readFile, torrentLocation)
+    .then(parseTorrent)
+    .then(function (torrentData) {
+      var store = FSChunkStore(torrentData.pieceLength, {
+        files: torrentData.files.map(function (file) {
+          return {
+            path: path.join(storageLocation, file.path),
+            length: file.length,
+            offset: file.offset
+          }
+        })
+      })
+      stores[infoHash].store = store
+    })
+    .then(function () {
+      _.forEach(server.stores[infoHash].requests, function (request) {
+        server.resolveRequest(infoHash, request[0], request[1], request[2], request[3])
+      })
+    })
+  this.stores[infoHash] = {
+    lastAccess: new Date(),
+    requests: []
+  }
+}
+
+Server.prototype.sendPiece = function (infoHash, publicKey, message) {
+  var index = message.readUInt32BE(2)
+  var offset = message.readUInt32BE(6)
+  var length = message.readUInt32BE(10)
+  if (!_.has(this.stores, infoHash)) {
+    this.createStore(infoHash)
+    this.addRequest(infoHash, publicKey, index, offset, length)
+  } else {
+    this.stores[infoHash].lastAccess = new Date()
+    if (_.has(this.stores, 'store')) {
+      this.resolveRequest(infoHash, publicKey, index, offset, length)
+    } else {
+      this.addRequest(infoHash, publicKey, index, offset, length)
+    }
+  }
+}
+
+Server.prototype.resolveRequest = function (infoHash, publicKey, index, offset, length) {
+  var server = this
+  return Q.nfcall(this.stores[infoHash].store.get, {offset: offset, length: length})
+    .then(function (buffer) {
+      server._sendMessage(infoHash, publicKey, 7, [index, offset], buffer)
+    })
+}
+
+Server.prototype.addRequest = function (infoHash, publicKey, index, offset, length) {
+  if (!_.has(this.stores[infoHash], 'requests')) {
+    this.stores[infoHash].requests = []
+  }
+  this.stores[infoHash].push([publicKey, index, offset, length])
+}
 
 module.exports = Server
