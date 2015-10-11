@@ -13,13 +13,17 @@ var Downloader = function (infoHash, engine) {
   this.storageLocation = path.join(engine.storageRoot, infoHash)
   this.torrentStream = new TorrentStream(infoHash, engine.storageRoot + '/' + infoHash, this.torrenting)
   this.torrentStream.on('ready', function () {
+    downloader.torrentStream.files.forEach(function (file) {
+      file.select()
+    })
     downloader.isReady = true
     downloader._returnStreams()
-    downloader._selectFiles()
   })
   this.torrentStream.on('idle', function () {
     downloader._returnPaths()
   })
+  this.torrentStream.on('verify', function (index) {})
+  this.torrentStream.on('download', function (index, buffer) {})
   this.torrentStream.listen()
 }
 
@@ -76,28 +80,6 @@ Downloader.prototype._getFile = function (fileName) {
 
 Downloader.prototype._addRequest = function (fileName, startIncomplete, defer) {
   this.requests.push([fileName, startIncomplete, defer])
-}
-
-Downloader.prototype._selectFiles = function () {
-  var files = []
-  _.forEach(this.requests, function (request) {
-    if (!request[1]) {
-      files.push(request[0])
-    }
-  })
-  files = _.uniq(files)
-  _.forEach(files, function (fileName) {
-    this._selectFile(fileName)
-  }, this)
-}
-
-Downloader.prototype._selectFile = function (fileName) {
-  var downloader = this
-  _.forEach(downloader.torrentStream.files, function (file) {
-    if (file.name === fileName) {
-      file.select()
-    }
-  })
 }
 
 Downloader.prototype._returnStreams = function () {

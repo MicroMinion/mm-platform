@@ -17,11 +17,11 @@ inherits(Torrenting, EventEmitter)
 
 Torrenting.prototype.send = function (infoHash, publicKey, message) {
   var engine = this
-  // process.nextTick(function () {
-  console.log('send ' + infoHash + ' ' + publicKey)
-  console.log(message)
-  engines[publicKey].emit('self.' + infoHash, engine.sender, message)
-// })
+  process.nextTick(function () {
+    console.log('send ' + infoHash + ' ' + publicKey)
+    console.log(message)
+    engines[publicKey].emit('self.' + infoHash, engine.sender, message)
+  })
 }
 
 var engines = {
@@ -54,6 +54,11 @@ engineA.put('./video.mp4')
   })
 
 setTimeout(function () {
-  engineB.get(hash)
+  var log = function (log) {
+    console.log('logging')
+    console.log(log)
+  }
+  engineB.get(hash, 'video.mp4', false)
+    .then(log, log)
   engineB.addSource(hash, 'engineA')
 }, 2000)

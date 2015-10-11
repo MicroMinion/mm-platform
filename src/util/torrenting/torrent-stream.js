@@ -195,7 +195,6 @@ TorrentStream.prototype.gc = function () {
     s.notify()
     this.oninterestchange()
   }
-
   if (!this.selection.length) this.emit('idle')
 }
 
@@ -280,7 +279,6 @@ TorrentStream.prototype.onrequest = function (wire, index, hotswap) {
   r[i] = wire
 
   var torrentStream = this
-
   wire.request(index, offset, size, function (err, block) {
     if (r[i] === wire) r[i] = null
 
@@ -341,7 +339,6 @@ TorrentStream.prototype.block = function (publicKey) {
 TorrentStream.prototype.onvalidatewire = function (wire) {
   debug('onvalidatewire')
   if (wire.requests.length) return
-
   for (var i = this.selection.length - 1; i >= 0; i--) {
     var next = this.selection[i]
     for (var j = next.to; j >= next.from + next.offset; j--) {
@@ -402,7 +399,6 @@ TorrentStream.prototype._select = function (wire, hotswap) {
   }
 
   var rank = this.speedRanker(wire)
-
   for (var i = 0; i < this.selection.length; i++) {
     var next = this.selection[i]
     for (var j = next.from + next.offset; j <= next.to; j++) {

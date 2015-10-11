@@ -94,7 +94,7 @@ Server.prototype.sendBitfield = function (infoHash, publicKey) {
   this._loadTorrent(infoHash)
     .then(function (torrentData) {
       var bitfield = new Bitfield(torrentData.pieces.length)
-      for (var i = 0; i < bitfield.buffer.length; i++) {
+      for (var i = 0; i < bitfield.buffer.length * 8; i++) {
         bitfield.set(i)
       }
       server._sendMessage(infoHash, publicKey, 5, [], bitfield.buffer)
@@ -214,7 +214,7 @@ Server.prototype.sendPiece = function (infoHash, publicKey, message) {
     this.addRequest(infoHash, publicKey, index, offset, length)
   } else {
     this.stores[infoHash].lastAccess = new Date()
-    if (_.has(this.stores, 'store')) {
+    if (_.has(this.stores[infoHash], 'store')) {
       this.resolveRequest(infoHash, publicKey, index, offset, length)
     } else {
       this.addRequest(infoHash, publicKey, index, offset, length)
@@ -225,10 +225,15 @@ Server.prototype.sendPiece = function (infoHash, publicKey, message) {
 Server.prototype.resolveRequest = function (infoHash, publicKey, index, offset, length) {
   debug('resolveRequest')
   var server = this
-  return Q.nfcall(this.stores[infoHash].store.get, {offset: offset, length: length})
-    .then(function (buffer) {
-      server._sendMessage(infoHash, publicKey, 7, [index, offset], buffer)
-    })
+  this.stores[infoHash].store.get(index, function (err, buffer) {
+    debug('store.get succeeeded')
+    if (err) {
+      console.log(err)
+      return
+    }
+    buffer = buffer.slice(offset, length)
+    server._sendMessage(infoHash, publicKey, 7, [index, offset], buffer)
+  })
 }
 
 Server.prototype.addRequest = function (infoHash, publicKey, index, offset, length) {
@@ -236,7 +241,7 @@ Server.prototype.addRequest = function (infoHash, publicKey, index, offset, leng
   if (!_.has(this.stores[infoHash], 'requests')) {
     this.stores[infoHash].requests = []
   }
-  this.stores[infoHash].push([publicKey, index, offset, length])
+  this.stores[infoHash].requests.push([publicKey, index, offset, length])
 }
 
 module.exports = Server
