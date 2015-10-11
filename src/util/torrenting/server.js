@@ -7,6 +7,7 @@ var fs = require('fs')
 var path = require('path')
 var FSChunkStore = require('fs-chunk-store')
 var _ = require('lodash')
+var bencode = require('bencode')
 
 var PSTR = new Buffer([0x13, 0x42, 0x69, 0x74, 0x54, 0x6f, 0x72, 0x72, 0x65, 0x6e, 0x74, 0x20, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c])
 var HANDSHAKE_LENGTH = 48
@@ -43,8 +44,8 @@ Server.prototype.onMessage = function (scope, infoHash, publicKey, message) {
   if (this.isHandshake(message)) {
     this.sendHandshake(infoHash, publicKey)
     this.sendBitfield(infoHash, publicKey)
-  } else if (this.isExtendedMetadata(message)) {
-    this.sendMetadata(infoHash, publicKey, message)
+  } else if (this.isExtended(message)) {
+    this.sendExtended(infoHash, publicKey, message)
   } else if (this.isRequest(message)) {
     this.sendPiece(infoHash, publicKey, message)
   }
@@ -84,9 +85,7 @@ Server.prototype._sendMessage = function (infoHash, publicKey, id, numbers, data
 
 Server.prototype.sendBitfield = function (infoHash, publicKey) {
   var server = this
-  var torrentLocation = path.join(this.storageLocation, infoHash + '.torrent')
-  Q.nfcall(fs.readFile, torrentLocation)
-    .then(parseTorrent)
+  this._loadTorrent(infoHash)
     .then(function (torrentData) {
       var bitfield = new Bitfield(torrentData.pieces.length)
       for (var i = 0; i < bitfield.buffer.length; i++) {
@@ -97,12 +96,65 @@ Server.prototype.sendBitfield = function (infoHash, publicKey) {
     })
 }
 
-Server.prototype.isExtendedMetadata = function (message) {}
-Server.prototype.sendMetadata = function (infoHash, publicKey, message) {}
+Server.prototype._loadTorrent = function (infoHash) {
+  var torrentLocation = path.join(this.storageLocation, infoHash + '.torrent')
+  return Q.nfcall(fs.readFile, torrentLocation)
+    .then(parseTorrent)
+}
+
+Server.prototype.isExtended = function (message) {
+  var id = message.readUInt8(4)
+  return id === 20
+}
+
+Server.prototype.sendExtended = function (infoHash, publicKey, message) {
+  var extendedId = message.readUInt8(5)
+  if (extendedId === 0) {
+    this.sendExtendedHandshake(infoHash, publicKey)
+  } else if (extendedId === 1) {
+    this.sendMetadata(infoHash, publicKey, message)
+  }
+}
+
+Server.prototype.sendMetadata = function (infoHash, publicKey, message) {
+  var server = this
+  var msg = bencode.decode(message.slice(6))
+  if (msg.msg_type === 0) {
+    this._loadTorrent(infoHash)
+      .then(function (torrentData) {
+        var msgResponse = {
+          msg_type: 1,
+          piece: msg.piece,
+          total_size: torrentData.infoBuffer.length
+        }
+        var start = 16384 * msgResponse.piece
+        var end = _.min(start + 16384, torrentData.infoBuffer.length)
+        var buf = torrentData.infoBuffer.slice(start, end)
+        msgResponse = bencode.encode(msgResponse)
+        var msg = Buffer.concat([msgResponse, buf])
+        server._sendMessage(infoHash, publicKey, 20, [1], msg)
+      })
+  }
+}
+
+Server.prototype.sendExtendedHandshake = function (infoHash, publicKey) {
+  var server = this
+  this._loadTorrent(infoHash)
+    .then(function (torrentData) {
+      var msg = {
+        m: {
+          'ut_metadata': 1
+        },
+        metadata_size: torrentData.infoBuffer.length
+      }
+      var buf = bencode.encode(msg)
+      server._sendMessage(infoHash, publicKey, 20, [0], buf)
+    })
+}
 
 Server.prototype.isRequest = function (message) {
-  var len = message.readUInt8(0)
-  var id = message.readUInt8(1)
+  var len = message.readUInt32BE(0)
+  var id = message.readUInt8(4)
   return len === 13 && id === 6
 }
 
@@ -137,9 +189,9 @@ Server.prototype.createStore = function (infoHash) {
 }
 
 Server.prototype.sendPiece = function (infoHash, publicKey, message) {
-  var index = message.readUInt32BE(2)
-  var offset = message.readUInt32BE(6)
-  var length = message.readUInt32BE(10)
+  var index = message.readUInt32BE(5)
+  var offset = message.readUInt32BE(9)
+  var length = message.readUInt32BE(13)
   if (!_.has(this.stores, infoHash)) {
     this.createStore(infoHash)
     this.addRequest(infoHash, publicKey, index, offset, length)
