@@ -10,13 +10,25 @@ var _ = require('lodash')
 var Q = require('q')
 var debug = require('debug')('flunky-platform:util:torrenting:TorrentingEngine')
 
+if (!String.prototype.endsWith) {
+  String.prototype.endsWith = function (searchString, position) {
+    var subjectString = this.toString()
+    if (typeof position !== 'number' || !isFinite(position) || Math.floor(position) !== position || position > subjectString.length) {
+      position = subjectString.length
+    }
+    position -= searchString.length
+    var lastIndex = subjectString.indexOf(searchString, position)
+    return lastIndex !== -1 && lastIndex === position
+  }
+}
+
 var TorrentingEngine = function (torrenting, storageRoot) {
   this.torrenting = torrenting
   this.storageRoot = storageRoot + '/torrents'
-  this.downloaders = {}
-  this.server = new Server(this.torrenting)
-  this._subscribeToFiles()
   mkdirp.sync(this.storageRoot)
+  this.downloaders = {}
+  this.server = new Server(this.torrenting, this.storageRoot)
+  this._subscribeToFiles()
 }
 
 /**
@@ -37,7 +49,7 @@ TorrentingEngine.prototype.get = function (infoHash, startIncomplete) {
 }
 
 TorrentingEngine.prototype._getLocation = function (infoHash, torrent) {
-  var location = this.storageRoot + '/' + infoHash
+  var location = path.join(this.storageRoot, infoHash)
   if (torrent) {
     location = location + '.torrent'
   } else {
@@ -69,7 +81,8 @@ TorrentingEngine.prototype.put = function (storageLocation) {
 TorrentingEngine.prototype._writeFiles = function (storageLocation, torrentData) {
   return Q.all([
     this._renameFile(storageLocation, torrentData),
-    this._writeTorrent(torrentData)
+    this._writeTorrent(torrentData),
+    this._subscribeToFile(torrentData.infoHash)
   ])
     .then(function () {
       return torrentData.infoHash
@@ -86,30 +99,29 @@ TorrentingEngine.prototype._renameFile = function (storageLocation, torrentData)
 }
 
 TorrentingEngine.prototype.has = function (infoHash) {
-  return false
+  return fs.statSync(this._getLocation(infoHash, true)).isFile()
 }
-
-TorrentingEngine.prototype.hoard = function (infoHash) {}
 
 /**
  * Initial subscription of files we have access to so that we get messages
  * for these files
  */
 TorrentingEngine.prototype._subscribeToFiles = function () {
-  // TODO: Implement to get list of infoHashes of files that we have on disk
-  var infoHashes = []
-  _.forEach(infoHashes, function (infoHash) {
-    var permissions = this._getPermissions(infoHash)
-    if (_.has(permissions, 'self')) {
-      this.torrenting.on('self.' + infoHash, this._onMessage.bind(this))
-    }
-    if (_.has(permissions, 'friends')) {
-      this.torrenting.on('friends.' + infoHash, this._onMessage.bind(this))
-    }
-    if (_.has(permissions, 'public')) {
-      this.torrenting.on('public.' + infoHash, this._onMessage.bind(this))
-    }
-  }, this)
+  var server = this
+  Q.nfcall(fs.readdir, this.storageRoot)
+    .then(function (files) {
+      _.forEach(files, function (file) {
+        if (file.endsWith('.torrent')) {
+          var infoHash = file.split('.')[0]
+          server._subscribeToFile(infoHash)
+        }
+      })
+    })
+}
+
+TorrentingEngine.prototype._subscribeToFile = function (infoHash) {
+  this.torrenting.on('self.' + infoHash, this._onMessage.bind(this))
+  this.torrenting.on('friends.' + infoHash, this._onMessage.bind(this))
 }
 
 TorrentingEngine.prototype._onMessage = function (topic, publicKey, message) {
@@ -119,7 +131,5 @@ TorrentingEngine.prototype._onMessage = function (topic, publicKey, message) {
     this.server.onMessage(scope, infoHash, publicKey, message)
   }
 }
-
-TorrentingEngine.prototype._getPermissions = function (infoHash) {}
 
 module.exports = TorrentingEngine
