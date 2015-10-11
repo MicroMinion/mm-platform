@@ -112,7 +112,11 @@ TorrentingEngine.prototype._renameFile = function (storageLocation, torrentData)
 }
 
 TorrentingEngine.prototype.has = function (infoHash) {
-  return fs.statSync(this._getLocation(infoHash, true)).isFile()
+  try {
+    return fs.statSync(this._getLocation(infoHash, true)).isFile()
+  } catch (e) {
+    return false
+  }
 }
 
 /**

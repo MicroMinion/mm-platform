@@ -6,10 +6,6 @@ var inherits = require('inherits')
 var fs = require('fs')
 var crypto = require('crypto')
 var _ = require('lodash')
-/*
-var createTorrent = require('create-torrent')
-var parseTorrent = require('parse-torrent')
-*/
 
 var Torrenting = function () {
   EventEmitter.call(this, {
@@ -21,11 +17,11 @@ inherits(Torrenting, EventEmitter)
 
 Torrenting.prototype.send = function (infoHash, publicKey, message) {
   var engine = this
-  process.nextTick(function () {
-    console.log('send ' + infoHash + ' ' + publicKey)
-    // console.log(message.toString())
-    engines[publicKey].emit('self.' + infoHash, engine.sender, message)
-  })
+  // process.nextTick(function () {
+  console.log('send ' + infoHash + ' ' + publicKey)
+  console.log(message)
+  engines[publicKey].emit('self.' + infoHash, engine.sender, message)
+// })
 }
 
 var engines = {
@@ -45,14 +41,6 @@ var hash
 
 fs.writeFileSync('./video.mp4', data)
 
-/*
-createTorrent('./video.mp4', function (err, torrent) {
-  if (!err) {
-    console.log(parseTorrent(torrent).info)
-  }
-})
-*/
-
 engineA.put('./video.mp4')
   .then(function (infoHash) {
     console.log('put result')
@@ -66,10 +54,6 @@ engineA.put('./video.mp4')
   })
 
 setTimeout(function () {
-  engineA.get(hash)
-}, 1000)
-
-setTimeout(function () {
   engineB.get(hash)
-  engineB.downloaders[hash].torrentStream.connect('engineA')
-}, 4000)
+  engineB.addSource(hash, 'engineA')
+}, 2000)

@@ -32,7 +32,6 @@ module.exports = function (engine, callback) {
 
       wire.on('extended', function (id, ext) {
         if (id !== EXTENSIONS.m.ut_metadata) return
-
         var metadata = engine.metadata
         var delimiter, message, piece
         try {
@@ -40,6 +39,7 @@ module.exports = function (engine, callback) {
           message = bncode.decode(ext.slice(0, delimiter === -1 ? ext.length : delimiter + 2))
           piece = message.piece
         } catch (err) {
+          console.log(err)
           return
         }
         if (piece < 0) return
