@@ -77,6 +77,7 @@ TorrentingEngine.prototype._download = function (infoHash, fileName, startIncomp
       debug('deleting downloader since we are done')
       engine.downloaders[infoHash].torrentStream.destroy()
       delete engine.downloaders[infoHash]
+      engine._subscribeToFile(infoHash)
     })
   }
   var defer = Q.defer()
@@ -151,6 +152,7 @@ TorrentingEngine.prototype._subscribeToFiles = function () {
 }
 
 TorrentingEngine.prototype._subscribeToFile = function (infoHash) {
+  debug('_subscribeToFile')
   this.torrenting.on('self.' + infoHash, this._onMessage.bind(this))
   this.torrenting.on('friends.' + infoHash, this._onMessage.bind(this))
 }
