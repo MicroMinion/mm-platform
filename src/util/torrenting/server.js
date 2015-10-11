@@ -25,7 +25,6 @@ Server.prototype.onMessage = function (scope, infoHash, publicKey, message) {
   if (this.isHandshake(message)) {
     this.sendHandshake(infoHash, publicKey)
     this.sendBitfield(infoHash, publicKey)
-    this.sendUnchoke(infoHash, publicKey)
   } else if (this.isExtendedMetadata(message)) {
     this.sendMetadata(infoHash, publicKey, message)
   } else if (this.isRequest(message)) {
@@ -76,10 +75,8 @@ Server.prototype.sendBitfield = function (infoHash, publicKey) {
         bitfield.set(i)
       }
       server._sendMessage(infoHash, publicKey, 5, [], bitfield.buffer)
+      server.torrenting.send(infoHash, publicKey, MESSAGE_UNCHOKE)
     })
-}
-Server.prototype.sendUnchoke = function (infoHash, publicKey) {
-  this.torrenting.send(infoHash, publicKey, MESSAGE_UNCHOKE)
 }
 
 Server.prototype.isExtendedMetadata = function (message) {}
