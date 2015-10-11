@@ -70,11 +70,25 @@ TorrentingEngine.prototype._getLocation = function (infoHash, torrent) {
 }
 
 TorrentingEngine.prototype._download = function (infoHash, fileName, startIncomplete) {
+  var engine = this
   if (!_.has(this.downloaders, infoHash)) {
     this.downloaders[infoHash] = new Downloader(infoHash, this)
+    this.downloaders[infoHash].once('idle', function () {
+      debug('deleting downloader since we are done')
+      engine.downloaders[infoHash].torrentStream.destroy()
+      delete engine.downloaders[infoHash]
+    })
   }
   var defer = Q.defer()
-  this.downloaders[infoHash].addRequest(fileName, startIncomplete, defer)
+  if (startIncomplete) {
+    this.downloaders[infoHash].once(fileName, function (file) {
+      defer.resolve(file.createReadStream())
+    })
+  } else {
+    this.downloaders[infoHash].once('idle', function () {
+      defer.resolve(path.join(engine._getLocation(infoHash), fileName))
+    })
+  }
   return defer.promise
 }
 
