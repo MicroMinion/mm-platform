@@ -1,12 +1,23 @@
 var Uint64BE = require('int64-buffer').Uint64BE
+var hrtime = require('browser-process-hrtime')
 
-// var HEADER_SIZE = 48
+var MAX_MESSAGE_SIZE = 1088
+var HEADER_SIZE = 48
+var MESSAGE_BODY = MAX_MESSAGE_SIZE - HEADER_SIZE
 
 var STOP_SUCCESS = 2048
 var STOP_FAILURE = 4096
 var STOP = STOP_SUCCESS + STOP_FAILURE
 
-var Message = function () {}
+var Message = function () {
+  this.id = 0
+  this.acknowledging_id = 0
+  this.padding = 0
+}
+
+Message.prototype.setPadding = function (bytes) {
+  this.padding = bytes
+}
 
 Message.prototype.fromBuffer = function (buf) {
   this.id = buf.readUInt32BE()
@@ -30,11 +41,91 @@ Message.prototype.fromBuffer = function (buf) {
 
 Message.prototype.toBuffer = function () {}
 
-var Chicago = function () {}
+var Chicago = function () {
+  this.clock = null
+  this.refresh_clock()
+  this.rtt_latest = 0
+  this.rtt_average = 0
+  this.rtt_deviation = 0
+  this.rtt_highwater = 0
+  this.rtt_lowwater = 0
+  this.rtt_timeout = 1000
+  this.seen_recent_high = 0
+  this.seen_recent_low = 0
+  this.seen_older_high = 0
+  this.seen_older_low = 0
+  this.rtt_phase = 0
+  this.wr_rate = 1000
+  this.ns_last_update = this.clock
+  this.ns_last_edge = 0
+  this.ns_last_doubling = 0
+  this.ns_last_panic = 0
+}
+
+Chicago.prototype.refresh_clock = function () {
+  this.clock = hrtime()
+}
+Chicago.prototype.on_timeout = function () {
+  if (this.clock > this.ns_last_panic + 4 * this.rtt_timeout) {
+    this.wr_rate = this.wr_rate * 2
+    this.ns_last_panic = this.clock
+    this.ns_last_edge = this.clock
+  }
+}
+
+Chicago.prototype._try_update_rates = function () {}
+
+Chicago.prototype._update = function (rtt_ns) {
+  this.rtt_latest = rtt_ns
+  /* Initialization */
+  if (!this.rtt_average) {
+    this.wr_rate = this.rtt_latest
+    this.rtt_average = this.rtt_latest
+    this.rtt_deviation = this.rtt_latest / 2
+    this.rtt_highwater = this.rtt_latest
+    this.rtt_lowwater = this.rtt_latest
+  }
+  /* Jacobson's retransmission timeout calculation. */
+  var rtt_delta = this.rtt_latest - this.rtt_average
+  this.rtt_average = this.rtt_average + (rtt_delta / 8)
+  if (rtt_delta < 0) {
+    rtt_delta = -rtt_delta
+  }
+  rtt_delta = rtt_delta - this.rtt_deviation
+  this.rtt_deviation = this.rtt_deviation + rtt_delta / 4
+  this.rtt_timeout = this.rtt_average + 4 * this.rtt_deviation
+  /* Adjust for delayed acknowledgements with anti-spiking. */
+  this.rtt_timeout = this.rtt_timeout + 8 * this.wr_rate
+  /* Recognize top and bottom of congestion cycle. */
+  rtt_delta = this.rtt_latest - this.rtt_highwater
+  this.rtt_highwater = this.rtt_highwater + rtt_delta / 1024
+  rtt_delta = this.rtt_latest - this.rtt_lowwater
+  if (rtt_delta > 0) {
+    this.rtt_lowwater = this.rtt_lowwater + rtt_delta / 8192
+  } else {
+    this.rtt_lowwater = this.rtt_lowwater + rtt_delta / 256
+  }
+  if (this.rtt_average > this.rtt_highwater + 5) {
+    this.seen_recent_high = 1
+  } else {
+    this.seen_recent_low = 1
+  }
+  if (this.clock >= this.ns_last_update + 16 * this.wr_rate) {
+    if (this.clock - this.ns_last_update > 10000) {
+      this.wr_rate = 1000
+    // TODO
+    }
+    this.ns_last_update = this.clock
+  }
+}
+
+Chicago.prototype.on_recv = function (ns_sent) {
+  this._update(this.clock - ns_sent)
+}
 
 var Messager = function (client) {
   this.chicago = new Chicago()
-  this.my_id = null
+  this.my_id = 1
   this.my_eof = null
   this.my_final = null
   this.my_maximum_send_bytes = client ? 512 : 1024
@@ -64,5 +155,24 @@ Messager.prototype.receive = function (buf) {}
 Messager.prototype.process_sendq = function () {}
 Messager.prototype.put_next_timeout = function (timeout) {}
 Messager.prototype.next_timeout = function () {}
+
+Messager.prototype.send_block = function (block) {
+  if (block && block.length > this.my_maximum_send_bytes) {
+    throw new Error('Block length longer than maximum byte length')
+  }
+  var message = new Message()
+  if (block) {
+    message.setPadding(MESSAGE_BODY - block.length)
+    this.my_id = this.my_id + 1
+    message.id = this.my_id
+  } else {
+    message.setPadding(MESSAGE_BODY)
+    message.id = 0
+  }
+  if (this.their_sent_id) {
+    message.acknowledging_id = this.their_sent_id
+  }
+// TODO: Complete
+}
 
 module.exports = Messager
