@@ -73,7 +73,25 @@ Chicago.prototype.on_timeout = function () {
   }
 }
 
-Chicago.prototype._try_update_rates = function () {}
+Chicago.prototype._try_update_rates = function () {
+  if (this.clock - this.ns_last_edge < 60000) {
+    if (this.clock < this.ns_last_doubling + 4 * this.wr_rate + 64 * this.rtt_timeout + 5000) {
+      return
+    }
+  } else {
+    if (this.clock < this.n_last_doubling + 4 * this.wr_rate + 2 * this.rtt_timeout) {
+      return
+    }
+  }
+  if (this.wr_rate <= 0.065535) {
+    return
+  }
+  this.wr_rate = this.wr_rate / 2
+  this.ns_last_doubling = this.clock
+  if (this.ns_last_edge) {
+    this.ns_last_edge = this.clock
+  }
+}
 
 Chicago.prototype._update = function (rtt_ns) {
   this.rtt_latest = rtt_ns
@@ -112,12 +130,40 @@ Chicago.prototype._update = function (rtt_ns) {
   }
   if (this.clock >= this.ns_last_update + 16 * this.wr_rate) {
     if (this.clock - this.ns_last_update > 10000) {
-      this.wr_rate = 1000
-    // TODO
+      this.wr_rate = 0.001
+      this.wr_rate += this.random__mod_n(this.wr_rate / 8)
     }
     this.ns_last_update = this.clock
+
+    if (this.wr_rate >= 0.131072) {
+      if (this.wr_rate < 16.777216) {
+        var u = this.wr_rate / 0.131072
+        this.wr_rate -= u * u * u
+      } else {
+        var d = this.wr_rate
+        this.wr_rate = d / (1 + d * d / 2251799813.685248)
+      }
+    }
+    if (this.rtt_phase === 0) {
+      if (this.seen_older_high) {
+        this.rtt_phase = 1
+        this.ns_last_edge = this.clock
+        this.wr_rate += this.random__mod_n(this.wr_rate / 4)
+      }
+    } else {
+      if (this.seen_older_low) {
+        this.rtt_phase = 0
+      }
+    }
+    this.seen_older_high = this.seen_recent_high
+    this.seen_older_low = this.seen_recent_low
+    this.seen_recent_high = 0
+    this.seen_recent_low = 0
+    this._try_update_rates()
   }
 }
+
+Chicago.prototype.random__mod_n = function (n) {}
 
 Chicago.prototype.on_recv = function (ns_sent) {
   this._update(this.clock - ns_sent)
