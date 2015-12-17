@@ -11,4 +11,8 @@ var Block = function () {
   this.data = null
 }
 
+Block.prototype.includedIn = function (size) {
+  return this.start_byte + this.data.length <= size
+}
+
 module.exports = Block

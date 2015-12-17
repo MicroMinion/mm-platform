@@ -19,7 +19,6 @@ var MAX_INCOMING = 64
 
 var MAXIMUM_UNPROCESSED_SEND_BYTES = 1024 * 1024
 
-// TODO: First message needs to be max 512 if we are client (check curveCPStream)
 // TODO: Add support for sending end of file (either error or normal)
 
 var MessageHandler = function (curveCPStream) {
@@ -30,6 +29,7 @@ var MessageHandler = function (curveCPStream) {
   Duplex.call(this, opts)
   this.maxBlockLength = 512
   this.stream = curveCPStream
+  this.stream.on('data', this._receiveData.bind(this))
   if (this.stream.is_server) {
     this.maxBlockLength = MESSAGE_BODY
   }
@@ -41,8 +41,6 @@ var MessageHandler = function (curveCPStream) {
   this.outgoing = new RingBuffer(MAX_OUTGOING)
   /* Messages that have been received but not yet processed */
   this.incoming = new RingBuffer(MAX_INCOMING)
-  /* Blocks that been acknowledged but not yet send upstream */
-  this.receivedBlocks = new RingBuffer(MAX_INCOMING)
   /* Number of bytes that have been received and send upstream */
   this.receivedBytes = 0
   /* Chicago congestion control algorithm */
@@ -59,6 +57,14 @@ MessageHandler.prototype.nextMessageId = function () {
   var result = this._nextMessageId
   this._nextMessageId += 1
   return result
+}
+
+MessageHandler.prototype._receiveData = function (data) {
+  var message = new Message()
+  message.fromBuffer(data)
+  if (!this.incoming.isFull()) {
+    this.incoming.enq(message)
+  }
 }
 
 MessageHandler.prototype._read = function (size) {}
@@ -89,7 +95,12 @@ MessageHandler.prototype.canResend = function () {
   return !this.outgoing.isEmpty()
 }
 
-MessageHandler.prototype.resendBlock = function () {}
+MessageHandler.prototype.resendBlock = function () {
+  var block = this.outgoing.peek()
+  block.transmission_time = this.chicago.clock
+  block.id = this.nextMessageId()
+  this._sendBlock(block)
+}
 
 MessageHandler.prototype.canSend = function () {
   return this.sendBytes.length > 0 && !this.outgoing.isFull()
@@ -108,6 +119,10 @@ MessageHandler.prototype.sendBlock = function () {
   this.sendBytes = this.sendBytes.slice(blockSize)
   this.sendProcessed = this.sendProcessed + block.data.length
   this.outgoing.enq(block)
+  this._sendBlock(block)
+}
+
+MessageHandler.prototype._sendBlock = function (block) {
   var message = new Message()
   message.id = block.id
   // TODO: Fill in and use int64 once receive logic is done
@@ -115,10 +130,50 @@ MessageHandler.prototype.sendBlock = function () {
   message.data = block.data
   message.offset = new Uint64BE(block.start_byte)
   this.stream.write(message.toBuffer())
+  this.maxBlockLength = MESSAGE_BODY
 }
 
-MessageHandler.prototype.canProcessMessage = function () {}
+MessageHandler.prototype.canProcessMessage = function () {
+  return !this.incoming.isEmpty()
+}
 
-MessageHandler.prototype.processMessage = function () {}
+MessageHandler.prototype.processMessage = function () {
+  var message = this.incoming.deq()
+  this.processAcknowledgments(message)
+  this._processMessage(message)
+}
+
+MessageHandler.prototype.processAcknowledgments = function (message) {
+  var size = message.acknowledging_range_1_size
+  var included = true
+  while (included) {
+    var block = this.outgoing.peek()
+    if (block.isIncluded(size)) {
+      this.outgoing.deq()
+    } else {
+      included = false
+    }
+  }
+}
+
+MessageHandler.prototype.sendAcknowledgment = function (message) {
+  var reply = new Message()
+  reply.id = this.nextMessageId()
+  reply.acknowledging_id = message.id
+  reply.acknowledging_range_1_size = new Uint64BE(this.receivedBytes)
+  this.stream.write(reply.toBuffer())
+}
+
+MessageHandler.prototype._processMessage = function (message) {
+  if (message.offset <= this.receivedBytes) {
+    if (message.data_length > 1) {
+      var ignoreBytes = this.receivedBytes - message.offset
+      var data = message.data.slice(ignoreBytes)
+      this.receivedBytes += data.length
+      this.emit('data', data)
+      this.sendAcknowledgment(message)
+    }
+  }
+}
 
 module.exports = MessageHandler
