@@ -12,6 +12,19 @@ var STOP = STOP_SUCCESS + STOP_FAILURE
 var Message = function () {
   this.id = 0
   this.acknowledging_id = 0
+  this.acknowledging_range_1_size = 0
+  this.acknowledging_range_12_gap = 0
+  this.acknowledging_range_2_size = 0
+  this.acknowledging_range_23_gap = 0
+  this.acknowledging_range_3_size = 0
+  this.acknowledging_range_34_gap = 0
+  this.acknowledging_range_4_size = 0
+  this.acknowledging_range_45_gap = 0
+  this.acknowledging_range_5_size = 0
+  this.acknowledging_range_56_gap = 0
+  this.acknowledging_range_6_size = 0
+  this.success = false
+  this.failure = false
 }
 
 Message.prototype.fromBuffer = function (buf) {
