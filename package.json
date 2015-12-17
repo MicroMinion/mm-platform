@@ -53,6 +53,7 @@
     "storagejs": "^1.0.7",
     "string_decoder": "^0.10.31",
     "torrent-piece": "^1.0.0",
+    "turn-js": "*",
     "tweetnacl": "^0.13.1",
     "useragent": "^2.1.7",
     "yamlparser": "0.0.2"
