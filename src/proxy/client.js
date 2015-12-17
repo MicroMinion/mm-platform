@@ -83,6 +83,7 @@ var Client = function () {
 }
 
 Client.prototype.handleMessage = function (topic, message) {
+  debug('handleMessage ' + topic + ' ' + message)
   var topicSplit = topic.split('/')
   var protocol = topicSplit[1]
   topic = topicSplit[2]

@@ -72,6 +72,7 @@ Server.prototype._dispatch = function (protocol, topic, publicKey, data) {
     qos: 0,
     retain: false
   }
+  debug('_dispatch ' + message.topic + ' ' + message.payload)
   this.server.publish(message, fakeClient)
 }
 
