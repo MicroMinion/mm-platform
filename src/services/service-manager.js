@@ -2,7 +2,11 @@
 
 var ServiceManager = function (messaging) {
   this.messaging = messaging
+  this.messaging.on('self.profile.updateRequest', function(topic, publicKey, data) {
+    console.log('updaterequest received!!!!')
+  })
   this.messaging.send('system.readyRequest', 'local', {})
+  this.messaging.send('profile.updateRequest', 'local', {})
   this.messaging.on('self.system.ready', this.onSystemReady.bind(this))
 }
 
