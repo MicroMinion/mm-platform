@@ -19,7 +19,7 @@ var expect = chai.expect
  * @fires AbstractTransport#disable
  * @fires AbstractTransport#connectionEstablished
  * @fires AbstractTransport#connectionStopped
- * @fires AbstractTransport#message
+ * @fires AbstractTransport#data
  * @param {string} publicKey
  * @param {string} privateKey
  */

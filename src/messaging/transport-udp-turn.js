@@ -21,6 +21,7 @@ var turnArgs = {
 var lifetime = 600
 
 var UDPTurnTransport = function (publicKey, privateKey) {
+  debug('initializing')
   AbstractTransport.call(this, publicKey, privateKey)
   this.udpConnectionStreams = {}
   var udpSocket = dgram.createSocket('udp4')
@@ -32,11 +33,13 @@ var UDPTurnTransport = function (publicKey, privateKey) {
     debug(errorMessage)
   // TODO: transport._listen(0)
   })
+  process.nextTick(this.enable.bind(this))
 }
 
 inherits(UDPTurnTransport, AbstractTransport)
 
 UDPTurnTransport.prototype._emitReady = function (srflxAddresses, relayAddresses) {
+  debug('_emitReady')
   var connectionInfo = {
     'udpTurn': {
       'srflx': {
@@ -222,3 +225,5 @@ UDPConnectionStream.prototype._write = function (chunk, encoding, done) {
 }
 
 inherits(UDPConnectionStream, Duplex)
+
+module.exports = UDPTurnTransport

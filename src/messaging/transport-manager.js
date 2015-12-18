@@ -9,6 +9,7 @@ var debug = require('debug')('flunky-platform:messaging:transport-manager')
 
 var TCPTransport = require('./transport-tcp.js')
 var GCMTransport = require('./transport-gcm.js')
+var UDPTurnTransport = require('./transport-udp-turn.js')
 
 var expect = chai.expect
 
@@ -82,7 +83,7 @@ TransportManager.prototype.setMessaging = function (messaging) {
 
 TransportManager.prototype._initializeTransports = function () {
   debug('initializeTransports')
-  var transports = [TCPTransport]
+  var transports = [UDPTurnTransport]
   _.forEach(transports, function (transportClass) {
     this._initializeTransport(transportClass)
   }, this)
