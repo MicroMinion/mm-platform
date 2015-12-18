@@ -26,7 +26,8 @@ var UDPTurnTransport = function (publicKey, privateKey) {
   var udpSocket = dgram.createSocket('udp4')
   this.turnSocket = turn(turnArgs.addr, turnArgs.port, turnArgs.user, turnArgs.pwd, udpSocket)
   this.enabled = false
-  this.turnSocket.on('message', this._onMessage.bind(this)) // TODO: must be bytes!
+  // this.turnSocket.on('message', TODO)
+  this.turnSocket.on('relayed-message', this._onMessage.bind(this)) // TODO: must be bytes!
   this.turnSocket.on('error', function (errorMessage) {
     debug(errorMessage)
   // TODO: transport._listen(0)
@@ -51,8 +52,8 @@ UDPTurnTransport.prototype._emitReady = function (srflxAddresses, relayAddresses
   this.emit('ready', connectionInfo)
 }
 
-UDPTurnTransport.prototype._onMessage = function (message, channelId) {
-  this.udpConnectionStreams[channelId].emit('data', message)
+UDPTurnTransport.prototype._onMessage = function (bytes, rinfo, channelId) {
+  this.udpConnectionStreams[channelId].emit('data', bytes)
 }
 
 /** establish connection with peer */
@@ -208,9 +209,9 @@ UDPConnectionStream.prototype._read = function (size) {
 }
 
 UDPConnectionStream.prototype._write = function (chunk, encoding, done) {
-  this.turnSocket.sendChannelData(
-    this.channel,
+  this.turnSocket.sendToChannel(
     chunk,
+    this.channel,
     function () { // on success
       done()
     },
