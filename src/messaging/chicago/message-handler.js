@@ -47,7 +47,7 @@ var MessageHandler = function (curveCPStream) {
   this.chicago = new Chicago()
   /* nanosecond precision timer */
   this.timer = new NanoTimer()
-  this.timer.setTimeout(this._process.bind(this), '', this.chicago.wr_rate.toString() + 'm')
+  this.timer.setTimeout(this._process.bind(this), '', this.chicago.nsecperblock.toString() + 'n')
   this._nextMessageId = 1
 }
 
@@ -70,15 +70,17 @@ MessageHandler.prototype._receiveData = function (data) {
 MessageHandler.prototype._read = function (size) {}
 
 MessageHandler.prototype._process = function () {
+  this.chicago.refresh_clock()
   if (this.canResend()) {
     this.resendBlock()
   } else if (this.canSend()) {
     this.sendBlock()
   }
   if (this.canProcessMessage()) {
+    this.chicago.refresh_clock()
     this.processMessage()
   }
-  this.timer.setTimeout(this._process.bind(this), '', this.chicago.wr_rate.toString() + 'm')
+  this.timer.setTimeout(this._process.bind(this), '', this.chicago.nsecperblock.toString() + 'n')
 }
 
 MessageHandler.prototype._write = function (chunk, encoding, done) {
@@ -99,6 +101,7 @@ MessageHandler.prototype.resendBlock = function () {
   var block = this.outgoing.peek()
   block.transmission_time = this.chicago.clock
   block.id = this.nextMessageId()
+  this.chicago.retransmission()
   this._sendBlock(block)
 }
 
@@ -125,10 +128,10 @@ MessageHandler.prototype.sendBlock = function () {
 MessageHandler.prototype._sendBlock = function (block) {
   var message = new Message()
   message.id = block.id
-  // TODO: Fill in and use int64 once receive logic is done
-  message.acknowledging_range_1_size = 0
+  message.acknowledging_range_1_size = new Uint64BE(this.receivedBytes)
   message.data = block.data
   message.offset = new Uint64BE(block.start_byte)
+  this.chicago.send_block(block.transmission_time)
   this.stream.write(message.toBuffer())
   this.maxBlockLength = MESSAGE_BODY
 }
