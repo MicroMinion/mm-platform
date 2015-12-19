@@ -73,6 +73,7 @@ CurveCPStream.prototype._connectStream = function (stream) {
 }
 
 CurveCPStream.prototype._onMessage = function (message) {
+  debug('_onMessage')
   if (this.is_server) {
     this._onMessageServer(message)
   } else {
@@ -81,7 +82,8 @@ CurveCPStream.prototype._onMessage = function (message) {
 }
 
 CurveCPStream.prototype._onMessageClient = function (message) {
-  if (message.length < 72 || message.length > 1088) {
+  debug('_onMessageClient')
+  if (message.length < 64 || message.length > 1088) {
     return
   }
   var messageType = message.subarray(0, 8)
@@ -93,7 +95,8 @@ CurveCPStream.prototype._onMessageClient = function (message) {
 }
 
 CurveCPStream.prototype._onMessageServer = function (message) {
-  if (message.length < 112 || message.length > 1088) {
+  debug('_onMessageServer')
+  if (message.length < 96 || message.length > 1088) {
     return
   }
   var messageType = message.subarray(0, 8)
@@ -226,7 +229,7 @@ CurveCPStream.prototype.onHello = function (hello_message) {
     return
   }
   this.clientConnectionPublicKey = hello_message.subarray(40, 40 + 32)
-  var box_data = this.decrypt(hello_message.subarray(40 + 32, 224), 'CurveCP-client-H', this.clientConnectionPublicKey, this.serverPrivateKey)
+  var box_data = this.decrypt(hello_message.subarray(40 + 32 + 64, 224), 'CurveCP-client-H', this.clientConnectionPublicKey, this.serverPrivateKey)
   if (box_data === undefined) {
     debug('Hello: not able to decrypt box data')
     return
@@ -257,18 +260,19 @@ CurveCPStream.prototype.sendCookie = function () {
   var server_cookie = this.encrypt_symmetric(cookie_data, 'minute-k', cookie_key)
   this.serverCookie = server_cookie
   box_data.set(server_cookie, 32)
-  result.set(this.encrypt(box_data, 'CurveCPK', this.serverPrivateKey, this.clientConnectionPublicKey), 56)
+  var encrypted_box_data = this.encrypt(box_data, 'CurveCPK', this.serverPrivateKey, this.clientConnectionPublicKey)
+  result.set(encrypted_box_data, 40)
   this.stream.write(new Buffer(result))
 }
 
 CurveCPStream.prototype.onCookie = function (cookie_message) {
-  debug('onWelcome')
+  debug('onCookie')
   this.canSend = false
   if (cookie_message.length !== 200) {
     debug('Cookie message has incorrect length')
     return
   }
-  var box_data = this.decrypt(cookie_message.subarray(56, 200), 'CurveCPK', this.serverPublicKey, this.clientConnectionPrivateKey)
+  var box_data = this.decrypt(cookie_message.subarray(40, 200), 'CurveCPK', this.serverPublicKey, this.clientConnectionPrivateKey)
   if (box_data === undefined) {
     debug('Not able to decrypt welcome box data')
     return
@@ -279,8 +283,8 @@ CurveCPStream.prototype.onCookie = function (cookie_message) {
     debug('Welcome command server cookie invalid')
     return
   }
-  this.emit('connect')
   this.canSend = true
+  this.emit('connect')
 }
 
 // Initiate command
@@ -308,7 +312,7 @@ CurveCPStream.prototype.create_vouch = function () {
 CurveCPStream.prototype.onInitiate = function (initiate_message) {
   debug('onInitiate')
   this.canSend = false
-  if (initiate_message.length < 544 + 16) {
+  if (initiate_message.length < 544) {
     debug('Initiate command has incorrect length')
     return
   }
@@ -333,13 +337,13 @@ CurveCPStream.prototype.onInitiate = function (initiate_message) {
   }
   this.emit('connect')
   this.canSend = true
-  this.emit('data', initiate_box_data.subarray(32 + 16 + 48 + 256))
+  this.emit('data', new Buffer(initiate_box_data.subarray(32 + 16 + 48 + 256)))
 }
 
 // Message command - Server
 
 CurveCPStream.prototype.sendServerMessage = function (message, done) {
-  debug('sendMessage')
+  debug('sendServerMessage')
   var result = new Uint8Array(64 + message.length)
   result.set(SERVER_MSG)
   var message_box = this.encrypt(message, 'CurveCP-server-M', this.serverConnectionPrivateKey, this.clientConnectionPublicKey)
@@ -348,7 +352,7 @@ CurveCPStream.prototype.sendServerMessage = function (message, done) {
 }
 
 CurveCPStream.prototype.onServerMessage = function (message) {
-  debug('onMessage')
+  debug('onServerMessage')
   if (message.length < 64 || message.length > 1088) {
     debug('Message command has incorrect length')
     return
@@ -365,7 +369,7 @@ CurveCPStream.prototype.onServerMessage = function (message) {
 // Message command - Client
 
 CurveCPStream.prototype.sendClientMessage = function (message, done) {
-  debug('sendMessage')
+  debug('sendClientMessage')
   var result = new Uint8Array(96 + message.length)
   result.set(CLIENT_MSG)
   var message_box = this.encrypt(message, 'CurveCP-client-M', this.clientConnectionPrivateKey, this.serverConnectionPublicKey)
@@ -374,12 +378,12 @@ CurveCPStream.prototype.sendClientMessage = function (message, done) {
 }
 
 CurveCPStream.prototype.onClientMessage = function (message) {
-  debug('onMessage')
+  debug('onClientMessage')
   if (message.length < 96 || message.length > 1088) {
     debug('Message command has incorrect length')
     return
   }
-  var box_data = this.decrypt(message.subarray(8), 'CurveZMQMESSAGES', this.clientConnectionPublicKey, this.serverConnectionPrivateKey)
+  var box_data = this.decrypt(message.subarray(40 + 32), 'CurveCP-client-M', this.clientConnectionPublicKey, this.serverConnectionPrivateKey)
   if (box_data === undefined || !box_data) {
     debug('not able to decrypt box data')
     return
