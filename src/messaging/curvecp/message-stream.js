@@ -7,7 +7,7 @@ var inherits = require('inherits')
 var Block = require('./message-block.js')
 var Uint64BE = require('int64-buffer').Uint64BE
 var _ = require('lodash')
-var debug = require('debug')('flunky-platform:messaging:chicago:MessageStream')
+var debug = require('debug')('flunky-platform:messaging:curvecp:MessageStream')
 
 var MAX_MESSAGE_SIZE = 1088
 var MINIMAL_PADDING = 16
@@ -28,9 +28,19 @@ var MessageStream = function (curveCPStream) {
     decodeStrings: true
   }
   Duplex.call(this, opts)
-  this.maxBlockLength = 512
+  this.maxBlockLength = 640 - HEADER_SIZE - MINIMAL_PADDING
   this.stream = curveCPStream
+  var self = this
   this.stream.on('data', this._receiveData.bind(this))
+  this.stream.on('error', function (error) {
+    self.emit('error', error)
+  })
+  this.stream.on('close', function () {
+    self.emit('close')
+  })
+  this.stream.on('connect', function () {
+    self.emit('connect')
+  })
   if (this.stream.is_server) {
     this.maxBlockLength = MESSAGE_BODY
   }
@@ -69,11 +79,18 @@ MessageStream.prototype._receiveData = function (data) {
   }
 }
 
+MessageStream.prototype.connect = function () {
+  this.stream.connect()
+}
+
+MessageStream.prototype.destroy = function () {
+  this.stream.destroy()
+}
+
 MessageStream.prototype._read = function (size) {}
 
 MessageStream.prototype._process = function () {
   debug('_process')
-  debug(this.label)
   debug(this.chicago.nsecperblock)
   this.chicago.refresh_clock()
   if (this.canResend()) {
@@ -94,7 +111,9 @@ MessageStream.prototype._process = function () {
 MessageStream.prototype._write = function (chunk, encoding, done) {
   debug('_write')
   assert(isBuffer(chunk))
+  debug('chunk length: ' + chunk.length)
   this.sendBytes = Buffer.concat([this.sendBytes, chunk])
+  debug('sendBytes lenth: ' + this.sendBytes.length)
   if (this.sendBytes.length > MAXIMUM_UNPROCESSED_SEND_BYTES) {
     done(new Error('Buffer full'))
   } else {
@@ -122,10 +141,13 @@ MessageStream.prototype.canSend = function () {
 }
 
 MessageStream.prototype.sendBlock = function () {
+  debug('sendBlock')
+  debug('sendBytes size: ' + this.sendBytes.length)
   var blockSize = this.sendBytes.length
   if (blockSize > this.maxBlockLength) {
     blockSize = this.maxBlockLength
   }
+  debug('blockSize: ' + blockSize)
   var block = new Block()
   block.start_byte = this.sendProcessed
   block.transmission_time = this.chicago.clock
@@ -138,6 +160,7 @@ MessageStream.prototype.sendBlock = function () {
 }
 
 MessageStream.prototype._sendBlock = function (block) {
+  debug('_sendBlock')
   var message = new Message()
   message.id = block.id
   message.acknowledging_range_1_size = new Uint64BE(this.receivedBytes)
@@ -180,11 +203,14 @@ MessageStream.prototype.sendAcknowledgment = function (message) {
 
 MessageStream.prototype._processMessage = function (message) {
   debug('_processMessage')
+  debug('message offset in stream: ' + Number(message.offset))
+  debug('message data length:' + message.data_length)
   if (Number(message.offset) <= this.receivedBytes) {
     if (message.data_length > 1) {
       var ignoreBytes = this.receivedBytes - Number(message.offset)
       var data = message.data.slice(ignoreBytes)
       this.receivedBytes += data.length
+      debug(data.toString())
       this.emit('data', data)
       this.sendAcknowledgment(message)
     }

@@ -1,10 +1,10 @@
 'use strict'
 
-var curve = require('./crypto-curvecp.js')
 var expect = require('chai').expect
 var isBuffer = require('is-buffer')
 var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
+var nacl = require('tweetnacl')
 
 var PROTOCOL = 'bt'
 
@@ -21,7 +21,7 @@ Torrenting.prototype._setupDispatcher = function () {
   var torrenting = this
   this.dispatcher.on(PROTOCOL, function (scope, publicKey, message) {
     expect(publicKey).to.be.a('string')
-    expect(curve.fromBase64(publicKey)).to.have.length(32)
+    expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
     var infoHash = message.slice(0, 20)
     message = message.slice(20)
     torrenting.emit(scope + '.' + infoHash, publicKey, message)

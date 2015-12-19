@@ -2,12 +2,14 @@
 
 var events = require('events')
 var chai = require('chai')
-var curve = require('./crypto-curvecp.js')
+var PacketStream = require('./curvecp/index.js').PacketStream
+var MessageStream = require('./curvecp/index.js').MessageStream
 var inherits = require('inherits')
 var _ = require('lodash')
 var Q = require('q')
 var debug = require('debug')('flunky-platform:messaging:transport-abstract')
 var os = require('os')
+var nacl = require('tweetnacl')
 
 var expect = chai.expect
 
@@ -26,9 +28,9 @@ var expect = chai.expect
 var AbstractTransport = function (publicKey, privateKey) {
   debug('initialize')
   expect(publicKey).to.be.a('string')
-  expect(curve.fromBase64(publicKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
   expect(privateKey).to.be.a('string')
-  expect(curve.fromBase64(privateKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(privateKey)).to.have.length(32)
   events.EventEmitter.call(this)
   this.publicKey = publicKey
   this.privateKey = privateKey
@@ -147,34 +149,36 @@ AbstractTransport.prototype._connect = function (connectionInfo) {
 
 AbstractTransport.prototype._wrapIncomingConnection = function (connection) {
   debug('wrapIncomingConnection')
-  var curveConnection = new curve.CurveCPStream({
+  var packetStream = new PacketStream({
     stream: connection,
     is_server: true,
-    serverPublicKey: curve.fromBase64(this.publicKey),
-    serverPrivateKey: curve.fromBase64(this.privateKey)
+    serverPublicKey: nacl.util.decodeBase64(this.publicKey),
+    serverPrivateKey: nacl.util.decodeBase64(this.privateKey)
   })
-  this._connectEvents(curveConnection)
+  var messageStream = new MessageStream(packetStream)
+  this._connectEvents(messageStream)
 }
 
 AbstractTransport.prototype._wrapOutgoingConnection = function (publicKey, connection) {
   debug('wrapOutgoingConnection')
-  var curveConnection = new curve.CurveCPStream({
+  var packetStream = new PacketStream({
     stream: connection,
     is_server: false,
-    serverPublicKey: curve.fromBase64(publicKey),
-    clientPublicKey: curve.fromBase64(this.publicKey),
-    clientPrivateKey: curve.fromBase64(this.privateKey)
+    serverPublicKey: nacl.util.decodeBase64(publicKey),
+    clientPublicKey: nacl.util.decodeBase64(this.publicKey),
+    clientPrivateKey: nacl.util.decodeBase64(this.privateKey)
   })
+  var messageStream = new MessageStream(packetStream)
   this.inProgressConnections[publicKey] = Q.defer()
-  this._connectEvents(curveConnection)
-  curveConnection.connect()
+  this._connectEvents(messageStream)
+  messageStream.connect()
   return this.inProgressConnections[publicKey].promise
 }
 
 AbstractTransport.prototype._connectEvents = function (stream) {
   debug('_connectEvents')
   expect(stream).to.exist
-  expect(stream).to.be.an.instanceof(curve.CurveCPStream)
+  expect(stream).to.be.an.instanceof(MessageStream)
   var transport = this
   var functions = {
     connect: function () {
@@ -235,11 +239,12 @@ AbstractTransport.prototype._deleteStream = function (stream) {
 
 AbstractTransport.prototype._getPeer = function (stream) {
   debug('getPeer')
+  stream = stream.stream
   var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey
   if (!publicKey) {
     return
   }
-  publicKey = curve.toBase64(publicKey)
+  publicKey = nacl.util.encodeBase64(publicKey)
   return publicKey
 }
 

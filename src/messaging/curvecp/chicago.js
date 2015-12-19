@@ -1,6 +1,6 @@
 var hrtime = require('browser-process-hrtime')
 var nacl = require('tweetnacl')
-var debug = require('debug')('flunky-platform:messaging:chicago:congestion')
+var debug = require('debug')('flunky-platform:messaging:curvecp:chicago')
 var NanoTimer = require('nanotimer')
 
 var MILLISECOND = 1000000

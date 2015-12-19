@@ -1,7 +1,6 @@
 /* global chrome */
 var uuid = require('node-uuid')
 var inherits = require('inherits')
-var curve = require('./crypto-curvecp.js')
 var _ = require('lodash')
 var Duplex = require('stream').Duplex
 var extend = require('extend.js')
@@ -9,6 +8,7 @@ var chai = require('chai')
 var AbstractTransport = require('./transport-abstract')
 var Q = require('q')
 var debug = require('debug')('flunky-platform:messaging:transport-gcm')
+var nacl = require('tweetnacl')
 
 var expect = chai.expect
 
@@ -64,7 +64,7 @@ GCMTransport.prototype._onMessage = function (message) {
     this._createConnection(source)
     this._wrapIncomingConnection(this.gcmConnections[source])
   }
-  this.gcmConnections[source].emit('data', new Buffer(curve.fromBase64(message.data.data)))
+  this.gcmConnections[source].emit('data', new Buffer(nacl.util.decodeBase64(message.data.data)))
 }
 
 /* API IMPLEMENTATION: TRANSPORT STATUS */
@@ -108,7 +108,7 @@ GCMTransport.prototype._connect = function (connectionInfo) {
   expect(this.registrationId).to.be.a('string')
   expect(this.registrationId).to.have.length.of.at.least(1)
   expect(connectionInfo.publicKey).to.be.a('string')
-  expect(curve.fromBase64(connectionInfo.publicKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(connectionInfo.publicKey)).to.have.length(32)
   expect(connectionInfo).to.be.an('object')
   expect(this.isDisabled()).to.be.false
   var transport = this
@@ -179,7 +179,7 @@ GCMConnection.prototype._write = function (chunk, encoding, done) {
       type: 'MESSAGE',
       destination: stream.destination,
       source: stream.source,
-      data: curve.toBase64(new Uint8Array(chunk))
+      data: nacl.util.encodeBase64(new Uint8Array(chunk))
     }
   }, function (messageId) {
     if (chrome.runtime.lastError) {
