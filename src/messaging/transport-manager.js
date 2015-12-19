@@ -83,7 +83,7 @@ TransportManager.prototype.setMessaging = function (messaging) {
 
 TransportManager.prototype._initializeTransports = function () {
   debug('initializeTransports')
-  var transports = [UDPTurnTransport, TCPTransport]
+  var transports = [TCPTransport, UDPTurnTransport, GCMTransport]
   _.forEach(transports, function (transportClass) {
     this._initializeTransport(transportClass)
   }, this)
