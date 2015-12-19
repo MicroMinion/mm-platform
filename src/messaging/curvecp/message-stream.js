@@ -155,6 +155,7 @@ MessageStream.prototype.sendBlock = function () {
 }
 
 MessageStream.prototype._sendBlock = function (block) {
+  debug('_sendBlock')
   var message = new Message()
   message.id = block.id
   message.acknowledging_range_1_size = new Uint64BE(this.receivedBytes)
@@ -197,11 +198,14 @@ MessageStream.prototype.sendAcknowledgment = function (message) {
 
 MessageStream.prototype._processMessage = function (message) {
   debug('_processMessage')
+  debug('message offset in stream: ' + Number(message.offset))
+  debug('message data length:' + message.data_length)
   if (Number(message.offset) <= this.receivedBytes) {
     if (message.data_length > 1) {
       var ignoreBytes = this.receivedBytes - Number(message.offset)
       var data = message.data.slice(ignoreBytes)
       this.receivedBytes += data.length
+      debug(data.toString())
       this.emit('data', data)
       this.sendAcknowledgment(message)
     }
