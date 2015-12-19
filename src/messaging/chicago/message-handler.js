@@ -8,6 +8,7 @@ var Duplex = require('stream').Duplex
 var inherits = require('inherits')
 var Block = require('./block.js')
 var Uint64BE = require('int64-buffer').Uint64BE
+var _ = require('lodash')
 
 var MAX_MESSAGE_SIZE = 1088
 var MINIMAL_PADDING = 16
@@ -38,7 +39,7 @@ var MessageHandler = function (curveCPStream) {
   /* Bytes that have been processed / send to peer */
   this.sendProcessed = 0
   /* Blocks that have been send but not yet acknowledged by other party */
-  this.outgoing = new RingBuffer(MAX_OUTGOING)
+  this.outgoing = {}
   /* Messages that have been received but not yet processed */
   this.incoming = new RingBuffer(MAX_INCOMING)
   /* Number of bytes that have been received and send upstream */
@@ -94,11 +95,13 @@ MessageHandler.prototype._write = function (chunk, encoding, done) {
 }
 
 MessageHandler.prototype.canResend = function () {
-  return !this.outgoing.isEmpty()
+  return !_.isEmpty(this.outgoing) && _.some(this.outgoing, function (block) {
+    return block.transmission_time + this.chicago.rtt_timeout < this.chicago.clock
+  }, this)
 }
 
 MessageHandler.prototype.resendBlock = function () {
-  var block = this.outgoing.peek()
+  var block = _.min(this.outgoing, 'transmission_time')
   block.transmission_time = this.chicago.clock
   block.id = this.nextMessageId()
   this.chicago.retransmission()
