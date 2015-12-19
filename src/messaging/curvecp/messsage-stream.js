@@ -30,7 +30,17 @@ var MessageStream = function (curveCPStream) {
   Duplex.call(this, opts)
   this.maxBlockLength = 512
   this.stream = curveCPStream
+  var self = this
   this.stream.on('data', this._receiveData.bind(this))
+  this.stream.on('error', function (error) {
+    self.emit('error', error)
+  })
+  this.stream.on('close', function () {
+    self.emit('close')
+  })
+  this.stream.on('connect', function () {
+    self.emit('connect')
+  })
   if (this.stream.is_server) {
     this.maxBlockLength = MESSAGE_BODY
   }
@@ -67,6 +77,14 @@ MessageStream.prototype._receiveData = function (data) {
     this.incoming.push(message)
     this.chicago.enableTimer()
   }
+}
+
+MessageStream.prototype.connect = function () {
+  this.stream.connect()
+}
+
+MessageStream.prototype.destroy = function () {
+  this.stream.destroy()
 }
 
 MessageStream.prototype._read = function (size) {}
