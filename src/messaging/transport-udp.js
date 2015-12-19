@@ -27,7 +27,7 @@ var UDPTransport = function (publicKey, privateKey) {
   this.socket.on('listening', this._onListening.bind(this))
   this.socket.on('close', function () {})
   this.socket.on('error', function (errorMessage) {
-    debug(err)
+    debug(errorMessage)
     transport._listen(0)
   })
   storagejs.get('flunky-messaging-transport-udp').then(this._listen.bind(this), function (err) {
@@ -80,7 +80,6 @@ UDPTransport.prototype.isDisabled = function () {
 }
 
 UDPTransport.prototype._connect = function (connectionInfo) {
-  var transport = this
   var deferred = Q.defer()
   if (this._hasConnectionInfo(connectionInfo)) {
   } else {
@@ -108,5 +107,14 @@ UDPTransport.prototype._hasConnectionInfo = function (connectionInfo) {
   return _.isObject(connectionInfo) &&
   _.has(connectionInfo, 'udp')
 }
+
+var UDPConnection = function () {
+  var opts = {}
+  opts.objectMode = false
+  opts.decodeStrings = true
+  Duplex.call(this, opts)
+}
+
+inherits(UDPConnection, Duplex)
 
 module.exports = UDPTransport
