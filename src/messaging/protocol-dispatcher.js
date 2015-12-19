@@ -5,7 +5,7 @@ var TransportManager = require('./transport-manager.js')
 var debug = require('debug')('flunky-platform:messaging:protocol-dispatcher')
 var isBuffer = require('is-buffer')
 var ns = require('../util/ns.js')
-var curve = require('./crypto-curvecp.js')
+var nacl = require('tweetnacl')
 
 // TODO: Filter out only trusted keys when receicing devices or contacts so that receive logic becomes simpeler
 
@@ -171,7 +171,7 @@ ProtocolDispatcher.prototype.setDevices = function (devices) {
 ProtocolDispatcher.prototype._getScope = function (publicKey) {
   debug('getScope')
   expect(publicKey).to.be.a('string')
-  expect(curve.fromBase64(publicKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
   if (this._inScope(publicKey, this.devices)) {
     return 'self'
   } else {

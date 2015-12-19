@@ -3,9 +3,8 @@ var _ = require('lodash')
 var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
 var chai = require('chai')
-var curve = require('./crypto-curvecp.js')
 var ProtocolDispatcher = require('./protocol-dispatcher.js')
-// var TransportManager = require('./transport-manager.js')
+var nacl = require('tweetnacl')
 var storagejs = require('storagejs')
 var debug = require('debug')('flunky-platform:messaging:messaging')
 var debugMessage = require('debug')('flunky-platform:messages')
@@ -105,7 +104,7 @@ Messaging.prototype._loadSendQueues = function () {
       expect(value).to.be.an('object')
       _.foreach(value, function (publicKey) {
         expect(publicKey).to.be.a('string')
-        expect(curve.fromBase64(publicKey)).to.have.length(32)
+        expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
         if (!_.has(messaging.sendQueues, publicKey)) {
           messaging.sendQueues[publicKey] = {}
         }
@@ -162,7 +161,7 @@ Messaging.prototype._setupDispatcher = function () {
   }
   this.dispatcher.on(PROTOCOL, function (scope, publicKey, message) {
     expect(publicKey).to.be.a('string')
-    expect(curve.fromBase64(publicKey)).to.have.length(32)
+    expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
     try {
       message = JSON.parse(message.toString())
     } catch (e) {
@@ -192,8 +191,8 @@ Messaging.prototype.setProfile = function (profile) {
   expect(profile).to.be.an('object')
   expect(profile.publicKey).to.be.a('string')
   expect(profile.privateKey).to.be.a('string')
-  expect(curve.fromBase64(profile.publicKey)).to.have.length(32)
-  expect(curve.fromBase64(profile.privateKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(profile.publicKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(profile.privateKey)).to.have.length(32)
   this.profile = profile
 }
 
@@ -216,7 +215,7 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
   debug('send')
   var messaging = this
   expect(publicKey).to.be.a('string')
-  expect(publicKey === 'local' || curve.fromBase64(publicKey).length === 32).to.be.true
+  expect(publicKey === 'local' || nacl.util.decodeBase64(publicKey).length === 32).to.be.true
   expect(topic).to.be.a('string')
   if (options) { expect(options).to.be.an('object') } else { options = {} }
   if (options.realtime) { expect(options.realtime).to.be.a('boolean') }
@@ -273,7 +272,7 @@ Messaging.prototype._isLocal = function (publicKey) {
 Messaging.prototype._trigger = function (publicKey) {
   debug('trigger')
   expect(publicKey).to.be.a('string')
-  expect(curve.fromBase64(publicKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
   if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0) {
     this.dispatcher.connect(publicKey)
       .then(this._flushQueue.bind(this, publicKey))
@@ -294,7 +293,7 @@ Messaging.prototype._trigger = function (publicKey) {
 Messaging.prototype._flushQueue = function (publicKey) {
   debug('flushQueue')
   expect(publicKey).to.be.a('string')
-  expect(curve.fromBase64(publicKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
   var messaging = this
   _.forEach(this.sendQueues[publicKey], function (message) {
     if (Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {

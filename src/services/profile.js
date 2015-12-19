@@ -2,11 +2,19 @@
 
 var _ = require('lodash')
 var storagejs = require('storagejs')
-var curve = require('../messaging/crypto-curvecp.js')
 var useragent = require('useragent')
 var qrImage = require('qr-image')
 var SyncEngine = require('../util/mmds/index.js')
 var debug = require('debug')('flunky-platform:services:profile')
+var nacl = require('tweetnacl')
+var crypto = require('crypto')
+
+nacl.setPRNG(function (x, n) {
+  var i
+  var v = crypto.randomBytes(n)
+  for (i = 0; i < n; i++) x[i] = v[i]
+  for (i = 0; i < v.length; i++) v[i] = 0
+})
 
 var PUBLISH_INTERVAL = 1000 * 60 * 5
 
@@ -88,7 +96,7 @@ Profile.prototype.update = function (regenerateQr) {
 }
 
 Profile.prototype.setCode = function () {
-  this.profile.code = curve.toBase64(curve.randomBytes(20))
+  this.profile.code = nacl.util.encodeBase64(nacl.randomBytes(20))
   this.update(true)
 }
 
@@ -135,9 +143,9 @@ Profile.prototype.publishUser = function () {
 
 Profile.prototype.setKeys = function () {
   if (!this.profile.privateKey) {
-    var keypair = curve.generateKeypair()
-    this.profile.publicKey = curve.toBase64(keypair.publicKey)
-    this.profile.privateKey = curve.toBase64(keypair.secretKey)
+    var keypair = nacl.box.keyPair()
+    this.profile.publicKey = nacl.util.encodeBase64(keypair.publicKey)
+    this.profile.privateKey = nacl.util.encodeBase64(keypair.secretKey)
     this.update(true)
   }
 }
