@@ -4,6 +4,9 @@ var inherits = require('inherits')
 var _ = require('lodash')
 var storagejs = require('storagejs')
 var debug = require('debug')('flunky-platform:messaging:transport-tcp')
+var Duplex = require('stream').Duplex
+var ns = require('../util/ns.js')
+var expect = require('chai').expect
 
 var net
 
@@ -65,7 +68,7 @@ TCPTransport.prototype._onClose = function () {
 
 TCPTransport.prototype._onConnection = function (connection) {
   debug('_onConnection')
-  this._wrapIncomingConnection(connection)
+  this._wrapIncomingConnection(new TCPConnection(connection))
 }
 
 TCPTransport.prototype.enable = function () {
@@ -143,10 +146,51 @@ TCPTransport.prototype._connectToAddress = function (address, port) {
   }
   connection.once('connect', function () {
     connection.removeListener('error', err)
-    deferred.resolve(connection)
+    deferred.resolve(new TCPConnection(connection))
   })
   connection.on('error', err)
   return deferred.promise
+}
+
+var TCPConnection = function (tcpStream) {
+  var opts = {}
+  opts.objectMode = false
+  opts.decodeStrings = true
+  Duplex.call(this, opts)
+  this.stream = tcpStream
+  this.stream.on('data', this.processMessage.bind(this))
+}
+
+inherits(TCPConnection, Duplex)
+
+TCPConnection.prototype.processMessage = function (data) {
+  var messageLength = ns.nsLength(data)
+  this.emit('data', ns.nsPayload(data))
+  if (messageLength < data.length) {
+    var buffer = new Buffer(data.length - messageLength)
+    data.copy(buffer, 0, messageLength)
+    this.processMessage(buffer)
+  }
+}
+
+TCPConnection.prototype._read = function (size) {}
+
+TCPConnection.prototype._write = function (chunk, encoding, done) {
+  debug('_write')
+  expect(Buffer.isBuffer(chunk)).to.be.true
+  expect(chunk).to.have.length.of.at.least(1)
+  expect(done).to.be.an.instanceof(Function)
+  this.stream.write(ns.nsWrite(chunk), encoding, done)
+}
+
+TCPConnection.prototype.error = function (errorMessage) {
+  debug('error')
+  expect(errorMessage).to.be.a('string')
+  expect(errorMessage).to.have.length.of.at.least(1)
+  this.stream.error(errorMessage)
+  this.emit('error', new Error(errorMessage))
+  this.emit('end')
+  this.emit('close')
 }
 
 module.exports = TCPTransport
