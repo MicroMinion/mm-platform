@@ -141,6 +141,11 @@ TransportManager.prototype.isDisabled = function () {
   })
 }
 
+/**
+ * Send a message to a public keys
+ *
+ * If a connection exists, we'll reuse this. Otherwise connect is executed first
+ */
 TransportManager.prototype.send = function (publicKey, message) {
   debug('send')
   var connection = this.getConnection(publicKey)
@@ -153,6 +158,11 @@ TransportManager.prototype.send = function (publicKey, message) {
   }
 }
 
+/**
+ * Send a message using a connection object
+ *
+ * @access private
+ */
 TransportManager.prototype._send = function (message, connection) {
   var deferred = Q.defer()
   connection.write(message, function (err) {
@@ -165,12 +175,18 @@ TransportManager.prototype._send = function (message, connection) {
   return deferred.promise
 }
 
+/**
+ * Connect to another host using publicKey identifier
+ *
+ * If we don't have connectionInfo assocated with publicKey, a lookup is performed first
+ */
 TransportManager.prototype.connect = function (publicKey) {
   debug('connect')
+  var manager = this
   if (this.isConnected(publicKey)) {
     var deferred = Q.defer()
     process.nextTick(function () {
-      deferred.resolve()
+      deferred.resolve(manager.getConnection(publicKey))
     })
     return deferred.promise
   } else {
@@ -190,6 +206,14 @@ TransportManager.prototype.getConnection = function (publicKey) {
   return connection
 }
 
+/**
+ * Try to connect to a host using connectionInfo Object
+ *
+ * Transports are tried in the order defined in "_initializeTransports" method
+ * When connection using one transport fails, the next one is tried
+ *
+ * @access private
+ */
 TransportManager.prototype._connect = function (connectionInfo) {
   debug('_connect')
   var deferred = Q.defer()
