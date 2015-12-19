@@ -221,6 +221,9 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
   if (options) { expect(options).to.be.an('object') } else { options = {} }
   if (options.realtime) { expect(options.realtime).to.be.a('boolean') }
   if (options.expireAfter) { expect(options.expireAfter).to.be.a('number') }
+  if (!options.realtime) {
+    options.realtime = true
+  }
   var message = {
     id: options.id ? options.id : uuid.v4(),
     topic: topic,
