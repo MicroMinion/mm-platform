@@ -2,8 +2,8 @@
 
 var events = require('events')
 var chai = require('chai')
-var PacketStream = require('curvecp').PacketStream
-var MessageStream = require('curvecp').MessageStream
+var PacketStream = require('./curvecp/index.js').PacketStream
+var MessageStream = require('./curvecp/index.js').MessageStream
 var inherits = require('inherits')
 var _ = require('lodash')
 var Q = require('q')
@@ -28,9 +28,9 @@ var expect = chai.expect
 var AbstractTransport = function (publicKey, privateKey) {
   debug('initialize')
   expect(publicKey).to.be.a('string')
-  expect(nacl.decodeBase64(publicKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
   expect(privateKey).to.be.a('string')
-  expect(nacl.decodeBase64(privateKey)).to.have.length(32)
+  expect(nacl.util.decodeBase64(privateKey)).to.have.length(32)
   events.EventEmitter.call(this)
   this.publicKey = publicKey
   this.privateKey = privateKey
@@ -152,8 +152,8 @@ AbstractTransport.prototype._wrapIncomingConnection = function (connection) {
   var packetStream = new PacketStream({
     stream: connection,
     is_server: true,
-    serverPublicKey: nacl.decodeBase64(this.publicKey),
-    serverPrivateKey: nacl.decodeBase64(this.privateKey)
+    serverPublicKey: nacl.util.decodeBase64(this.publicKey),
+    serverPrivateKey: nacl.util.decodeBase64(this.privateKey)
   })
   var messageStream = new MessageStream(packetStream)
   this._connectEvents(messageStream)
@@ -164,9 +164,9 @@ AbstractTransport.prototype._wrapOutgoingConnection = function (publicKey, conne
   var packetStream = new PacketStream({
     stream: connection,
     is_server: false,
-    serverPublicKey: nacl.decodeBase64(publicKey),
-    clientPublicKey: nacl.decodeBase64(this.publicKey),
-    clientPrivateKey: nacl.decodeBase64(this.privateKey)
+    serverPublicKey: nacl.util.decodeBase64(publicKey),
+    clientPublicKey: nacl.util.decodeBase64(this.publicKey),
+    clientPrivateKey: nacl.util.decodeBase64(this.privateKey)
   })
   var messageStream = new MessageStream(packetStream)
   this.inProgressConnections[publicKey] = Q.defer()
@@ -243,7 +243,7 @@ AbstractTransport.prototype._getPeer = function (stream) {
   if (!publicKey) {
     return
   }
-  publicKey = nacl.encodeBase64(publicKey)
+  publicKey = nacl.util.encodeBase64(publicKey)
   return publicKey
 }
 
