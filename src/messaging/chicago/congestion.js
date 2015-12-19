@@ -1,5 +1,7 @@
 var hrtime = require('browser-process-hrtime')
 var nacl = require('tweetnacl')
+var debug = require('debug')('flunky-platform:messaging:chicago:congestion')
+var NanoTimer = require('nanotimer')
 
 var MILLISECOND = 1000000
 var SECOND = MILLISECOND * 1000
@@ -27,6 +29,35 @@ var Chicago = function () {
   this.lastedge = 0
   this.lastdoubling = 0
   this.lastpanic = 0
+  this.timer = new NanoTimer()
+  this._setTimeout()
+  this.timerDisabled = false
+}
+
+Chicago.prototype.setTimeout = function (func) {
+  this.timeoutCallback = func
+}
+
+Chicago.prototype.disableTimer = function () {
+  this.timerDisabled = true
+}
+
+Chicago.prototype.enableTimer = function () {
+  this.timerDisabled = false
+  this._setTimeout()
+}
+
+Chicago.prototype._timeoutCallback = function () {
+  if (this.timeoutCallback) {
+    this.timeoutCallback()
+  }
+  if (!this.timerDisabled) {
+    this._setTimeout()
+  }
+}
+
+Chicago.prototype._setTimeout = function () {
+  this.timer.setTimeout(this._timeoutCallback.bind(this), [], this.nsecperblock.toString() + 'n')
 }
 
 Chicago.prototype.refresh_clock = function () {
@@ -59,6 +90,7 @@ Chicago.prototype.randommod = function (n) {
 }
 
 Chicago.prototype.acknowledgement = function (original_blocktime) {
+  debug('acknowledgement')
   var rtt = this.clock - original_blocktime
   var rtt_delta
   if (!this.rtt_average) {

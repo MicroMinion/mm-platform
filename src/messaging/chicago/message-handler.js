@@ -1,7 +1,5 @@
 var Chicago = require('./congestion.js')
 var Message = require('./message.js')
-var RingBuffer = require('ringbufferjs')
-var NanoTimer = require('nanotimer')
 var isBuffer = require('isbuffer')
 var assert = require('assert')
 var Duplex = require('stream').Duplex
@@ -9,6 +7,7 @@ var inherits = require('inherits')
 var Block = require('./block.js')
 var Uint64BE = require('int64-buffer').Uint64BE
 var _ = require('lodash')
+var debug = require('debug')('flunky-platform:messaging:chicago:messageHandler')
 
 var MAX_MESSAGE_SIZE = 1088
 var MINIMAL_PADDING = 16
@@ -23,6 +22,7 @@ var MAXIMUM_UNPROCESSED_SEND_BYTES = 1024 * 1024
 // TODO: Add support for sending end of file (either error or normal)
 
 var MessageHandler = function (curveCPStream) {
+  debug('initialize')
   var opts = {
     objectMode: false,
     decodeStrings: true
@@ -41,14 +41,13 @@ var MessageHandler = function (curveCPStream) {
   /* Blocks that have been send but not yet acknowledged by other party */
   this.outgoing = {}
   /* Messages that have been received but not yet processed */
-  this.incoming = new RingBuffer(MAX_INCOMING)
+  this.incoming = []
   /* Number of bytes that have been received and send upstream */
   this.receivedBytes = 0
   /* Chicago congestion control algorithm */
   this.chicago = new Chicago()
   /* nanosecond precision timer */
-  this.timer = new NanoTimer()
-  this.timer.setTimeout(this._process.bind(this), '', this.chicago.nsecperblock.toString() + 'n')
+  this.chicago.setTimeout(this._process.bind(this))
   this._nextMessageId = 1
 }
 
@@ -61,16 +60,21 @@ MessageHandler.prototype.nextMessageId = function () {
 }
 
 MessageHandler.prototype._receiveData = function (data) {
+  debug('_receiveData')
   var message = new Message()
   message.fromBuffer(data)
-  if (!this.incoming.isFull()) {
-    this.incoming.enq(message)
+  if (_.size(this.incoming) < MAX_INCOMING) {
+    this.incoming.push(message)
+    this.chicago.enableTimer()
   }
 }
 
 MessageHandler.prototype._read = function (size) {}
 
 MessageHandler.prototype._process = function () {
+  debug('_process')
+  debug(this.label)
+  debug(this.chicago.nsecperblock)
   this.chicago.refresh_clock()
   if (this.canResend()) {
     this.resendBlock()
@@ -81,15 +85,20 @@ MessageHandler.prototype._process = function () {
     this.chicago.refresh_clock()
     this.processMessage()
   }
-  this.timer.setTimeout(this._process.bind(this), '', this.chicago.nsecperblock.toString() + 'n')
+  this.chicago.refresh_clock()
+  if (_.isEmpty(this.incoming) && _.isEmpty(this.outgoing) && this.sendBytes.length === 0) {
+    this.chicago.disableTimer()
+  }
 }
 
 MessageHandler.prototype._write = function (chunk, encoding, done) {
+  debug('_write')
   assert(isBuffer(chunk))
   this.sendBytes = Buffer.concat([this.sendBytes, chunk])
   if (this.sendBytes.length > MAXIMUM_UNPROCESSED_SEND_BYTES) {
     done(new Error('Buffer full'))
   } else {
+    this.chicago.enableTimer()
     done()
   }
 }
@@ -109,7 +118,7 @@ MessageHandler.prototype.resendBlock = function () {
 }
 
 MessageHandler.prototype.canSend = function () {
-  return this.sendBytes.length > 0 && !this.outgoing.isFull()
+  return this.sendBytes.length > 0 && _.size(this.outgoing) < MAX_OUTGOING
 }
 
 MessageHandler.prototype.sendBlock = function () {
@@ -124,7 +133,7 @@ MessageHandler.prototype.sendBlock = function () {
   block.data = this.sendBytes.slice(0, blockSize)
   this.sendBytes = this.sendBytes.slice(blockSize)
   this.sendProcessed = this.sendProcessed + block.data.length
-  this.outgoing.enq(block)
+  this.outgoing[block.id] = block
   this._sendBlock(block)
 }
 
@@ -140,29 +149,28 @@ MessageHandler.prototype._sendBlock = function (block) {
 }
 
 MessageHandler.prototype.canProcessMessage = function () {
-  return !this.incoming.isEmpty()
+  return this.incoming.length > 0
 }
 
 MessageHandler.prototype.processMessage = function () {
-  var message = this.incoming.deq()
+  debug('processMessage')
+  var message = this.incoming.shift()
   this.processAcknowledgments(message)
   this._processMessage(message)
 }
 
 MessageHandler.prototype.processAcknowledgments = function (message) {
-  var size = message.acknowledging_range_1_size
-  var included = true
-  while (included) {
-    var block = this.outgoing.peek()
-    if (block.isIncluded(size)) {
-      this.outgoing.deq()
-    } else {
-      included = false
-    }
+  debug('processAcknowledgements')
+  if (_.has(this.outgoing, message.acknowledging_id)) {
+    debug('processing acknowledgement')
+    var block = this.outgoing[message.acknowledging_id]
+    delete this.outgoing[message.acknowledging_id]
+    this.chicago.acknowledgement(block.transmission_time)
   }
 }
 
 MessageHandler.prototype.sendAcknowledgment = function (message) {
+  debug('sendAcknowledgment')
   var reply = new Message()
   reply.id = this.nextMessageId()
   reply.acknowledging_id = message.id
@@ -171,9 +179,10 @@ MessageHandler.prototype.sendAcknowledgment = function (message) {
 }
 
 MessageHandler.prototype._processMessage = function (message) {
-  if (message.offset <= this.receivedBytes) {
+  debug('_processMessage')
+  if (Number(message.offset) <= this.receivedBytes) {
     if (message.data_length > 1) {
-      var ignoreBytes = this.receivedBytes - message.offset
+      var ignoreBytes = this.receivedBytes - Number(message.offset)
       var data = message.data.slice(ignoreBytes)
       this.receivedBytes += data.length
       this.emit('data', data)
