@@ -28,7 +28,7 @@ var MessageStream = function (curveCPStream) {
     decodeStrings: true
   }
   Duplex.call(this, opts)
-  this.maxBlockLength = 512
+  this.maxBlockLength = 640 - HEADER_SIZE - MINIMAL_PADDING
   this.stream = curveCPStream
   var self = this
   this.stream.on('data', this._receiveData.bind(this))
@@ -111,7 +111,9 @@ MessageStream.prototype._process = function () {
 MessageStream.prototype._write = function (chunk, encoding, done) {
   debug('_write')
   assert(isBuffer(chunk))
+  debug('chunk length: ' + chunk.length)
   this.sendBytes = Buffer.concat([this.sendBytes, chunk])
+  debug('sendBytes lenth: ' + this.sendBytes.length)
   if (this.sendBytes.length > MAXIMUM_UNPROCESSED_SEND_BYTES) {
     done(new Error('Buffer full'))
   } else {
@@ -139,10 +141,13 @@ MessageStream.prototype.canSend = function () {
 }
 
 MessageStream.prototype.sendBlock = function () {
+  debug('sendBlock')
+  debug('sendBytes size: ' + this.sendBytes.length)
   var blockSize = this.sendBytes.length
   if (blockSize > this.maxBlockLength) {
     blockSize = this.maxBlockLength
   }
+  debug('blockSize: ' + blockSize)
   var block = new Block()
   block.start_byte = this.sendProcessed
   block.transmission_time = this.chicago.clock

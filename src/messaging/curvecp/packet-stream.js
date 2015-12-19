@@ -83,7 +83,7 @@ CurveCPStream.prototype._onMessage = function (message) {
 
 CurveCPStream.prototype._onMessageClient = function (message) {
   debug('_onMessageClient')
-  if (message.length < 64 || message.length > 1088) {
+  if (message.length < 64 || message.length > 1152) {
     return
   }
   var messageType = message.subarray(0, 8)
@@ -96,10 +96,11 @@ CurveCPStream.prototype._onMessageClient = function (message) {
 
 CurveCPStream.prototype._onMessageServer = function (message) {
   debug('_onMessageServer')
-  if (message.length < 96 || message.length > 1088) {
+  if (message.length < 96 || message.length > 1184) {
     return
   }
   var messageType = message.subarray(0, 8)
+  debug(messageType.toString())
   if (this.isEqual(messageType, HELLO_MSG)) {
     this.onHello(message)
   } else if (this.isEqual(messageType, INITIATE_MSG)) {
@@ -353,7 +354,7 @@ CurveCPStream.prototype.sendServerMessage = function (message, done) {
 
 CurveCPStream.prototype.onServerMessage = function (message) {
   debug('onServerMessage')
-  if (message.length < 64 || message.length > 1088) {
+  if (message.length < 64 || message.length > 1152) {
     debug('Message command has incorrect length')
     return
   }
@@ -379,7 +380,7 @@ CurveCPStream.prototype.sendClientMessage = function (message, done) {
 
 CurveCPStream.prototype.onClientMessage = function (message) {
   debug('onClientMessage')
-  if (message.length < 96 || message.length > 1088) {
+  if (message.length < 96 || message.length > 1184) {
     debug('Message command has incorrect length')
     return
   }

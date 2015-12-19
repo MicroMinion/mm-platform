@@ -171,8 +171,12 @@ var TCPConnection = function (tcpStream) {
 inherits(TCPConnection, Duplex)
 
 TCPConnection.prototype.processMessage = function (data) {
+  debug('processMessage')
   var messageLength = ns.nsLength(data)
-  this.emit('data', ns.nsPayload(data))
+  debug(messageLength)
+  var payload = ns.nsPayload(data)
+  debug(payload.length)
+  this.emit('data', payload)
   if (messageLength < data.length) {
     var buffer = new Buffer(data.length - messageLength)
     data.copy(buffer, 0, messageLength)
@@ -184,10 +188,16 @@ TCPConnection.prototype._read = function (size) {}
 
 TCPConnection.prototype._write = function (chunk, encoding, done) {
   debug('_write')
+  debug(chunk.length)
   expect(Buffer.isBuffer(chunk)).to.be.true
   expect(chunk).to.have.length.of.at.least(1)
   expect(done).to.be.an.instanceof(Function)
-  this.stream.write(ns.nsWrite(chunk), encoding, done)
+  var result = this.stream.write(ns.nsWrite(chunk), encoding, done)
+  if (result) {
+    debug('data flushed successfully')
+  } else {
+    debug('part of data queued in memory')
+  }
 }
 
 TCPConnection.prototype.error = function (errorMessage) {
