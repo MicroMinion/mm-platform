@@ -9,18 +9,7 @@ var Downloader = require('./downloader.js')
 var _ = require('lodash')
 var Q = require('q')
 var debug = require('debug')('flunky-platform:util:torrenting:TorrentingEngine')
-
-if (!String.prototype.endsWith) {
-  String.prototype.endsWith = function (searchString, position) {
-    var subjectString = this.toString()
-    if (typeof position !== 'number' || !isFinite(position) || Math.floor(position) !== position || position > subjectString.length) {
-      position = subjectString.length
-    }
-    position -= searchString.length
-    var lastIndex = subjectString.indexOf(searchString, position)
-    return lastIndex !== -1 && lastIndex === position
-  }
-}
+var endsWith = require('../endsWith.js')
 
 var TorrentingEngine = function (torrenting, storageRoot) {
   this.torrenting = torrenting
@@ -143,7 +132,7 @@ TorrentingEngine.prototype._subscribeToFiles = function () {
   Q.nfcall(fs.readdir, this.storageRoot)
     .then(function (files) {
       _.forEach(files, function (file) {
-        if (file.endsWith('.torrent')) {
+        if (endsWith(file, '.torrent')) {
           var infoHash = file.split('.')[0]
           server._subscribeToFile(infoHash)
         }

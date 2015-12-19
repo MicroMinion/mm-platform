@@ -4,20 +4,10 @@ var EventEmitter = require('ak-eventemitter')
 var extend = require('extend.js')
 var inherits = require('inherits')
 var debug = require('debug')('flunky-platform:proxy:client')
+var endsWith = require('../util/endsWith.js')
 
 var MQTT_PORT = 65432
 
-if (!String.prototype.endsWith) {
-  String.prototype.endsWith = function (searchString, position) {
-    var subjectString = this.toString()
-    if (position === undefined || position > subjectString.length) {
-      position = subjectString.length
-    }
-    position -= searchString.length
-    var lastIndex = subjectString.indexOf(searchString, position)
-    return lastIndex !== -1 && lastIndex === position
-  }
-}
 var Messaging = function (client) {
   EventEmitter.call(this, {
     delimiter: '.'
@@ -34,7 +24,7 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
 
 Messaging.prototype.on = function (ns, callback) {
   EventEmitter.prototype.on.call(this, ns, callback)
-  if (ns.endsWith('*')) {
+  if (endsWith(ns, '*')) {
     ns = ns.replace('*', '/#')
   } else {
     ns = ns + '/#'
