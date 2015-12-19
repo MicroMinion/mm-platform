@@ -239,6 +239,7 @@ AbstractTransport.prototype._deleteStream = function (stream) {
 
 AbstractTransport.prototype._getPeer = function (stream) {
   debug('getPeer')
+  var stream = stream.stream
   var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey
   if (!publicKey) {
     return
