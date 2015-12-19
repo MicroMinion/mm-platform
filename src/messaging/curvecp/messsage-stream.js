@@ -1,13 +1,13 @@
-var Chicago = require('./congestion.js')
+var Chicago = require('./chicago.js')
 var Message = require('./message.js')
 var isBuffer = require('isbuffer')
 var assert = require('assert')
 var Duplex = require('stream').Duplex
 var inherits = require('inherits')
-var Block = require('./block.js')
+var Block = require('./message-block.js')
 var Uint64BE = require('int64-buffer').Uint64BE
 var _ = require('lodash')
-var debug = require('debug')('flunky-platform:messaging:chicago:messageHandler')
+var debug = require('debug')('flunky-platform:messaging:chicago:MessageStream')
 
 var MAX_MESSAGE_SIZE = 1088
 var MINIMAL_PADDING = 16
@@ -21,7 +21,7 @@ var MAXIMUM_UNPROCESSED_SEND_BYTES = 1024 * 1024
 
 // TODO: Add support for sending end of file (either error or normal)
 
-var MessageHandler = function (curveCPStream) {
+var MessageStream = function (curveCPStream) {
   debug('initialize')
   var opts = {
     objectMode: false,
@@ -51,15 +51,15 @@ var MessageHandler = function (curveCPStream) {
   this._nextMessageId = 1
 }
 
-inherits(MessageHandler, Duplex)
+inherits(MessageStream, Duplex)
 
-MessageHandler.prototype.nextMessageId = function () {
+MessageStream.prototype.nextMessageId = function () {
   var result = this._nextMessageId
   this._nextMessageId += 1
   return result
 }
 
-MessageHandler.prototype._receiveData = function (data) {
+MessageStream.prototype._receiveData = function (data) {
   debug('_receiveData')
   var message = new Message()
   message.fromBuffer(data)
@@ -69,9 +69,9 @@ MessageHandler.prototype._receiveData = function (data) {
   }
 }
 
-MessageHandler.prototype._read = function (size) {}
+MessageStream.prototype._read = function (size) {}
 
-MessageHandler.prototype._process = function () {
+MessageStream.prototype._process = function () {
   debug('_process')
   debug(this.label)
   debug(this.chicago.nsecperblock)
@@ -91,7 +91,7 @@ MessageHandler.prototype._process = function () {
   }
 }
 
-MessageHandler.prototype._write = function (chunk, encoding, done) {
+MessageStream.prototype._write = function (chunk, encoding, done) {
   debug('_write')
   assert(isBuffer(chunk))
   this.sendBytes = Buffer.concat([this.sendBytes, chunk])
@@ -103,13 +103,13 @@ MessageHandler.prototype._write = function (chunk, encoding, done) {
   }
 }
 
-MessageHandler.prototype.canResend = function () {
+MessageStream.prototype.canResend = function () {
   return !_.isEmpty(this.outgoing) && _.some(this.outgoing, function (block) {
     return block.transmission_time + this.chicago.rtt_timeout < this.chicago.clock
   }, this)
 }
 
-MessageHandler.prototype.resendBlock = function () {
+MessageStream.prototype.resendBlock = function () {
   var block = _.min(this.outgoing, 'transmission_time')
   block.transmission_time = this.chicago.clock
   block.id = this.nextMessageId()
@@ -117,11 +117,11 @@ MessageHandler.prototype.resendBlock = function () {
   this._sendBlock(block)
 }
 
-MessageHandler.prototype.canSend = function () {
+MessageStream.prototype.canSend = function () {
   return this.sendBytes.length > 0 && _.size(this.outgoing) < MAX_OUTGOING
 }
 
-MessageHandler.prototype.sendBlock = function () {
+MessageStream.prototype.sendBlock = function () {
   var blockSize = this.sendBytes.length
   if (blockSize > this.maxBlockLength) {
     blockSize = this.maxBlockLength
@@ -137,7 +137,7 @@ MessageHandler.prototype.sendBlock = function () {
   this._sendBlock(block)
 }
 
-MessageHandler.prototype._sendBlock = function (block) {
+MessageStream.prototype._sendBlock = function (block) {
   var message = new Message()
   message.id = block.id
   message.acknowledging_range_1_size = new Uint64BE(this.receivedBytes)
@@ -148,18 +148,18 @@ MessageHandler.prototype._sendBlock = function (block) {
   this.maxBlockLength = MESSAGE_BODY
 }
 
-MessageHandler.prototype.canProcessMessage = function () {
+MessageStream.prototype.canProcessMessage = function () {
   return this.incoming.length > 0
 }
 
-MessageHandler.prototype.processMessage = function () {
+MessageStream.prototype.processMessage = function () {
   debug('processMessage')
   var message = this.incoming.shift()
   this.processAcknowledgments(message)
   this._processMessage(message)
 }
 
-MessageHandler.prototype.processAcknowledgments = function (message) {
+MessageStream.prototype.processAcknowledgments = function (message) {
   debug('processAcknowledgements')
   if (_.has(this.outgoing, message.acknowledging_id)) {
     debug('processing acknowledgement')
@@ -169,7 +169,7 @@ MessageHandler.prototype.processAcknowledgments = function (message) {
   }
 }
 
-MessageHandler.prototype.sendAcknowledgment = function (message) {
+MessageStream.prototype.sendAcknowledgment = function (message) {
   debug('sendAcknowledgment')
   var reply = new Message()
   reply.id = this.nextMessageId()
@@ -178,7 +178,7 @@ MessageHandler.prototype.sendAcknowledgment = function (message) {
   this.stream.write(reply.toBuffer())
 }
 
-MessageHandler.prototype._processMessage = function (message) {
+MessageStream.prototype._processMessage = function (message) {
   debug('_processMessage')
   if (Number(message.offset) <= this.receivedBytes) {
     if (message.data_length > 1) {
@@ -191,4 +191,4 @@ MessageHandler.prototype._processMessage = function (message) {
   }
 }
 
-module.exports = MessageHandler
+module.exports = MessageStream
