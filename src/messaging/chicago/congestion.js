@@ -1,5 +1,5 @@
 var hrtime = require('browser-process-hrtime')
-var nacl = require('tweetnacl-js')
+var nacl = require('tweetnacl')
 
 var MILLISECOND = 1000000
 var SECOND = MILLISECOND * 1000
@@ -46,15 +46,14 @@ Chicago.prototype.retransmission = function () {
   }
 }
 
-Chicago.prototype.randommnod = function (n) {
-  // TODO: Validate correctness
+Chicago.prototype.randommod = function (n) {
   var result = 0
   if (n <= 1) {
     return 0
   }
   var randomBytes = nacl.randomBytes(32)
   for (var j = 0; j < 32; j++) {
-    result = (result * 256 + randomBytes[j] % n)
+    result = (result * 256 + Number(randomBytes[j]) % n)
   }
   return result
 }
