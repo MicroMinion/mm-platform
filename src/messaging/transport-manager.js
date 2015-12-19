@@ -259,6 +259,7 @@ TransportManager.prototype._saveDirectoryCache = function () {
 TransportManager.prototype._publishConnectionInfo = function () {
   debug('publishConnectionInfo')
   this.messaging.send('directory.put', 'local', {key: this.publicKey, value: JSON.stringify(this.connectionInfo)})
+  this.messaging.send('messaging.myConnectionInfo', 'local', {key: this.publicKey, value: this.connectionInfo})
 }
 
 /**
