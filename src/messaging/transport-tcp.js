@@ -158,7 +158,14 @@ var TCPConnection = function (tcpStream) {
   opts.decodeStrings = true
   Duplex.call(this, opts)
   this.stream = tcpStream
+  var connection = this
   this.stream.on('data', this.processMessage.bind(this))
+  this.stream.on('error', function (err) {
+    connection.emit('error', err)
+  })
+  this.stream.on('close', function () {
+    connection.emit('close')
+  })
 }
 
 inherits(TCPConnection, Duplex)
