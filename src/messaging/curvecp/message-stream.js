@@ -7,7 +7,7 @@ var inherits = require('inherits')
 var Block = require('./message-block.js')
 var Uint64BE = require('int64-buffer').Uint64BE
 var _ = require('lodash')
-var debug = require('debug')('flunky-platform:messaging:chicago:MessageStream')
+var debug = require('debug')('flunky-platform:messaging:curvecp:MessageStream')
 
 var MAX_MESSAGE_SIZE = 1088
 var MINIMAL_PADDING = 16
@@ -91,7 +91,6 @@ MessageStream.prototype._read = function (size) {}
 
 MessageStream.prototype._process = function () {
   debug('_process')
-  debug(this.label)
   debug(this.chicago.nsecperblock)
   this.chicago.refresh_clock()
   if (this.canResend()) {

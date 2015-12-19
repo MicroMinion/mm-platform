@@ -2,7 +2,7 @@
 var Duplex = require('stream').Duplex
 var inherits = require('inherits')
 var extend = require('extend.js')
-var debug = require('debug')('curve-protocol')
+var debug = require('debug')('flunky-platform:messaging:curvecp:PacketStream')
 
 var nacl = require('tweetnacl')
 
