@@ -22,7 +22,7 @@ var expect = chai.expect
  * @public
  * @readonly
  */
-var PUBLISH_CONNECTION_INFO_INTERVAL = 1000 * 60 * 5
+var PUBLISH_CONNECTION_INFO_INTERVAL = 1000 * 60
 
 var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
@@ -83,7 +83,7 @@ TransportManager.prototype.setMessaging = function (messaging) {
 
 TransportManager.prototype._initializeTransports = function () {
   debug('initializeTransports')
-  var transports = [UDPTurnTransport]
+  var transports = [UDPTurnTransport, TCPTransport]
   _.forEach(transports, function (transportClass) {
     this._initializeTransport(transportClass)
   }, this)

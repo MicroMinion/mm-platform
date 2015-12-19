@@ -63,9 +63,9 @@ UDPTurnTransport.prototype._onMessage = function (bytes, rinfo, channelId) {
 
 UDPTurnTransport.prototype._connect = function (connectionInfo) {
   expect(this.isDisabled()).to.be.false
-  var relayAddress = connectionInfo.udpTurn.relay
   var self = this
   if (_isValidConnectionInfo(connectionInfo)) {
+    var relayAddress = connectionInfo.udpTurn.relay
     // create permission
     return this.turnSocket.createPermissionP(relayAddress.address)
       .then(function () {
@@ -120,11 +120,12 @@ UDPTurnTransport.prototype.enable = function (onSuccess, onFailure) {
   var self = this
   this.turnSocket.allocateP()
     .then(function (addresses) {
+      debug('log 1')
       self.srflxAddresses = addresses.mappedAddress
       self.relayAddress = addresses.relayedAddress
       debug('srflx address = ' + self.srflxAddresses.address + ':' + self.srflxAddresses.port)
       debug('relay address = ' + self.relayAddress.address + ':' + self.relayAddress.port)
-      return self.socket.refreshP(lifetime)
+      return self.turnSocket.refreshP(lifetime)
     })
     .then(function (duration) {
       debug('lifetime = ' + duration)
@@ -180,7 +181,7 @@ UDPTurnTransport.prototype.isDisabled = function () {
 UDPTurnTransport.prototype._startRefreshLoop = function (duration) {
   var self = this
   this.refreshTimer = setInterval(function () {
-    self.socket.refreshP(
+    self.turnSocket.refreshP(
       duration,
       function () {}, // on success
       function (error) { // on error
