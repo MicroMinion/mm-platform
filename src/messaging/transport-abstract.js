@@ -128,12 +128,21 @@ AbstractTransport.prototype._listAddresses = function () {
  * @return {Promise}
  */
 AbstractTransport.prototype.connect = function (connectionInfo) {
-  debug('connect')
+  debug('connect ' + connectionInfo.publicKey)
+  var transport = this
   if (_.has(this.inProgressConnections, connectionInfo.publicKey)) {
     return this.inProgressConnections[connectionInfo.publicKey].promise
   } else {
-    return this._connect(connectionInfo)
+    this._connect(connectionInfo)
       .then(this._wrapOutgoingConnection.bind(this, connectionInfo.publicKey))
+      .fail(function (error) {
+        debug('Connection to ' + connectionInfo.publicKey + ' failed')
+        var deferred = transport.inProgressConnections[connectionInfo.publicKey]
+        delete transport.inProgressConnections[connectionInfo.publicKey]
+        deferred.reject(error)
+      })
+    this.inProgressConnections[connectionInfo.publicKey] = Q.defer()
+    return this.inProgressConnections[connectionInfo.publicKey].promise
   }
 }
 
@@ -169,10 +178,8 @@ AbstractTransport.prototype._wrapOutgoingConnection = function (publicKey, conne
     clientPrivateKey: nacl.util.decodeBase64(this.privateKey)
   })
   var messageStream = new MessageStream(packetStream)
-  this.inProgressConnections[publicKey] = Q.defer()
   this._connectEvents(messageStream)
   messageStream.connect()
-  return this.inProgressConnections[publicKey].promise
 }
 
 AbstractTransport.prototype._connectEvents = function (stream) {
@@ -186,18 +193,12 @@ AbstractTransport.prototype._connectEvents = function (stream) {
       if (!_.has(transport.connections, publicKey)) {
         transport.connections[publicKey] = []
       }
-      var removedStreams = _.filter(transport.connections[publicKey], function (streamInArray) {
-        return streamInArray !== stream
-      })
       transport.connections[publicKey].push(stream)
       transport.emit('connection', publicKey)
       if (_.has(transport.inProgressConnections, publicKey)) {
         transport.inProgressConnections[publicKey].resolve(stream)
         delete transport.inProgressConnections[publicKey]
       }
-      _.forEach(removedStreams, function (stream) {
-        stream.destroy()
-      })
     },
     data: function (data) {
       debug('data event' + data)
@@ -249,14 +250,14 @@ AbstractTransport.prototype._getPeer = function (stream) {
 }
 
 AbstractTransport.prototype.getConnection = function (publicKey) {
-  debug('getConnection')
+  debug('getConnection ' + publicKey)
   if (_.has(this.connections, publicKey)) {
     return _.last(this.connections[publicKey])
   }
 }
 
 AbstractTransport.prototype.isConnected = function (publicKey) {
-  debug('isConnected')
+  debug('isConnected ' + publicKey)
   return Boolean(this.getConnection(publicKey))
 }
 

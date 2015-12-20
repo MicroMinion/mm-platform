@@ -21,6 +21,8 @@ var TCPTransport = function (publicKey, privateKey) {
   AbstractTransport.call(this, publicKey, privateKey)
   this.enabled = false
   var transport = this
+  this.tcpConnections = {}
+  this.tcpInProgress = {}
   this._server = net.createServer()
   this._server.on('listening', this._onListening.bind(this))
   this._server.on('close', this._onClose.bind(this))
@@ -68,7 +70,9 @@ TCPTransport.prototype._onClose = function () {
 
 TCPTransport.prototype._onConnection = function (connection) {
   debug('_onConnection')
-  this._wrapIncomingConnection(new TCPConnection(connection))
+  connection = new TCPConnection(connection)
+  this.tcpConnections[connection.toString()] = connection
+  this._wrapIncomingConnection(connection)
 }
 
 TCPTransport.prototype.enable = function () {
@@ -92,6 +96,7 @@ TCPTransport.prototype.isDisabled = function () {
 
 TCPTransport.prototype._connect = function (connectionInfo) {
   debug('_connect')
+  debug(connectionInfo)
   var transport = this
   if (this._hasConnectionInfo(connectionInfo)) {
     var promises = []
@@ -108,45 +113,36 @@ TCPTransport.prototype._connect = function (connectionInfo) {
   }
 }
 
-TCPTransport.prototype._pickConnection = function (stateSnapshots) {
-  var connection
-  var deferred = Q.defer()
-  _.forEach(stateSnapshots, function (snapshot) {
-    if (snapshot.state === 'fulfilled') {
-      if (connection) {
-        connection.destroy()
-      } else {
-        connection = snapshot.value
-      }
-    }
-  }, this)
-  if (connection) {
-    return connection
-  } else {
-    process.nextTick(function () {
-      deferred.reject()
-    })
-  }
-  return deferred.promise
-}
-
 TCPTransport.prototype._hasConnectionInfo = function (connectionInfo) {
   return _.isObject(connectionInfo) && _.has(connectionInfo, 'tcp') && _.isObject(connectionInfo.tcp) &&
   _.has(connectionInfo.tcp, 'addresses') && _.has(connectionInfo.tcp, 'port')
 }
 
 TCPTransport.prototype._connectToAddress = function (address, port) {
-  debug('_connectToAddress')
+  debug('_connectToAddress ' + address + ' ' + port)
+  var transport = this
   var deferred = Q.defer()
+  if (_.has(this.tcpInProgress, address + ':' + port)) {
+    debug('connection already in progress to ' + address + ':' + port)
+    return
+  }
+  if (_.has(this.tcpConnections, address + ':' + port)) {
+    debug('already connected to ' + address + ':' + port)
+  }
+  this.tcpInProgress[address + ':' + port] = true
   var connection = net.createConnection(port, address)
   var err = function (err) {
     if (!deferred.promise.isFulfilled()) {
+      delete transport.tcpInProgress[address + ':' + port]
       deferred.reject(err)
     }
   }
   connection.once('connect', function () {
     connection.removeListener('error', err)
-    deferred.resolve(new TCPConnection(connection))
+    var stream = new TCPConnection(connection)
+    transport.tcpConnections[stream.toString()] = stream
+    delete transport.tcpInProgress[stream.toString()]
+    deferred.resolve(stream)
   })
   connection.on('error', err)
   return deferred.promise
@@ -166,9 +162,25 @@ var TCPConnection = function (tcpStream) {
   this.stream.on('close', function () {
     connection.emit('close')
   })
+  this.stream.on('connect', function () {
+    connection.emit('connect')
+  })
+  this.stream.on('drain', function () {
+    connection.emit('drain')
+  })
+  this.stream.on('end', function () {
+    connection.emit('end')
+  })
+  this.stream.on('timeout', function () {
+    connection.destroy()
+  })
 }
 
 inherits(TCPConnection, Duplex)
+
+TCPConnection.prototype.toString = function () {
+  return this.stream.remoteAddress + ':' + this.stream.remotePort
+}
 
 TCPConnection.prototype.processMessage = function (data) {
   debug('processMessage')
@@ -200,14 +212,14 @@ TCPConnection.prototype._write = function (chunk, encoding, done) {
   }
 }
 
-TCPConnection.prototype.error = function (errorMessage) {
-  debug('error')
-  expect(errorMessage).to.be.a('string')
-  expect(errorMessage).to.have.length.of.at.least(1)
-  this.stream.error(errorMessage)
-  this.emit('error', new Error(errorMessage))
-  this.emit('end')
-  this.emit('close')
+TCPConnection.prototype.destroy = function () {
+  debug('TCPConnection.destroy')
+  this.stream.destroy()
+}
+
+TCPConnection.prototype.end = function () {
+  debug('TCPConnection.end')
+  this.stream.end()
 }
 
 module.exports = TCPTransport

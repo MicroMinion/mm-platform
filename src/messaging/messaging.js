@@ -73,6 +73,9 @@ var Messaging = function (dispatcher) {
   this.sendQueues = {}
   this._sendQueuesRetrieved = false
   this._loadSendQueues()
+  this.on('self.transport.connection', function (topic, local, publicKey) {
+    messaging._flushQueue(publicKey)
+  })
   /**
    * Interface for actually sending/receiving messages
    *
@@ -275,12 +278,6 @@ Messaging.prototype._trigger = function (publicKey) {
   expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
   if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0) {
     this.dispatcher.connect(publicKey)
-      .then(this._flushQueue.bind(this, publicKey))
-      .fail(function (error) {
-        debugMessage('connect failed for ' + publicKey)
-        debugMessage(error)
-      })
-      .done()
   }
 }
 

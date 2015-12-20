@@ -144,17 +144,19 @@ TransportManager.prototype.isDisabled = function () {
 /**
  * Send a message to a public keys
  *
- * If a connection exists, we'll reuse this. Otherwise connect is executed first
+ * Connection needs to exist before executing this method
  */
 TransportManager.prototype.send = function (publicKey, message) {
-  debug('send')
+  debug('send ' + publicKey)
   var connection = this.getConnection(publicKey)
   if (connection) {
     return this._send(message, connection)
   } else {
-    var result = this.connect(publicKey)
-      .then(this._send.bind(this, message))
-    return result
+    var deferred = Q.defer()
+    process.nextTick(function () {
+      deferred.reject(new Error('Connection does not exist'))
+    })
+    return deferred.promise
   }
 }
 
@@ -181,7 +183,7 @@ TransportManager.prototype._send = function (message, connection) {
  * If we don't have connectionInfo assocated with publicKey, a lookup is performed first
  */
 TransportManager.prototype.connect = function (publicKey) {
-  debug('connect')
+  debug('connect ' + publicKey)
   var manager = this
   if (this.isConnected(publicKey)) {
     var deferred = Q.defer()
@@ -196,7 +198,7 @@ TransportManager.prototype.connect = function (publicKey) {
 }
 
 TransportManager.prototype.getConnection = function (publicKey) {
-  debug('getConnection')
+  debug('getConnection ' + publicKey)
   var connection
   _.forEach(this.transports, function (transport) {
     if (!connection) {
@@ -215,7 +217,7 @@ TransportManager.prototype.getConnection = function (publicKey) {
  * @access private
  */
 TransportManager.prototype._connect = function (connectionInfo) {
-  debug('_connect')
+  debug('_connect ' + connectionInfo.publicKey)
   var deferred = Q.defer()
   var promise = deferred.promise
   _.forEach(this.transports, function (transport) {
@@ -258,8 +260,8 @@ TransportManager.prototype._saveDirectoryCache = function () {
  */
 TransportManager.prototype._publishConnectionInfo = function () {
   debug('publishConnectionInfo')
-  this.messaging.send('directory.put', 'local', {key: this.publicKey, value: JSON.stringify(this.connectionInfo)})
-  this.messaging.send('messaging.myConnectionInfo', 'local', {key: this.publicKey, value: this.connectionInfo})
+  // this.messaging.send('directory.put', 'local', {key: this.publicKey, value: JSON.stringify(this.connectionInfo)})
+  this.messaging.send('messaging.myConnectionInfo', 'local', this.connectionInfo)
 }
 
 /**

@@ -7,7 +7,20 @@ var _ = require('lodash')
 // TODO: Use Storagejs as storage adapter
 // TODO: Need to include seeds (format: dictionary with publicKey as key and connectionInfo as value)
 
-var seeds = {}
+var seeds = {
+  'mA1sdyNdidwSytdZZWJj7cC2zM5+F61cMNXkGu8qKAk=': {publicKey: 'mA1sdyNdidwSytdZZWJj7cC2zM5+F61cMNXkGu8qKAk=',
+    tcp: {
+      addresses: ['192.168.3.79'],
+      port: 57307
+    }
+  },
+  'bs+h1QCxKl9UZl1GPTrpQR1uJWPhqsBfD2cXQOG38TA=': {publicKey: 'bs+h1QCxKl9UZl1GPTrpQR1uJWPhqsBfD2cXQOG38TA=',
+    tcp: {
+      addresses: ['192.168.3.79'],
+      port: 57334
+    }
+  }
+}
 
 /* KADEMLIA CONTACT */
 
@@ -39,7 +52,6 @@ var FlunkyTransport = function (options) {
   this.messaging.on('self.kademlia', this._onMessage.bind(this))
   this.messaging.on('friends.kademlia', this._onMessage.bind(this))
   this.messaging.on('public.kademlia', this._onMessage.bind(this))
-  this._setupSeeds()
 }
 
 FlunkyTransport.prototype._onMessage = function (topic, publicKey, data) {
@@ -48,12 +60,14 @@ FlunkyTransport.prototype._onMessage = function (topic, publicKey, data) {
 }
 
 FlunkyTransport.prototype._createContact = function (options) {
+  debug('_createContact')
+  debug(JSON.stringify(options))
   return new FlunkyContact(options)
 }
 
 FlunkyTransport.prototype._send = function (data, contact) {
   data = JSON.parse(data.toString('utf8'))
-  this.messsaging.send('kademlia', contact.publicKey, data)
+  this.messaging.send('kademlia', contact.publicKey, data, {realtime: true, expireAfter: 10000})
 }
 
 FlunkyTransport.prototype._close = function () {}
@@ -70,7 +84,7 @@ var KademliaService = function (messaging) {
 
 KademliaService.prototype._updateReplyTo = function (topic, publicKey, data) {
   this.replyTo.publicKey = data.publicKey
-  this.replyTo.connectionInfo = data.connectionInfo
+  this.replyTo.connectionInfo = data
   if (!this.dht) {
     this._setup()
   }
@@ -81,7 +95,7 @@ KademliaService.prototype._setup = function () {
   this.messaging.on('self.directory.put', this.put.bind(this))
   this.dht = new kademlia.Node({
     messaging: this.messaging,
-    storage: kadfs('./storage/kad'),
+    storage: kadfs(process.env.STORAGE + '/kad'),
     transport: FlunkyTransport,
     replyto: this.replyTo
   })

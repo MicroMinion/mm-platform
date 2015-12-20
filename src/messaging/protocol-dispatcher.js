@@ -199,34 +199,4 @@ ProtocolDispatcher.prototype._inScope = function (publicKey, searchObject) {
   })
 }
 
-/*
-var Messaging = function() {
-  EventEmitter.call(this)
-}
-
-inherits(Messaging, EventEmitter)
-
-Messaging.prototype.send = function(publicKey, message) {
-  var buffer = new Buffer(8)
-  message.copy(buffer, 0, 0, 8)
-  this.emit('message', publicKey, buffer)
-  var buffer = new Buffer(message.length - 8 + 8)
-  message.copy(buffer, 0, 8)
-  buffer.writeUInt32BE(8, message.length - 8)
-  buffer.writeUInt16BE(1, message.length - 8 + 4)
-  buffer.write('XY', message.length - 8 + 4 + 2)
-  this.emit('message', publicKey, buffer)
-}
-
-var dispatcher = new ProtocolDispatcher()
-dispatcher.transportManager = new Messaging()
-dispatcher._setupTransportManager()
-
-dispatcher.on(1, function(publicKey, message) {
-  debug(message.toString())
-})
-
-dispatcher.send(1, 'local', new Buffer('abcdefghijklmnopqrstuvwxyz'))
-*/
-
 module.exports = ProtocolDispatcher
