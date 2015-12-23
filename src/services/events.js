@@ -4,9 +4,9 @@ var debug = require('debug')('flunky-platform:services:events')
 
 var SUBSCRIPTION_TIMEOUT = 1000 * 60 * 5
 
-var Events = function (messaging) {
+var Events = function (options) {
   var events = this
-  this.messaging = messaging
+  this.messaging = options.messaging
   this.subscribers = {}
   this.messaging.on('self.*', this.processEvent.bind(this))
   this.messaging.on('self.events.subscribe', this.subscribe.bind(this))

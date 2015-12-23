@@ -26,8 +26,9 @@ var PUBLISH_CONNECTION_INFO_INTERVAL = 1000 * 60
 
 var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
-var TransportManager = function () {
+var TransportManager = function (options) {
   debug('initialize')
+  this.options = options
   var manager = this
   this.messaging
   /**
@@ -93,8 +94,11 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
   debug('initializeTransport')
   var manager = this
   var transport
+  var options = this.options
+  options.publicKey = this.publicKey
+  options.privateKey = this.privateKey
   try {
-    transport = new TransportClass(this.publicKey, this.privateKey)
+    transport = new TransportClass(options)
   } catch(e) {
     debug('disabling transport ' + TransportClass)
     debug(e)

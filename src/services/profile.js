@@ -18,9 +18,9 @@ nacl.setPRNG(function (x, n) {
 
 var PUBLISH_INTERVAL = 1000 * 60 * 5
 
-var Profile = function (messaging) {
+var Profile = function (options) {
   var profile = this
-  this.messaging = messaging
+  this.messaging = options.messaging
   this.profile = {
     info: {
       name: '',
@@ -35,7 +35,7 @@ var Profile = function (messaging) {
   this.loadProfile()
   this.collection = {}
   this.collection['profile'] = this.profile.info
-  this.syncEngine = new SyncEngine(messaging, 'profile', 'id', this.collection)
+  this.syncEngine = new SyncEngine(options.messaging, 'profile', 'id', this.collection)
   this.syncEngine.on('processEvent', function (action, document) {
     if (action === 'update') {
       if (document.name) {

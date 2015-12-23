@@ -42,7 +42,11 @@ var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
  * @constructor
  * @public
  */
-var Messaging = function (dispatcher) {
+var Messaging = function (options) {
+  if (!options) {
+    options = {}
+  }
+  this.options = options
   EventEmitter.call(this, {
     delimiter: '.'
   })
@@ -83,7 +87,7 @@ var Messaging = function (dispatcher) {
    * @type {ProtocolDispatcher}
    *
    */
-  this.dispatcher = dispatcher
+  this.dispatcher = options.dispatcher
   this._setupDispatcher()
   setInterval(function () {
     debug('trigger send queues periodically')
@@ -160,7 +164,8 @@ Messaging.prototype.enable = function () {
 Messaging.prototype._setupDispatcher = function () {
   var messaging = this
   if (_.isUndefined(this.dispatcher)) {
-    this.dispatcher = new ProtocolDispatcher(this)
+    this.options.messaging = this
+    this.dispatcher = new ProtocolDispatcher(this.options)
   }
   this.dispatcher.on(PROTOCOL, function (scope, publicKey, message) {
     expect(publicKey).to.be.a('string')

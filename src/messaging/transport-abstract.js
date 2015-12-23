@@ -25,15 +25,16 @@ var expect = chai.expect
  * @param {string} publicKey
  * @param {string} privateKey
  */
-var AbstractTransport = function (publicKey, privateKey) {
+var AbstractTransport = function (options) {
   debug('initialize')
-  expect(publicKey).to.be.a('string')
-  expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
-  expect(privateKey).to.be.a('string')
-  expect(nacl.util.decodeBase64(privateKey)).to.have.length(32)
+  expect(options.publicKey).to.be.a('string')
+  expect(nacl.util.decodeBase64(options.publicKey)).to.have.length(32)
+  expect(options.privateKey).to.be.a('string')
+  expect(nacl.util.decodeBase64(options.privateKey)).to.have.length(32)
   events.EventEmitter.call(this)
-  this.publicKey = publicKey
-  this.privateKey = privateKey
+  this.publicKey = options.publicKey
+  this.privateKey = options.privateKey
+  this.options = options
   /*
    * Connection objects
    *

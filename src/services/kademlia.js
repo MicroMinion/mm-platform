@@ -76,8 +76,8 @@ inherits(FlunkyTransport, kademlia.RPC)
 
 /* FLUNKY SERVICE */
 
-var KademliaService = function (messaging) {
-  this.messaging = messaging
+var KademliaService = function (options) {
+  this.messaging = options.messaging
   this.replyTo = {}
   this.messaging.on('self.messaging.myConnectionInfo', this._updateReplyTo.bind(this))
 }

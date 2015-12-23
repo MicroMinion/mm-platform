@@ -3,13 +3,13 @@ var SyncEngine = require('../util/mmds/index.js')
 var TorrentingEngine = require('../util/torrenting/engine.js')
 var storagejs = require('storagejs')
 
-var HomeVideos = function (messaging, torrenting) {
+var HomeVideos = function (options) {
   var homevideos = this
-  this.messaging = messaging
-  this.torrenting = torrenting
+  this.messaging = options.messaging
+  this.torrenting = options.torrenting
   this.videos = {}
   this.loadVideos()
-  this.syncEngine = new SyncEngine(messaging, 'homevideos', 'uuid', this.videos)
+  this.syncEngine = new SyncEngine(options.messaging, 'homevideos', 'uuid', this.videos)
   this.syncEngine.on('processEvent', function (action, document) {
     if (action === 'update' || action === 'add') {
       homevideos.videos[document.uuid] = document
@@ -18,7 +18,7 @@ var HomeVideos = function (messaging, torrenting) {
     }
     homevideos.update()
   })
-  this.torrentEngine = new TorrentingEngine(torrenting)
+  this.torrentEngine = new TorrentingEngine(options.torrenting)
 }
 
 HomeVideos.prototype.loadVideos = function () {

@@ -22,13 +22,14 @@ var expect = require('chai').expect
  */
 var verificationState = require('../constants/verificationState.js')
 
-var ProtocolDispatcher = function (messaging) {
+var ProtocolDispatcher = function (options) {
   debug('initialize')
+  this.options = options
   EventEmitter.call(this)
   this.transportManager
   this._setupTransportManager()
-  if (messaging) {
-    this.setMessaging(messaging)
+  if (options.messaging) {
+    this.setMessaging(options.messaging)
   }
   this.buffers = {}
   /**
@@ -70,7 +71,7 @@ ProtocolDispatcher.prototype.enable = function () {
 
 ProtocolDispatcher.prototype._setupTransportManager = function () {
   var dispatcher = this
-  this.transportManager = new TransportManager()
+  this.transportManager = new TransportManager(this.options)
   this.transportManager.on('message', function (publicKey, message) {
     expect(publicKey).to.be.a('string')
     expect(isBuffer(message)).to.be.true

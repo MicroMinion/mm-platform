@@ -8,19 +8,19 @@ var SyncEngine = require('../util/mmds/index.js')
 
 var CONTACT_LOOKUP_INTERVAL = 1000 * 60
 
-var Contacts = function (messaging) {
+var Contacts = function (options) {
   var contacts = this
-  this.messaging = messaging
+  this.messaging = options.messaging
   this.contacts = {}
   AuthenticationManager.call(this, {scope: 'friends', name: 'contacts'})
   this.loadContacts()
-  messaging.on('self.profile.update', this.setProfile.bind(this))
-  messaging.send('profile.updateRequest', 'local', {})
-  messaging.on('self.contacts.updateInfo', this.updateInfo.bind(this))
-  messaging.on('self.contacts.addKey', this.addKey.bind(this))
-  messaging.on('self.contacts.startVerification', this.startVerification.bind(this))
-  messaging.on('self.contacts.enterCode', this.enterCode.bind(this))
-  messaging.on('self.directory.getReply', function (topic, publicKey, data) {
+  this.messaging.on('self.profile.update', this.setProfile.bind(this))
+  this.messaging.send('profile.updateRequest', 'local', {})
+  this.messaging.on('self.contacts.updateInfo', this.updateInfo.bind(this))
+  this.messaging.on('self.contacts.addKey', this.addKey.bind(this))
+  this.messaging.on('self.contacts.startVerification', this.startVerification.bind(this))
+  this.messaging.on('self.contacts.enterCode', this.enterCode.bind(this))
+  this.messaging.on('self.directory.getReply', function (topic, publicKey, data) {
     var contact = _.find(contacts.contacts, function (contact) {
       return _.any(contact.info.accounts, function (account) {
         var key = account.type + ':' + account.id
@@ -60,7 +60,7 @@ var Contacts = function (messaging) {
       }, contacts)
     })
   }, CONTACT_LOOKUP_INTERVAL)
-  this.syncEngine = new SyncEngine(messaging, 'contacts', 'uuid', this.contacts)
+  this.syncEngine = new SyncEngine(this.messaging, 'contacts', 'uuid', this.contacts)
   this.syncEngine.on('processEvent', function (action, document) {
     if (action === 'update') {
       contacts.contacts[document.uuid] = document
