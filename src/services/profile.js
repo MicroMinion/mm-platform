@@ -1,7 +1,7 @@
 /* global cloudSky */
 
 var _ = require('lodash')
-var storagejs = require('storagejs')
+var Q = require('q')
 var useragent = require('useragent')
 var qrImage = require('qr-image')
 var SyncEngine = require('../util/mmds/index.js')
@@ -21,6 +21,7 @@ var PUBLISH_INTERVAL = 1000 * 60 * 5
 var Profile = function (options) {
   var profile = this
   this.messaging = options.messaging
+  this.storage = options.storage
   this.profile = {
     info: {
       name: '',
@@ -92,7 +93,7 @@ Profile.prototype.update = function (regenerateQr) {
   if (this.profile.privateKey) {
     this.messaging.send('profile.update', 'local', this.profile)
   }
-  storagejs.put('profile', this.profile)
+  this.storage.put('profile', JSON.stringify(this.profile))
 }
 
 Profile.prototype.setCode = function () {
@@ -104,6 +105,7 @@ Profile.prototype.loadProfile = function () {
   var profile = this
   var options = {
     success: function (state) {
+      state = JSON.parse(state)
       profile.profile = state
       profile.collection['profile'].name = state.info.name
       profile.collection['profile'].accounts = state.info.accounts
@@ -119,7 +121,7 @@ Profile.prototype.loadProfile = function () {
       profile.messaging.send('profile.ready', 'local', {})
     }
   }
-  storagejs.get('profile').then(options.success, options.error)
+  Q.nfcall(this.storage.get.bind(this.storage), 'profile').then(options.success, options.error)
 }
 
 Profile.prototype.setDefaults = function () {

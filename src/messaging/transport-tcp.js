@@ -2,7 +2,6 @@ var AbstractTransport = require('./transport-abstract.js')
 var Q = require('q')
 var inherits = require('inherits')
 var _ = require('lodash')
-var storagejs = require('storagejs')
 var debug = require('debug')('flunky-platform:messaging:transport-tcp')
 var Duplex = require('stream').Duplex
 var ns = require('../util/ns.js')
@@ -16,9 +15,10 @@ if (_.isUndefined(window.chrome)) {
   net = require('chrome-net')
 }
 
-var TCPTransport = function (publicKey, privateKey) {
+var TCPTransport = function (options) {
   debug('initialize')
-  AbstractTransport.call(this, publicKey, privateKey)
+  AbstractTransport.call(this, options)
+  this.storage = options.storage
   this.enabled = false
   var transport = this
   this.tcpConnections = {}
@@ -31,10 +31,15 @@ var TCPTransport = function (publicKey, privateKey) {
     debug(err)
     transport._listen(0)
   })
-  storagejs.get('flunky-messaging-transport-tcp').then(this._listen.bind(this), function (err) {
-    debug(err)
-    transport._listen(0)
-  })
+  Q.nfcall(this.storage.get.bind(this.storage), 'flunky-messaging-transport-tcp').then(
+    function (port) {
+      transport._listen(JSON.parse(port))
+    },
+    function (err) {
+      debug(err)
+      transport._listen(0)
+    }
+  )
 }
 
 inherits(TCPTransport, AbstractTransport)
@@ -47,7 +52,7 @@ TCPTransport.prototype._listen = function (port) {
 TCPTransport.prototype._onListening = function () {
   debug('_onListening')
   this.enabled = true
-  storagejs.put('flunky-messaging-transport-tcp', this._server.address().port)
+  this.storage.put('flunky-messaging-transport-tcp', JSON.stringify(this._server.address().port))
   var addresses = this._listAddresses()
   addresses.then(this._emitReady.bind(this)).done()
 }

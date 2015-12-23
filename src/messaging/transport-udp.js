@@ -6,7 +6,6 @@ var AbstractTransport = require('./transport-abstract.js')
 var Q = require('q')
 var inherits = require('inherits')
 var _ = require('lodash')
-var storagejs = require('storagejs')
 var debug = require('debug')('flunky-platform:messaging:transport-udp')
 var Duplex = require('stream').Duplex
 var dgram
@@ -17,10 +16,11 @@ if (_.isUndefined(window.chrome)) {
   dgram = require('chrome-dgram')
 }
 
-var UDPTransport = function (publicKey, privateKey) {
-  AbstractTransport.call(this, publicKey, privateKey)
+var UDPTransport = function (options) {
+  AbstractTransport.call(this, options)
   this.enabled = false
   var transport = this
+  this.storage = options.storage
   this.socket = dgram.createSocket('udp4')
   this.udpConnections = {}
   this.socket.on('message', this._onMessage.bind(this))
@@ -30,10 +30,15 @@ var UDPTransport = function (publicKey, privateKey) {
     debug(errorMessage)
     transport._listen(0)
   })
-  storagejs.get('flunky-messaging-transport-udp').then(this._listen.bind(this), function (err) {
-    debug(err)
-    transport._listen(0)
-  })
+  Q.nfcall(this.storage.get.bind(this.storage), 'flunky-messaging-transport-udp').then(
+    function (port) {
+      transport._listen(JSON.parse(port))
+    },
+    function (err) {
+      debug(err)
+      transport._listen(0)
+    }
+  )
 }
 
 inherits(UDPTransport, AbstractTransport)
@@ -44,7 +49,7 @@ UDPTransport.prototype._listen = function (port) {
 
 UDPTransport.prototype._onListening = function () {
   this.enabled = true
-  storagejs.put('flunky-messaging-transport-udp', this.socket.address().port)
+  this.storage.put('flunky-messaging-transport-udp', JSON.stringify(this.socket.address().port))
   var addresses = this._listAddresses()
   addresses.then(this._emitReady.bind(this)).done()
 }

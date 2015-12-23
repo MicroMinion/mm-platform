@@ -1,6 +1,5 @@
 var kademlia = require('kad')
 var inherits = require('inherits')
-var kadfs = require('kad-fs')
 var debug = require('debug')('flunky-platform:services:kademlia')
 var _ = require('lodash')
 
@@ -78,6 +77,7 @@ inherits(FlunkyTransport, kademlia.RPC)
 
 var KademliaService = function (options) {
   this.messaging = options.messaging
+  this.storage = options.storage
   this.replyTo = {}
   this.messaging.on('self.messaging.myConnectionInfo', this._updateReplyTo.bind(this))
 }
@@ -95,7 +95,7 @@ KademliaService.prototype._setup = function () {
   this.messaging.on('self.directory.put', this.put.bind(this))
   this.dht = new kademlia.Node({
     messaging: this.messaging,
-    storage: kadfs(process.env.STORAGE + '/kad'),
+    storage: this.storage,
     transport: FlunkyTransport,
     replyto: this.replyTo
   })

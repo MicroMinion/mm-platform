@@ -1,6 +1,6 @@
 var inherits = require('inherits')
 var _ = require('lodash')
-var storagejs = require('storagejs')
+var Q = require('q')
 var AuthenticationManager = require('../util/authentication.js')
 var verificationState = require('../constants/verificationState.js')
 var node_uuid = require('node-uuid')
@@ -11,6 +11,7 @@ var CONTACT_LOOKUP_INTERVAL = 1000 * 60
 var Contacts = function (options) {
   var contacts = this
   this.messaging = options.messaging
+  this.storage = options.storage
   this.contacts = {}
   AuthenticationManager.call(this, {scope: 'friends', name: 'contacts'})
   this.loadContacts()
@@ -60,7 +61,7 @@ var Contacts = function (options) {
       }, contacts)
     })
   }, CONTACT_LOOKUP_INTERVAL)
-  this.syncEngine = new SyncEngine(this.messaging, 'contacts', 'uuid', this.contacts)
+  this.syncEngine = new SyncEngine(this.messaging, 'contacts', 'uuid', this.contacts, this.storage)
   this.syncEngine.on('processEvent', function (action, document) {
     if (action === 'update') {
       contacts.contacts[document.uuid] = document
@@ -81,6 +82,7 @@ Contacts.prototype.loadContacts = function () {
   var contacts = this
   var options = {
     success: function (value) {
+      value = JSON.parse(value)
       contacts.contacts = value
       contacts.syncEngine.setCollection(value)
       _.forEach(contacts.contacts, function (contact, uuid) {
@@ -94,12 +96,12 @@ Contacts.prototype.loadContacts = function () {
       contacts.update()
     }
   }
-  storagejs.get('contacts').then(options.success)
+  Q.nfcall(this.storage.get.bind(this.storage), 'contacts').then(options.success)
 }
 
 Contacts.prototype.update = function () {
   this.messaging.send('contacts.update', 'local', this.contacts)
-  storagejs.put('contacts', this.contacts)
+  this.storage.put('contacts', JSON.stringify(this.contacts))
 }
 
 /* MESSAGE HANDLERS */

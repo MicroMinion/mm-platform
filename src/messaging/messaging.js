@@ -5,9 +5,9 @@ var inherits = require('inherits')
 var chai = require('chai')
 var ProtocolDispatcher = require('./protocol-dispatcher.js')
 var nacl = require('tweetnacl')
-var storagejs = require('storagejs')
 var debug = require('debug')('flunky-platform:messaging:messaging')
 var debugMessage = require('debug')('flunky-platform:messages')
+var Q = require('q')
 
 var expect = chai.expect
 
@@ -74,6 +74,7 @@ var Messaging = function (options) {
    * @access private
    * @type {Object.<string, Object.<string, Object>>}
    */
+  this.storage = options.storage
   this.sendQueues = {}
   this._sendQueuesRetrieved = false
   this._loadSendQueues()
@@ -108,6 +109,8 @@ Messaging.prototype._loadSendQueues = function () {
   var messaging = this
   var options = {
     success: function (value) {
+      debug('success in loading sendqueue')
+      value = JSON.parse(value)
       expect(value).to.be.an('object')
       _.foreach(value, function (publicKey) {
         expect(publicKey).to.be.a('string')
@@ -124,10 +127,12 @@ Messaging.prototype._loadSendQueues = function () {
       messaging._sendQueuesRetrieved = true
     },
     error: function (errorMessage) {
+      debug('error in loading sendqueue')
+      debug(errorMessage)
       messaging._sendQueuesRetrieved = true
     }
   }
-  storagejs.get('flunky-messaging-sendQueues').then(options.success, options.error)
+  Q.nfcall(this.storage.get.bind(this.storage), 'flunky-messaging-sendQueues').then(options.success, options.error)
 }
 
 Messaging.prototype._saveSendQueues = function (publicKeys) {
@@ -136,7 +141,7 @@ Messaging.prototype._saveSendQueues = function (publicKeys) {
   if (!this._sendQueuesRetrieved) {
     return
   }
-  storagejs.put('flunky-messaging-sendQueues', this.sendQueues)
+  this.storage.put('flunky-messaging-sendQueues', JSON.stringify(this.sendQueues))
 }
 
 /**

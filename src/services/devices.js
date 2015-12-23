@@ -1,6 +1,6 @@
 var inherits = require('inherits')
 var _ = require('lodash')
-var storagejs = require('storagejs')
+var Q = require('q')
 var chai = require('chai')
 var AuthenticationManager = require('../util/authentication.js')
 var verificationState = require('../constants/verificationState.js')
@@ -12,6 +12,7 @@ var expect = chai.expect
 var Devices = function (options) {
   var devices = this
   this.messaging = options.messaging
+  this.storage = options.storage
   this.devices = {}
   AuthenticationManager.call(this, {scope: 'self', name: 'devices'})
   this._loadDevices()
@@ -31,7 +32,7 @@ var Devices = function (options) {
   this.messaging.on('self.devices.updateRequest', function (topic, publicKey, data) {
     devices.update(false)
   })
-  this.syncEngine = new SyncEngine(options.messaging, 'devices', 'publicKey', this.devices)
+  this.syncEngine = new SyncEngine(options.messaging, 'devices', 'publicKey', this.devices, this.storage)
   this.syncEngine.on('processEvent', function (action, document) {
     debug('processEvent', document)
     if (action === 'remove') {
@@ -51,6 +52,7 @@ Devices.prototype._loadDevices = function () {
   var devices = this
   var options = {
     success: function (value) {
+      value = JSON.parse(value)
       devices.devices = value
       devices.syncEngine.setCollection(value)
       _.forEach(devices.devices, function (device, publicKey) {
@@ -62,13 +64,13 @@ Devices.prototype._loadDevices = function () {
       devices.update(false)
     }
   }
-  storagejs.get('devices').then(options.success)
+  Q.nfcall(this.storage.get.bind(this.storage), 'devices').then(options.success)
 }
 
 Devices.prototype.update = function (store) {
   this.messaging.send('devices.update', 'local', this.devices)
   if (store) {
-    storagejs.put('devices', this.devices)
+    this.storage.put('devices', JSON.stringify(this.devices))
   }
 }
 

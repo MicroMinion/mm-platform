@@ -1,4 +1,4 @@
-var storagejs = require('storagejs')
+var Q = require('q')
 var verificationState = require('../../constants/verificationState.js')
 var SyncStream = require('./sync-stream.js')
 var Log = require('./collection.js')
@@ -9,19 +9,21 @@ var debug = require('debug')('flunky-platform:util:mmds:syncEngine')
 
 var SYNC_INTERVAL = 1000 * 60
 
-var SyncEngine = function (messaging, service, idAttribute, collection) {
+var SyncEngine = function (messaging, service, idAttribute, collection, storage) {
   var engine = this
   events.EventEmitter.call(this)
   this.messaging = messaging
-  this.log = new Log(service, idAttribute, collection)
+  this.storage = storage
+  this.log = new Log(service, idAttribute, collection, storage)
   this.log.on('processEvent', function (action, document) {
     engine.emit('processEvent', action, document)
   })
   this.service = service
   this.syncStreams = {}
   this.checkpoints = {}
-  storagejs.get(this.service + '-checkpoints').then(
+  Q.nfcall(this.storage.get.bind(this.storage), this.service + '-checkpoints').then(
     function (value) {
+      value = JSON.parse(value)
       engine.checkpoints = value
       _.forEach(engine.syncStreams, function (stream, key) {
         if (_.has(this.checkpoints, key)) {
@@ -97,7 +99,7 @@ SyncEngine.prototype.updateDevices = function (topic, local, data) {
     }
     engine.syncStreams[publicKey].on('sequenceCheckpointUpdate', function (sequence) {
       engine.checkpoints[publicKey] = sequence
-      storagejs.put(engine.service + '-checkpoints', engine.checkpoints)
+      engine.storage.put(engine.service + '-checkpoints', JSON.stringify(engine.checkpoints))
     })
     engine.syncStreams[publicKey].send_checkpoint()
   }, this)

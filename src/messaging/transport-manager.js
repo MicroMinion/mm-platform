@@ -1,6 +1,5 @@
 var inherits = require('inherits')
 var _ = require('lodash')
-var storagejs = require('storagejs')
 var chai = require('chai')
 var Q = require('q')
 var extend = require('extend.js')
@@ -29,6 +28,7 @@ var DIRECTORY_LOOKUP_TIMEOUT = 10000
 var TransportManager = function (options) {
   debug('initialize')
   this.options = options
+  this.storage = this.options.storage
   var manager = this
   this.messaging
   /**
@@ -241,6 +241,7 @@ TransportManager.prototype._loadDirectoryCache = function () {
   var manager = this
   var options = {
     success: function (value) {
+      value = JSON.parse(value)
       expect(value).to.be.an('object')
       _.forEach(value, function (n, key) {
         if (!_.has(manager.directoryCache, key)) {
@@ -249,12 +250,12 @@ TransportManager.prototype._loadDirectoryCache = function () {
       })
     }
   }
-  storagejs.get('flunky-transport-directoryCache').then(options.success)
+  Q.nfcall(this.storage.get.bind(this.storage), 'flunky-transport-directoryCache').then(options.success)
 }
 
 TransportManager.prototype._saveDirectoryCache = function () {
   debug('saveDirectoryCache')
-  storagejs.put('flunky-transport-directoryCache', this.directoryCache)
+  this.storage.put('flunky-transport-directoryCache', JSON.stringify(this.directoryCache))
 }
 
 /**
