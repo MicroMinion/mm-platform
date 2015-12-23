@@ -14,9 +14,9 @@ var expect = chai.expect
 
 var SENDER_ID = '559190877287'
 
-function GCMTransport (publicKey, privateKey) {
+function GCMTransport (options) {
   debug('initialize')
-  AbstractTransport.call(this, publicKey, privateKey)
+  AbstractTransport.call(this, options)
   this.registrationId = undefined
   this.gcmConnections = {}
   if (typeof chrome !== 'undefined' && typeof chrome.gcm !== 'undefined') {
