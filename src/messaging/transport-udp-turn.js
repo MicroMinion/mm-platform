@@ -20,9 +20,9 @@ var turnArgs = {
 
 var lifetime = 600
 
-var UDPTurnTransport = function (publicKey, privateKey) {
+var UDPTurnTransport = function (options) {
   debug('initializing')
-  AbstractTransport.call(this, publicKey, privateKey)
+  AbstractTransport.call(this, options)
   this.udpConnectionStreams = {}
   var udpSocket = dgram.createSocket('udp4')
   this.turnSocket = turn(turnArgs.addr, turnArgs.port, turnArgs.user, turnArgs.pwd, udpSocket)
