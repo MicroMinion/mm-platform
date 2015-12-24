@@ -36,7 +36,7 @@ var Profile = function (options) {
   this.loadProfile()
   this.collection = {}
   this.collection['profile'] = this.profile.info
-  this.syncEngine = new SyncEngine(options.messaging, 'profile', 'id', this.collection)
+  this.syncEngine = new SyncEngine(options.messaging, 'profile', 'id', this.collection, options.storage)
   this.syncEngine.on('processEvent', function (action, document) {
     if (action === 'update') {
       if (document.name) {
