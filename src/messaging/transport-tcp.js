@@ -33,7 +33,9 @@ var TCPTransport = function (options) {
   })
   Q.nfcall(this.storage.get.bind(this.storage), 'flunky-messaging-transport-tcp').then(
     function (port) {
-      transport._listen(JSON.parse(port))
+      debug('retrieved old port')
+      debug(port)
+      transport._listen(JSON.parse(port).port)
     },
     function (err) {
       debug(err)
@@ -52,7 +54,7 @@ TCPTransport.prototype._listen = function (port) {
 TCPTransport.prototype._onListening = function () {
   debug('_onListening')
   this.enabled = true
-  this.storage.put('flunky-messaging-transport-tcp', JSON.stringify(this._server.address().port))
+  this.storage.put('flunky-messaging-transport-tcp', JSON.stringify({port: this._server.address().port}))
   var addresses = this._listAddresses()
   addresses.then(this._emitReady.bind(this)).done()
 }

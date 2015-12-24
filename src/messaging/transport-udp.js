@@ -32,7 +32,7 @@ var UDPTransport = function (options) {
   })
   Q.nfcall(this.storage.get.bind(this.storage), 'flunky-messaging-transport-udp').then(
     function (port) {
-      transport._listen(JSON.parse(port))
+      transport._listen(JSON.parse(port).port)
     },
     function (err) {
       debug(err)
@@ -49,7 +49,7 @@ UDPTransport.prototype._listen = function (port) {
 
 UDPTransport.prototype._onListening = function () {
   this.enabled = true
-  this.storage.put('flunky-messaging-transport-udp', JSON.stringify(this.socket.address().port))
+  this.storage.put('flunky-messaging-transport-udp', {port: JSON.stringify(this.socket.address().port}))
   var addresses = this._listAddresses()
   addresses.then(this._emitReady.bind(this)).done()
 }
