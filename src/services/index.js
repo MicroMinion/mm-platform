@@ -6,5 +6,6 @@ module.exports = {
   DirectoryServer: require('./directory/index.js').DirectoryServer,
   Events: require('./events.js'),
   ServiceManager: require('./service-manager.js'),
-  Kademlia: require('./kademlia.js')
+  Kademlia: require('./kademlia.js'),
+  mDNS: require('./mdns.js')
 }
