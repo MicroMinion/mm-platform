@@ -67,24 +67,18 @@ TransportManager.prototype.setMessaging = function (messaging) {
     debug('profile update event')
     manager.publicKey = data.publicKey
     manager.privateKey = data.privateKey
+    manager.connectionInfo.publicKey = data.publicKey
     manager._initializeTransports()
   })
-  this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
-  this.messaging.on('self.messaging.connectionInfo', function (topic, publicKey, data) {
-    debug('connectionInfo event')
-    if (!manager.directoryCache[data.publicKey]) {
-      manager.directoryCache[data.publicKey] = {}
-      manager.directoryCache[data.publicKey].connectionInfo = data.connectionInfo
-      manager.directoryCache[data.publicKey].publicKey = data.publicKey
-      manager.directoryCache[data.publicKey].lastUpdate = new Date().toJSON()
-      manager._saveDirectoryCache()
-    }
+  this.messaging.on('self.messaging.connectionInfo', this._processConnectionInfo.bind(this))
+  this.messaging.on('self.messaging.requestMyConnectionInfo', function (topic, publicKey, data) {
+    manager._publishConnectionInfo()
   })
 }
 
 TransportManager.prototype._initializeTransports = function () {
   debug('initializeTransports')
-  var transports = [TCPTransport, UDPTurnTransport, GCMTransport]
+  var transports = [TCPTransport]
   _.forEach(transports, function (transportClass) {
     this._initializeTransport(transportClass)
   }, this)
@@ -265,7 +259,7 @@ TransportManager.prototype._saveDirectoryCache = function () {
  */
 TransportManager.prototype._publishConnectionInfo = function () {
   debug('publishConnectionInfo')
-  // this.messaging.send('directory.put', 'local', {key: this.publicKey, value: JSON.stringify(this.connectionInfo)})
+  debug(this.connectionInfo)
   this.messaging.send('messaging.myConnectionInfo', 'local', this.connectionInfo)
 }
 
@@ -282,7 +276,7 @@ TransportManager.prototype._findKey = function (publicKey) {
     var deferred = Q.defer()
     var cacheResult = this.directoryCache[publicKey]
     process.nextTick(function () {
-      deferred.resolve(cacheResult.connectionInfo)
+      deferred.resolve(cacheResult)
     })
     if (!this.directoryCache[publicKey].lastUpdate || Math.abs(new Date() - new Date(this.directoryCache[publicKey].lastUpdate)) > PUBLISH_CONNECTION_INFO_INTERVAL) {
       if (!_.has(this.directoryLookup, publicKey)) {
@@ -302,7 +296,7 @@ TransportManager.prototype._lookupKey = function (publicKey) {
   expect(this.directoryLookup).to.not.have.ownProperty(publicKey)
   var deferred = Q.defer()
   var manager = this
-  this.messaging.send('directory.get', 'local', {key: publicKey})
+  this.messaging.send('messaging.requestConnectionInfo', 'local', publicKey)
   this.directoryLookup[publicKey] = deferred
   setTimeout(function () {
     if (_.has(manager.directoryLookup, publicKey)) {
@@ -313,18 +307,17 @@ TransportManager.prototype._lookupKey = function (publicKey) {
   return deferred.promise
 }
 
-TransportManager.prototype._processGetReply = function (topic, publicKey, data) {
-  debug('_processGetReply')
-  if (_.has(this.directoryLookup, data.key)) {
-    if (!_.has(this.directoryCache, data.key)) {
-      this.directoryCache[data.key] = {}
-    }
-    this.directoryCache[data.key].lastUpdate = new Date().toJSON()
-    this.directoryCache[data.key].connectionInfo = JSON.parse(data.value)
-    this.directoryCache[data.key].publicKey = data.key
-    this._saveDirectoryCache()
-    this.directoryLookup[data.key].resolve(this.directoryCache[data.key].connectionInfo)
-    delete this.directoryLookup[data.key]
+TransportManager.prototype._processConnectionInfo = function (topic, publicKey, data) {
+  debug('connectionInfo event')
+  if (!_.has(this.directoryCache, data.publicKey)) {
+    this.directoryCache[data.publicKey] = {}
+  }
+  this.directoryCache[data.publicKey] = data
+  this.directoryCache[data.publicKey].lastUpdate = new Date().toJSON()
+  this._saveDirectoryCache()
+  if (_.has(this.directoryLookup, data.publicKey)) {
+    this.directoryLookup[data.publicKey].resolve(data)
+    delete this.directoryLookup[data.publicKey]
   }
 }
 
