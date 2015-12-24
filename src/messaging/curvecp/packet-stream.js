@@ -291,7 +291,7 @@ CurveCPStream.prototype.onCookie = function (cookie_message) {
 // Initiate command
 
 CurveCPStream.prototype.sendInitiate = function (message, done) {
-  debug('sendInitiate')
+  debug('sendInitiate ' + nacl.util.encodeBase64(this.clientPublicKey) + ' > ' + nacl.util.encodeBase64(this.serverPublicKey))
   var result = new Uint8Array(544 + message.length)
   result.set(INITIATE_MSG)
   result.set(this.clientConnectionPublicKey, 40)
@@ -303,6 +303,7 @@ CurveCPStream.prototype.sendInitiate = function (message, done) {
   result.set(this.encrypt(initiate_box_data, 'CurveCP-client-I', this.clientConnectionPrivateKey, this.serverConnectionPublicKey), 168)
   this.stream.write(new Buffer(result), done)
   this.initiateSend = true
+  this.canSend = false
 }
 
 CurveCPStream.prototype.create_vouch = function () {
@@ -363,6 +364,7 @@ CurveCPStream.prototype.onServerMessage = function (message) {
     debug('not able to decrypt box data')
     return
   }
+  this.canSend = true
   var buffer = new Buffer(box_data)
   this.emit('data', buffer)
 }
@@ -370,7 +372,7 @@ CurveCPStream.prototype.onServerMessage = function (message) {
 // Message command - Client
 
 CurveCPStream.prototype.sendClientMessage = function (message, done) {
-  debug('sendClientMessage')
+  debug('sendClientMessage ' + nacl.util.encodeBase64(this.clientPublicKey) + ' > ' + nacl.util.encodeBase64(this.serverPublicKey))
   var result = new Uint8Array(96 + message.length)
   result.set(CLIENT_MSG)
   var message_box = this.encrypt(message, 'CurveCP-client-M', this.clientConnectionPrivateKey, this.serverConnectionPublicKey)
@@ -379,7 +381,7 @@ CurveCPStream.prototype.sendClientMessage = function (message, done) {
 }
 
 CurveCPStream.prototype.onClientMessage = function (message) {
-  debug('onClientMessage')
+  debug('onClientMessage ' + nacl.util.encodeBase64(this.clientPublicKey) + ' > ' + nacl.util.encodeBase64(this.serverPublicKey))
   if (message.length < 96 || message.length > 1184) {
     debug('Message command has incorrect length')
     return
