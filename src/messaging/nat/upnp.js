@@ -14,12 +14,15 @@ var merge = require('merge')
 var natUPnP = require('nat-upnp')
 var Q = require('q')
 
+var pjson = require('../../../package.json')
+var defaultDescription = pjson.name + ' v' + pjson.version
+
 var defaultOpts = {}
 defaultOpts.public = {}
 defaultOpts.private = {}
 defaultOpts.ttl = 0
 defaultOpts.protocol = 'UDP'
-defaultOpts.description = 'flunky'
+defaultOpts.description = defaultDescription
 
 // returns public IP address of the GW, which is not necessarily your overall public IP address (for instance when GWs are chained)
 function getPublicGWAddressP () {
@@ -94,6 +97,51 @@ function mapPrivateToPublicPortP (args) {
 
   return deferred.promise
 }
+
+// function mapPrivateToPublicPortP (args) {
+//   debugLog('port mapping request. args = ' + JSON.stringify(args))
+//   var deferred = Q.defer()
+//
+//   function executeMapOperation (pmargs) {
+//     debugLog('executing pmapping request with args ' + JSON.stringify(pmargs))
+//     var client = natUPnP.createClient()
+//     client.portMapping(pmargs, function (error) {
+//       client.close()
+//       if (error) {
+//         errorLog('could not map local port ' + args.private.port + ' to public port ' + args.public.port + '. ' + error)
+//         deferred.reject(error)
+//       } else {
+//         deferred.resolve(pmargs)
+//       }
+//     })
+//   }
+//
+//   if (!args.public.port) {
+//     var errorMsg = 'public port is undefined'
+//     errorLog(errorMsg)
+//     deferred.reject(new Error(errorMsg))
+//   } else {
+//     var pmargs = merge(defaultOpts, args)
+//     pmargs.private.port = pmargs.private.port || pmargs.public.port
+//     pmargs.public.host = pmargs.public.host || '*'
+//     if (!pmargs.private.host) {
+//       ipAddresses.getLocalIpAddress(function (error, address) {
+//         if (error) {
+//           errorLog('could not detect local ip address.' + error)
+//           deferred.reject(error)
+//         } else {
+//           pmargs.private.host = address
+//           executeMapOperation(pmargs)
+//         }
+//       })
+//     } else {
+//       pmargs.private.host = args.private.host
+//       executeMapOperation(pmargs)
+//     }
+//   }
+//
+//   return deferred.promise
+// }
 
 function unmapPrivateToPublicPortP (args) {
   debugLog('port un-mapping request. args = ' + JSON.stringify(args))
