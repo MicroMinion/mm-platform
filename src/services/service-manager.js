@@ -1,7 +1,7 @@
 'use strict'
 
-var ServiceManager = function (messaging) {
-  this.messaging = messaging
+var ServiceManager = function (options) {
+  this.messaging = options.messaging
   this.messaging.on('self.profile.updateRequest', function (topic, publicKey, data) {
     console.log('updaterequest received!!!!')
   })

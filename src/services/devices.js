@@ -1,6 +1,6 @@
 var inherits = require('inherits')
 var _ = require('lodash')
-var storagejs = require('storagejs')
+var Q = require('q')
 var chai = require('chai')
 var AuthenticationManager = require('../util/authentication.js')
 var verificationState = require('../constants/verificationState.js')
@@ -9,17 +9,18 @@ var debug = require('debug')('flunky-platform:util:devices')
 
 var expect = chai.expect
 
-var Devices = function (messaging) {
+var Devices = function (options) {
   var devices = this
-  this.messaging = messaging
+  this.messaging = options.messaging
+  this.storage = options.storage
   this.devices = {}
   AuthenticationManager.call(this, {scope: 'self', name: 'devices'})
   this._loadDevices()
-  messaging.on('self.profile.update', this.setProfile.bind(this))
-  messaging.send('profile.updateRequest', 'local', {})
-  messaging.on('self.devices.add', this.add.bind(this))
-  messaging.on('self.devices.startVerification', this.startVerification.bind(this))
-  messaging.on('self.devices.code', this.setCode.bind(this))
+  this.messaging.on('self.profile.update', this.setProfile.bind(this))
+  this.messaging.send('profile.updateRequest', 'local', {})
+  this.messaging.on('self.devices.add', this.add.bind(this))
+  this.messaging.on('self.devices.startVerification', this.startVerification.bind(this))
+  this.messaging.on('self.devices.code', this.setCode.bind(this))
   this.on('newInstance', function (publicKey, data) {
     devices.add('self.devices.add', 'local', {publicKey: publicKey, info: data.info})
     devices._createProtocol(publicKey)
@@ -31,7 +32,7 @@ var Devices = function (messaging) {
   this.messaging.on('self.devices.updateRequest', function (topic, publicKey, data) {
     devices.update(false)
   })
-  this.syncEngine = new SyncEngine(messaging, 'devices', 'publicKey', this.devices)
+  this.syncEngine = new SyncEngine(options.messaging, 'devices', 'publicKey', this.devices, this.storage)
   this.syncEngine.on('processEvent', function (action, document) {
     debug('processEvent', document)
     if (action === 'remove') {
@@ -51,6 +52,7 @@ Devices.prototype._loadDevices = function () {
   var devices = this
   var options = {
     success: function (value) {
+      value = JSON.parse(value)
       devices.devices = value
       devices.syncEngine.setCollection(value)
       _.forEach(devices.devices, function (device, publicKey) {
@@ -62,13 +64,13 @@ Devices.prototype._loadDevices = function () {
       devices.update(false)
     }
   }
-  storagejs.get('devices').then(options.success)
+  Q.nfcall(this.storage.get.bind(this.storage), 'devices').then(options.success)
 }
 
 Devices.prototype.update = function (store) {
   this.messaging.send('devices.update', 'local', this.devices)
   if (store) {
-    storagejs.put('devices', this.devices)
+    this.storage.put('devices', JSON.stringify(this.devices))
   }
 }
 

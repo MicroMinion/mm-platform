@@ -5,14 +5,15 @@ var Log
 var _ = require('lodash')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('inherits')
-var storagejs = require('storagejs')
+var Q = require('q')
 
-Log = function (name, idAttribute, collection) {
+Log = function (name, idAttribute, collection, storage) {
   EventEmitter.call(this)
   this.events = {}
   this.name = name + '-log'
   this.idAttribute = idAttribute
   this.collection = collection
+  this.storage = storage
   this._loadLog()
 }
 
@@ -26,10 +27,10 @@ Log.prototype._loadLog = function () {
   var log = this
   var options = {
     success: function (value) {
-      log.events = value
+      log.events = JSON.parse(value)
     }
   }
-  storagejs.get(log.name).then(options.success)
+  Q.nfcall(this.storage.get.bind(this.storage), log.name).then(options.success)
 }
 
 /* LOCAL LOG MODIFICATION */
@@ -65,7 +66,7 @@ Log.prototype._createNewEvent = function (action, document) {
   event[this.idAttribute] = document[this.idAttribute]
   event.document = JSON.parse(JSON.stringify(document))
   this.events[event[this.idAttribute]] = event
-  storagejs.put(this.name, this.events)
+  this.storage.put(this.name, JSON.stringify(this.events))
   this.emit('newEvent', event)
 }
 

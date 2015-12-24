@@ -6,16 +6,16 @@ var sendOptions = {
   expireAfter: 10000
 }
 
-var DirectoryClient = function (messaging, serverKey, serverConnectionInfo) {
-  this.messaging = messaging
-  this.serverKey = serverKey
+var DirectoryClient = function (options) {
+  this.messaging = options.messaging
+  this.serverKey = options.serverKey
   this.messaging.on('self.directory.get', this.get.bind(this))
   this.messaging.on('self.directory.put', this.put.bind(this))
   this.messaging.on('self.directoryServer.getReply', this.getReply.bind(this))
   this.messaging.on('friends.directoryServer.getReply', this.getReply.bind(this))
   this.messaging.on('public.directoryServer.getReply', this.getReply.bind(this))
-  serverConnectionInfo.publicKey = serverKey
-  this.messaging.send('messaging.connectionInfo', 'local', {publicKey: serverKey, connectionInfo: serverConnectionInfo})
+  options.serverConnectionInfo.publicKey = options.serverKey
+  this.messaging.send('messaging.connectionInfo', 'local', {publicKey: options.serverKey, connectionInfo: options.serverConnectionInfo})
 }
 
 DirectoryClient.prototype.put = function (topic, publicKey, data) {
@@ -32,8 +32,8 @@ DirectoryClient.prototype.getReply = function (topic, publicKey, data) {
   }
 }
 
-var DirectoryServer = function (messaging) {
-  this.messaging = messaging
+var DirectoryServer = function (options) {
+  this.messaging = options.messaging
   this.state = {}
   this.messaging.on('self.directoryServer.get', this.processGet.bind(this))
   this.messaging.on('friends.directoryServer.get', this.processGet.bind(this))
