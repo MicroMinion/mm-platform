@@ -1,7 +1,9 @@
 exports.getPublicGWAddressP = getPublicGWAddressP
 exports.getPublicGWAddress = getPublicGWAddress
-exports.mapPrivateToPublicPortP = mapPrivateToPublicPortP
-exports.unmapPrivateToPublicPortP = unmapPrivateToPublicPortP
+exports.mapPublicPortP = mapPublicPortP
+exports.mapPublicPort = mapPublicPort
+exports.unmapPublicPortP = unmapPublicPortP
+exports.unmapPublicPort = unmapPublicPort
 exports.getPortMappingsP = getPortMappingsP
 exports.getPortMappings = getPortMappings
 exports.printPortMappings = printPortMappings
@@ -39,6 +41,11 @@ function getPublicGWAddressP () {
 }
 
 function getPublicGWAddress (onSuccess, onFailure) {
+  if (onSuccess === undefined || onFailure === undefined) {
+    var error = 'get public GW address -- callback handlers are undefined'
+    errorLog(error)
+    throw new Error(error)
+  }
   debugLog('get public GW address request')
   var client = natUPnP.createClient()
   client.externalIp(function (error, ip) {
@@ -53,52 +60,63 @@ function getPublicGWAddress (onSuccess, onFailure) {
   })
 }
 
-function mapPrivateToPublicPortP (args) {
+function mapPublicPortP (args) {
   debugLog('port mapping request. args = ' + JSON.stringify(args))
-  var deferred = Q.defer()
-
-  function executeMapOperation (pmargs) {
-    debugLog('executing pmapping request with args ' + JSON.stringify(pmargs))
-    var client = natUPnP.createClient()
-    client.portMapping(pmargs, function (error) {
-      client.close()
-      if (error) {
-        errorLog('could not map local port ' + args.private.port + ' to public port ' + args.public.port + '. ' + error)
-        deferred.reject(error)
-      } else {
-        deferred.resolve(pmargs)
-      }
-    })
-  }
 
   if (!args.public.port) {
     var errorMsg = 'public port is undefined'
     errorLog(errorMsg)
-    deferred.reject(new Error(errorMsg))
-  } else {
-    var pmargs = merge(defaultOpts, args)
-    pmargs.private.port = pmargs.private.port || pmargs.public.port
-    pmargs.public.host = pmargs.public.host || '*'
-    if (!pmargs.private.host) {
-      ipAddresses.getLocalIpAddress(function (error, address) {
-        if (error) {
-          errorLog('could not detect local ip address.' + error)
-          deferred.reject(error)
-        } else {
-          pmargs.private.host = address
-          executeMapOperation(pmargs)
-        }
-      })
-    } else {
-      pmargs.private.host = args.private.host
-      executeMapOperation(pmargs)
-    }
+    return Q.fcall(function () {
+      throw new Error(errorMsg)
+    })
   }
 
+  var pmargs = merge(defaultOpts, args)
+  pmargs.private.port = pmargs.private.port || pmargs.public.port
+  pmargs.public.host = pmargs.public.host || '*'
+  if (!pmargs.private.host) {
+    return ipAddresses.getLocalIpAddressP()
+      .then(function (address) {
+        pmargs.private.host = address
+        return _executeMapOperationP(pmargs)
+      })
+  } else {
+    return _executeMapOperationP(pmargs)
+  }
+}
+
+function mapPublicPort (args, onSuccess, onFailure) {
+  if (onSuccess === undefined || onFailure === undefined) {
+    var error = 'map private to public port -- callback handlers are undefined'
+    errorLog(error)
+    throw new Error(error)
+  }
+  mapPublicPortP(args)
+    .then(function (pmargs) {
+      onSuccess(pmargs)
+    })
+    .catch(function (error) {
+      onFailure(error)
+    })
+}
+
+function _executeMapOperationP (pmargs) {
+  debugLog('executing pmapping request with args ' + JSON.stringify(pmargs))
+  var deferred = Q.defer()
+  var client = natUPnP.createClient()
+  client.portMapping(pmargs, function (error) {
+    client.close()
+    if (error) {
+      errorLog('could not map local port ' + pmargs.private.port + ' to public port ' + pmargs.public.port + '. ' + error)
+      deferred.reject(error)
+    } else {
+      deferred.resolve(pmargs)
+    }
+  })
   return deferred.promise
 }
 
-// function mapPrivateToPublicPortP (args) {
+// function mapPublicPortP (args) {
 //   debugLog('port mapping request. args = ' + JSON.stringify(args))
 //   var deferred = Q.defer()
 //
@@ -143,7 +161,7 @@ function mapPrivateToPublicPortP (args) {
 //   return deferred.promise
 // }
 
-function unmapPrivateToPublicPortP (args) {
+function unmapPublicPortP (args) {
   debugLog('port un-mapping request. args = ' + JSON.stringify(args))
   var deferred = Q.defer()
 
@@ -167,12 +185,27 @@ function unmapPrivateToPublicPortP (args) {
   return deferred.promise
 }
 
+function unmapPublicPort (args, onSuccess, onFailure) {
+  if (onSuccess === undefined || onFailure === undefined) {
+    var error = 'port un-mapping request -- callback handlers are undefined'
+    errorLog(error)
+    throw new Error(error)
+  }
+  unmapPublicPortP(args)
+    .then(function () {
+      onSuccess()
+    })
+    .catch(function (error) {
+      onFailure(error)
+    })
+}
+
 // return all current port mappings
 function getPortMappingsP () {
   var deferred = Q.defer()
   getPortMappings(
     function (mappings) { // on success
-      deferred.resolve(address)
+      deferred.resolve(mappings)
     },
     function (error) { // on failure
       deferred.reject(error)
@@ -182,6 +215,11 @@ function getPortMappingsP () {
 }
 
 function getPortMappings (onSuccess, onFailure) {
+  if (onSuccess === undefined || onFailure === undefined) {
+    var error = 'get port mappings -- callback handlers are undefined'
+    errorLog(error)
+    throw new Error(error)
+  }
   debugLog('get port mappings')
   var client = natUPnP.createClient()
   client.getMappings(function (error, mappings) {

@@ -33,49 +33,49 @@ describe('#NAT-UPNP', function () {
     pmargs.public = {}
     pmargs.public.port = 65535
     var myMapping
-    return upnp.mapPrivateToPublicPortP(pmargs)
+    return upnp.mapPublicPortP(pmargs)
       .then(function (args) {
         myMapping = args
-        //return upnp.getPortMappingsP()
+        return upnp.getPortMappingsP()
       })
-      // .then(function (currentMappings) {
-      //   expect(_pmMatch(myMapping, currentMappings)).to.be.true
-      //   return upnp.unmapPrivateToPublicPortP(myMapping)
-      // })
-      // .then(function () {
-      //   return upnp.getPortMappingsP()
-      // })
-      // .then(function (currentMappings) {
-      //   expect(_pmMatch(myMapping, currentMappings)).to.be.false
-      // })
+      .then(function (currentMappings) {
+        expect(_pmMatch(myMapping, currentMappings)).to.be.true
+        return upnp.unmapPublicPortP(myMapping)
+      })
+      .then(function () {
+        return upnp.getPortMappingsP()
+      })
+      .then(function (currentMappings) {
+        expect(_pmMatch(myMapping, currentMappings)).to.be.false
+      })
   })
 
-//   it('should map TCP port 65534 to 65533, using custom description and ttl = 2 minutes, and delete it afterwards', function () {
-//     var pmargs = {}
-//     pmargs.public = {}
-//     pmargs.private = {}
-//     pmargs.private.port = 65534
-//     pmargs.public.port = 65533
-//     pmargs.protocol = 'TCP'
-//     pmargs.ttl = 120
-//     pmargs.description = 'funky:test'
-//     var myMapping
-//     return upnp.mapPrivateToPublicPortP(pmargs)
-//       .then(function (args) {
-//         myMapping = args
-//         return upnp.getPortMappingsP()
-//       })
-//       .then(function (currentMappings) {
-//         expect(_pmMatch(myMapping, currentMappings)).to.be.true
-//         return upnp.unmapPrivateToPublicPortP(myMapping)
-//       })
-//       .then(function () {
-//         return upnp.getPortMappingsP()
-//       })
-//       .then(function (currentMappings) {
-//         expect(_pmMatch(myMapping, currentMappings)).to.be.false
-//       })
-//   })
+  it('should map TCP port 65534 to 65533, using custom description and ttl = 2 minutes, and delete it afterwards', function () {
+    var pmargs = {}
+    pmargs.public = {}
+    pmargs.private = {}
+    pmargs.private.port = 65534
+    pmargs.public.port = 65533
+    pmargs.protocol = 'TCP'
+    pmargs.ttl = 120
+    pmargs.description = 'funky:test'
+    var myMapping
+    return upnp.mapPublicPortP(pmargs)
+      .then(function (args) {
+        myMapping = args
+        return upnp.getPortMappingsP()
+      })
+      .then(function (currentMappings) {
+        expect(_pmMatch(myMapping, currentMappings)).to.be.true
+        return upnp.unmapPublicPortP(myMapping)
+      })
+      .then(function () {
+        return upnp.getPortMappingsP()
+      })
+      .then(function (currentMappings) {
+        expect(_pmMatch(myMapping, currentMappings)).to.be.false
+      })
+  })
 })
 
 function _pmMatch (myMapping, returnedMappings) {
