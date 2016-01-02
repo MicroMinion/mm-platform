@@ -23,6 +23,7 @@ var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
 /**
  * @constructor
+ * @public
  */
 var TransportManager = function (options) {
   debug('initialize')
@@ -63,6 +64,11 @@ inherits(TransportManager, events.EventEmitter)
 
 /* MESSAGING INTERACTION */
 
+/**
+ * Set messaging objects
+ *
+ * @public
+ */
 TransportManager.prototype.setMessaging = function (messaging) {
   this.messaging = messaging
   var manager = this
@@ -81,10 +87,19 @@ TransportManager.prototype.setMessaging = function (messaging) {
 
 /* TRANSPORT MANAGEMENT */
 
+/**
+ * Add Transport class
+ *
+ * @param {AbstractTransport} TransportClass
+ * @public
+ */
 TransportManager.prototype.addTransport = function (TransportClass) {
   this.transportClasses.push(TransportClass)
 }
 
+/**
+ * @public
+ */
 TransportManager.prototype.enable = function () {
   debug('enable')
   _.forEach(this.transports, function (transport) {
@@ -92,6 +107,9 @@ TransportManager.prototype.enable = function () {
   })
 }
 
+/**
+ * @public
+ */
 TransportManager.prototype.disable = function () {
   debug('disable')
   _.forEach(this.transports, function (transport) {
@@ -99,6 +117,9 @@ TransportManager.prototype.disable = function () {
   })
 }
 
+/**
+ * @public
+ */
 TransportManager.prototype.isDisabled = function () {
   debug('isDisabled')
   return _.every(this.transports, function (transport) {
@@ -106,6 +127,9 @@ TransportManager.prototype.isDisabled = function () {
   })
 }
 
+/**
+ * @private
+ */
 TransportManager.prototype._initializeTransports = function () {
   debug('initializeTransports')
   _.forEach(this.transportClasses, function (transportClass) {
@@ -113,6 +137,9 @@ TransportManager.prototype._initializeTransports = function () {
   }, this)
 }
 
+/**
+ * @private
+ */
 TransportManager.prototype._initializeTransport = function (TransportClass) {
   debug('initializeTransport')
   var manager = this
@@ -153,12 +180,13 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
  * Send a message to a public keys
  *
  * Connection needs to exist before executing this method
+ * @public
  */
-// TODO: Execute connect first if not connected (use promises) !!!!!!!!!!!!!!!
 TransportManager.prototype.send = function (publicKey, message) {
   debug('send ' + publicKey)
   var connection = this._getConnection(publicKey)
   if (connection) {
+    // TODO: Execute connect first if not connected (use promises) !!!!!!!!!!!!!!!
     return this._send(message, connection)
   } else {
     var deferred = Q.defer()
@@ -172,7 +200,7 @@ TransportManager.prototype.send = function (publicKey, message) {
 /**
  * Send a message using a connection object
  *
- * @access private
+ * @private
  */
 TransportManager.prototype._send = function (message, connection) {
   var deferred = Q.defer()
@@ -190,6 +218,8 @@ TransportManager.prototype._send = function (message, connection) {
  * Connect to another host using publicKey identifier
  *
  * If we don't have connectionInfo assocated with publicKey, a lookup is performed first
+ *
+ * @private
  */
 TransportManager.prototype._connect = function (publicKey) {
   debug('connect ' + publicKey)
@@ -212,7 +242,7 @@ TransportManager.prototype._connect = function (publicKey) {
  * Transports are tried in the order defined in "_initializeTransports" method
  * When connection using one transport fails, the next one is tried
  *
- * @access private
+ * @private
  */
 TransportManager.prototype._connectTransports = function (connectionInfo) {
   // debug('_connect ' + connectionInfo.publicKey)
@@ -227,6 +257,9 @@ TransportManager.prototype._connectTransports = function (connectionInfo) {
   return promise
 }
 
+/**
+ * @private
+ */
 TransportManager.prototype._getConnection = function (publicKey) {
   debug('getConnection ' + publicKey)
   var connection
@@ -243,6 +276,10 @@ TransportManager.prototype._getConnection = function (publicKey) {
 
 /**
  * CONNECTION INFO
+ */
+
+/**
+ * @private
  */
 TransportManager.prototype._loadDirectoryCache = function () {
   debug('loadDirectoryCache')
@@ -261,6 +298,9 @@ TransportManager.prototype._loadDirectoryCache = function () {
   Q.nfcall(this.storage.get.bind(this.storage), 'flunky-transport-directoryCache').then(options.success)
 }
 
+/**
+ * @private
+ */
 TransportManager.prototype._saveDirectoryCache = function () {
   debug('saveDirectoryCache')
   this.storage.put('flunky-transport-directoryCache', JSON.stringify(this.directoryCache))
@@ -305,6 +345,9 @@ TransportManager.prototype._findKey = function (publicKey) {
   }
 }
 
+/**
+ * @private
+ */
 TransportManager.prototype._lookupKey = function (publicKey) {
   debug('_lookupKey')
   expect(this.directoryLookup).to.not.have.ownProperty(publicKey)
@@ -321,6 +364,9 @@ TransportManager.prototype._lookupKey = function (publicKey) {
   return deferred.promise
 }
 
+/**
+ * @private
+ */
 TransportManager.prototype._processConnectionInfo = function (topic, publicKey, data) {
   debug('connectionInfo event')
   if (!_.has(this.directoryCache, data.publicKey)) {

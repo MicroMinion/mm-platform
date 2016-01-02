@@ -27,6 +27,8 @@ var verificationState = require('../constants/verificationState.js')
  *
  * @constructor
  * @param {Object} options
+ * @fires ProtocolDispatcher#ms
+ * @fires ProtocolDispatcher#bt
  */
 var ProtocolDispatcher = function (options) {
   debug('initialize')
@@ -49,6 +51,18 @@ var ProtocolDispatcher = function (options) {
    * @type {Object.<string, Object>}
    */
   this.contacts = {}
+
+  /**
+   * Message event
+   *
+   * @event ProtocolDispatcher#ms
+   */
+
+/**
+ * Torrent packet event
+ *
+ * @event ProtocolDispatcher#bt
+ */
 }
 
 inherits(ProtocolDispatcher, EventEmitter)

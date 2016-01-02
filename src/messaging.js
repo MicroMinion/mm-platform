@@ -102,6 +102,9 @@ inherits(Messaging, EventEmitter)
  * PERSISTENCE
  */
 
+/**
+ * @private
+ */
 Messaging.prototype._loadSendQueues = function () {
   debug('loadSendQueues')
   var messaging = this
@@ -133,6 +136,9 @@ Messaging.prototype._loadSendQueues = function () {
   Q.nfcall(this.storage.get.bind(this.storage), 'flunky-messaging-sendQueues').then(options.success, options.error)
 }
 
+/**
+ * @private
+ */
 Messaging.prototype._saveSendQueues = function (publicKeys) {
   debug('saveSendQueues')
   expect(publicKeys).to.be.an('array')
@@ -146,6 +152,9 @@ Messaging.prototype._saveSendQueues = function (publicKeys) {
  * DISPATCHER
  */
 
+/**
+ * @private
+ */
 Messaging.prototype._setupDispatcher = function () {
   var messaging = this
   this.dispatcher.on(PROTOCOL, function (scope, publicKey, message) {
@@ -172,7 +181,7 @@ Messaging.prototype._setupDispatcher = function () {
  * @param {Object} profile - Profile object of application user
  * @param {string} profile.publicKey - Base64 encoded publicKey for use with Nacl libraries
  * @param {String} profile.privateKey - Base64 encoded privateKey for use with Nacl libraries
- * @public
+ * @private
  */
 Messaging.prototype._setProfile = function (profile) {
   debug('setProfile')
@@ -240,6 +249,9 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
   }
 }
 
+/**
+ * @private
+ */
 Messaging.prototype._isLocal = function (publicKey) {
   debug('isLocal')
   if (publicKey === 'local') {
