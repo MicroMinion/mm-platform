@@ -3,12 +3,8 @@ var _ = require('lodash')
 var chai = require('chai')
 var Q = require('q')
 var extend = require('extend.js')
-var AbstractTransport = require('./transports/transport-abstract.js')
-var debug = require('debug')('flunky-platform:messaging:transport-manager')
-
-var TCPTransport = require('./transports/transport-tcp.js')
-var GCMTransport = require('./transports/transport-gcm.js')
-var UDPTurnTransport = require('./transports/transport-udp-turn.js')
+var debug = require('debug')('flunky-platform:transport-manager')
+var events = require('events')
 
 var expect = chai.expect
 
@@ -56,9 +52,13 @@ var TransportManager = function (options) {
    * @access private
    */
   this.transports = []
+  this.transportClasses = []
+  events.EventEmitter.call(this)
 }
 
-inherits(TransportManager, AbstractTransport)
+inherits(TransportManager, events.EventEmitter)
+
+/* MESSAGING INTERACTION */
 
 TransportManager.prototype.setMessaging = function (messaging) {
   this.messaging = messaging
@@ -76,10 +76,36 @@ TransportManager.prototype.setMessaging = function (messaging) {
   })
 }
 
+/* TRANSPORT MANAGEMENT */
+
+TransportManager.prototype.addTransport = function (TransportClass) {
+  this.transportClasses.push(TransportClass)
+}
+
+TransportManager.prototype.enable = function () {
+  debug('enable')
+  _.forEach(this.transports, function (transport) {
+    transport.enable()
+  })
+}
+
+TransportManager.prototype.disable = function () {
+  debug('disable')
+  _.forEach(this.transports, function (transport) {
+    transport.disable()
+  })
+}
+
+TransportManager.prototype.isDisabled = function () {
+  debug('isDisabled')
+  return _.every(this.transports, function (transport) {
+    return transport.isDisabled()
+  })
+}
+
 TransportManager.prototype._initializeTransports = function () {
   debug('initializeTransports')
-  var transports = [TCPTransport]
-  _.forEach(transports, function (transportClass) {
+  _.forEach(this.transportClasses, function (transportClass) {
     this._initializeTransport(transportClass)
   }, this)
 }
@@ -118,35 +144,17 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
   }
 }
 
-TransportManager.prototype.enable = function () {
-  debug('enable')
-  _.forEach(this.transports, function (transport) {
-    transport.enable()
-  })
-}
-
-TransportManager.prototype.disable = function () {
-  debug('disable')
-  _.forEach(this.transports, function (transport) {
-    transport.disable()
-  })
-}
-
-TransportManager.prototype.isDisabled = function () {
-  debug('isDisabled')
-  return _.every(this.transports, function (transport) {
-    return transport.isDisabled()
-  })
-}
+/* SEND LOGIC */
 
 /**
  * Send a message to a public keys
  *
  * Connection needs to exist before executing this method
  */
+// TODO: Execute connect first if not connected (use promises) !!!!!!!!!!!!!!!
 TransportManager.prototype.send = function (publicKey, message) {
   debug('send ' + publicKey)
-  var connection = this.getConnection(publicKey)
+  var connection = this._getConnection(publicKey)
   if (connection) {
     return this._send(message, connection)
   } else {
@@ -180,22 +188,43 @@ TransportManager.prototype._send = function (message, connection) {
  *
  * If we don't have connectionInfo assocated with publicKey, a lookup is performed first
  */
-TransportManager.prototype.connect = function (publicKey) {
+TransportManager.prototype._connect = function (publicKey) {
   debug('connect ' + publicKey)
   var manager = this
   if (this.isConnected(publicKey)) {
     var deferred = Q.defer()
     process.nextTick(function () {
-      deferred.resolve(manager.getConnection(publicKey))
+      deferred.resolve(manager._getConnection(publicKey))
     })
     return deferred.promise
   } else {
     return this._findKey(publicKey)
-      .then(this._connect.bind(this))
+      .then(this._connectTransports.bind(this))
   }
 }
 
-TransportManager.prototype.getConnection = function (publicKey) {
+/**
+ * Try to connect to a host using connectionInfo Object
+ *
+ * Transports are tried in the order defined in "_initializeTransports" method
+ * When connection using one transport fails, the next one is tried
+ *
+ * @access private
+ */
+TransportManager.prototype._connectTransports = function (connectionInfo) {
+  // debug('_connect ' + connectionInfo.publicKey)
+  var deferred = Q.defer()
+  var promise = deferred.promise
+  _.forEach(this.transports, function (transport) {
+    if (!transport.isDisabled()) {
+      promise = promise.then(undefined, transport.connect.bind(transport, connectionInfo))
+    }
+  }, this)
+  deferred.reject()
+  return promise
+}
+
+TransportManager.prototype._getConnection = function (publicKey) {
   debug('getConnection ' + publicKey)
   var connection
   _.forEach(this.transports, function (transport) {
@@ -207,27 +236,6 @@ TransportManager.prototype.getConnection = function (publicKey) {
     debug('Connection is null')
   }
   return connection
-}
-
-/**
- * Try to connect to a host using connectionInfo Object
- *
- * Transports are tried in the order defined in "_initializeTransports" method
- * When connection using one transport fails, the next one is tried
- *
- * @access private
- */
-TransportManager.prototype._connect = function (connectionInfo) {
-  // debug('_connect ' + connectionInfo.publicKey)
-  var deferred = Q.defer()
-  var promise = deferred.promise
-  _.forEach(this.transports, function (transport) {
-    if (!transport.isDisabled()) {
-      promise = promise.then(undefined, transport.connect.bind(transport, connectionInfo))
-    }
-  }, this)
-  deferred.reject()
-  return promise
 }
 
 /**

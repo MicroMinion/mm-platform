@@ -2,7 +2,7 @@ var _ = require('lodash')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('inherits')
 var TransportManager = require('./transport-manager.js')
-var debug = require('debug')('flunky-platform:messaging:protocol-dispatcher')
+var debug = require('debug')('flunky-platform:protocol-dispatcher')
 var isBuffer = require('is-buffer')
 var ns = require('.util/ns.js')
 var nacl = require('tweetnacl')
@@ -28,9 +28,6 @@ var ProtocolDispatcher = function (options) {
   EventEmitter.call(this)
   this.transportManager
   this._setupTransportManager()
-  if (options.messaging) {
-    this.setMessaging(options.messaging)
-  }
   this.buffers = {}
   /**
    * List of devices that belong to the current user
@@ -53,20 +50,12 @@ inherits(ProtocolDispatcher, EventEmitter)
 ProtocolDispatcher.prototype.setMessaging = function (messaging) {
   var dispatcher = this
   messaging.on('self.devices.update', function (topic, publicKey, data) {
-    dispatcher.setDevices(data)
+    dispatcher._setDevices(data)
   })
   messaging.on('self.contacts.update', function (topic, publicKey, data) {
-    dispatcher.setContacts(data)
+    dispatcher._setContacts(data)
   })
   this.transportManager.setMessaging(messaging)
-}
-
-ProtocolDispatcher.prototype.disable = function () {
-  this.transportManager.disable()
-}
-
-ProtocolDispatcher.prototype.enable = function () {
-  this.transportManager.enable()
 }
 
 ProtocolDispatcher.prototype._setupTransportManager = function () {
@@ -83,7 +72,7 @@ ProtocolDispatcher.prototype._setupTransportManager = function () {
       dispatcher.buffers[publicKey] = message
     }
     try {
-      dispatcher.processBuffer(publicKey)
+      dispatcher._processBuffer(publicKey)
     } catch (e) {
       debug(e)
       delete dispatcher.buffers[publicKey]
@@ -91,9 +80,9 @@ ProtocolDispatcher.prototype._setupTransportManager = function () {
   })
 }
 
-ProtocolDispatcher.prototype.processBuffer = function (publicKey) {
+ProtocolDispatcher.prototype._processBuffer = function (publicKey) {
   expect(publicKey).to.be.a('string')
-  debug('processBuffer')
+  debug('_processBuffer')
   var buffer = this.buffers[publicKey]
   if (buffer.length === 0) {
     return
@@ -102,18 +91,18 @@ ProtocolDispatcher.prototype.processBuffer = function (publicKey) {
   debug('message length: ' + messageLength)
   debug('buffer length: ' + buffer.length)
   if (buffer.length >= messageLength) {
-    this.processMessage(publicKey, ns.nsPayload(buffer))
+    this._processMessage(publicKey, ns.nsPayload(buffer))
     this.buffers[publicKey] = new Buffer(buffer.length - messageLength)
     buffer.copy(this.buffers[publicKey], 0, messageLength)
     debug('buffer length after processing: ' + this.buffers[publicKey].length)
-    this.processBuffer(publicKey)
+    this._processBuffer(publicKey)
   }
 }
 
-ProtocolDispatcher.prototype.processMessage = function (publicKey, message) {
+ProtocolDispatcher.prototype._processMessage = function (publicKey, message) {
   expect(publicKey).to.be.a('string')
   expect(isBuffer(message)).to.be.true
-  debug('processMessage')
+  debug('_processMessage')
   var protocol = message.toString('utf-8', 0, 2)
   debug(protocol)
   var scope = this._getScope(publicKey)
@@ -131,10 +120,6 @@ ProtocolDispatcher.prototype.send = function (protocol, publicKey, message) {
   return this.transportManager.send(publicKey, ns.nsWrite(buffer))
 }
 
-ProtocolDispatcher.prototype.connect = function (publicKey) {
-  return this.transportManager.connect(publicKey)
-}
-
 /**
  * Set contacts that we consider to be trusted.
  * Messages from these contacts will be triggered in the "Friends" namespace
@@ -142,7 +127,7 @@ ProtocolDispatcher.prototype.connect = function (publicKey) {
  * @param {Object.<string, Object>} contacts
  * @public
  */
-ProtocolDispatcher.prototype.setContacts = function (contacts) {
+ProtocolDispatcher.prototype._setContacts = function (contacts) {
   debug('setContacts')
   this.contacts = contacts
 }
@@ -154,7 +139,7 @@ ProtocolDispatcher.prototype.setContacts = function (contacts) {
  * @param {Object.<string, Object>} devices
  * @public
  */
-ProtocolDispatcher.prototype.setDevices = function (devices) {
+ProtocolDispatcher.prototype._setDevices = function (devices) {
   debug('setDevices')
   this.devices = devices
 }

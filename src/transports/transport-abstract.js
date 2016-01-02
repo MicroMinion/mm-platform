@@ -7,7 +7,7 @@ var MessageStream = require('curvecp').MessageStream
 var inherits = require('inherits')
 var _ = require('lodash')
 var Q = require('q')
-var debug = require('debug')('flunky-platform:messaging:transport-abstract')
+var debug = require('debug')('flunky-platform:transports:transport-abstract')
 var os = require('os')
 var nacl = require('tweetnacl')
 

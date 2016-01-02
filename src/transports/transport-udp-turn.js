@@ -1,7 +1,7 @@
 var _ = require('lodash')
 var AbstractTransport = require('./transport-abstract.js')
 var chai = require('chai')
-var debug = require('debug')('flunky-platform:messaging:transport-udpTurn')
+var debug = require('debug')('flunky-platform:transports:transport-udpTurn')
 var dgram = (_.isUndefined(window.chrome)) ? require('dgram') : require('chrome-dgram')
 var Duplex = require('stream').Duplex
 var extend = require('extend.js')

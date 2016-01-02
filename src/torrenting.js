@@ -13,6 +13,7 @@ var Torrenting = function (dispatcher) {
     delimiter: '.'
   })
   this.dispatcher = dispatcher
+  this._setupDispatcher()
 }
 
 inherits(Torrenting, EventEmitter)

@@ -3,10 +3,8 @@ var _ = require('lodash')
 var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
 var chai = require('chai')
-var ProtocolDispatcher = require('./protocol-dispatcher.js')
 var nacl = require('tweetnacl')
-var debug = require('debug')('flunky-platform:messaging:messaging')
-var debugMessage = require('debug')('flunky-platform:messages')
+var debug = require('debug')('flunky-platform:messaging')
 var Q = require('q')
 
 var expect = chai.expect
@@ -64,7 +62,7 @@ var Messaging = function (options) {
    */
   this.profile = undefined
   this.on('self.profile.update', function (topic, publicKey, data) {
-    messaging.setProfile(data)
+    messaging._setProfile(data)
   })
 
   /**
@@ -148,30 +146,8 @@ Messaging.prototype._saveSendQueues = function (publicKeys) {
  * DISPATCHER
  */
 
-/**
- * Manually disable dispatcher
- *
- * @public
- */
-Messaging.prototype.disable = function () {
-  this.dispatcher.disable()
-}
-
-/**
- * Manually enable dispatcher
- *
- * @public
- */
-Messaging.prototype.enable = function () {
-  this.dispatcher.enable()
-}
-
 Messaging.prototype._setupDispatcher = function () {
   var messaging = this
-  if (_.isUndefined(this.dispatcher)) {
-    this.options.messaging = this
-    this.dispatcher = new ProtocolDispatcher(this.options)
-  }
   this.dispatcher.on(PROTOCOL, function (scope, publicKey, message) {
     expect(publicKey).to.be.a('string')
     expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
@@ -181,7 +157,7 @@ Messaging.prototype._setupDispatcher = function () {
       debug(e)
       return
     }
-    debugMessage('RECEIVED ' + scope + '.' + message.topic + ' from ' + publicKey + ' (' + JSON.stringify(message) + ')')
+    debug('RECEIVED ' + scope + '.' + message.topic + ' from ' + publicKey + ' (' + JSON.stringify(message) + ')')
     messaging.emit(scope + '.' + message.topic, publicKey, message.data)
   })
 }
@@ -198,7 +174,7 @@ Messaging.prototype._setupDispatcher = function () {
  * @param {String} profile.privateKey - Base64 encoded privateKey for use with Nacl libraries
  * @public
  */
-Messaging.prototype.setProfile = function (profile) {
+Messaging.prototype._setProfile = function (profile) {
   debug('setProfile')
   expect(profile).to.exist
   expect(profile).to.be.an('object')
@@ -249,7 +225,6 @@ Messaging.prototype.send = function (topic, publicKey, data, options) {
     })
     return
   }
-  // debugMessage('queuing message ' + topic + ' to ' + publicKey + '(' + JSON.stringify(data) + ')')
   if (!this.sendQueues[publicKey]) {
     this.sendQueues[publicKey] = {}
   }
@@ -287,8 +262,7 @@ Messaging.prototype._trigger = function (publicKey) {
   expect(publicKey).to.be.a('string')
   expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
   if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0) {
-    this.dispatcher.connect(publicKey)
-      .then(this._flushQueue.bind(this, publicKey))
+    this._flushQueue(publicKey)
   }
 }
 
@@ -305,15 +279,15 @@ Messaging.prototype._flushQueue = function (publicKey) {
   var messaging = this
   _.forEach(this.sendQueues[publicKey], function (message) {
     if (Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
-      debugMessage('SEND: ' + JSON.stringify(message))
+      debug('SEND: ' + JSON.stringify(message))
       this.dispatcher.send(PROTOCOL, publicKey, new Buffer(JSON.stringify(message)))
         .then(function () {
           delete messaging.sendQueues[publicKey][message.id]
           messaging._saveSendQueues([publicKey])
         })
         .fail(function (error) {
-          debugMessage('message sending failed')
-          debugMessage(error)
+          debug('message sending failed')
+          debug(error)
         })
         .done()
     }

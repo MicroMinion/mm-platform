@@ -6,7 +6,7 @@ var AbstractTransport = require('./transport-abstract.js')
 var Q = require('q')
 var inherits = require('inherits')
 var _ = require('lodash')
-var debug = require('debug')('flunky-platform:messaging:transport-udp')
+var debug = require('debug')('flunky-platform:transports:transport-udp')
 var Duplex = require('stream').Duplex
 var dgram
 var nacl = require('tweetnacl')

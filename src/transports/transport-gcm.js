@@ -7,7 +7,7 @@ var extend = require('extend.js')
 var chai = require('chai')
 var AbstractTransport = require('./transport-abstract')
 var Q = require('q')
-var debug = require('debug')('flunky-platform:messaging:transport-gcm')
+var debug = require('debug')('flunky-platform:transports:transport-gcm')
 var nacl = require('tweetnacl')
 
 var expect = chai.expect
