@@ -15,6 +15,9 @@ if (_.isUndefined(window.chrome)) {
   net = require('chrome-net')
 }
 
+/**
+ * @constructor
+ */
 var TCPTransport = function (options) {
   debug('initialize')
   AbstractTransport.call(this, options)

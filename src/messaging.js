@@ -17,7 +17,7 @@ var PROTOCOL = 'ms'
  * @constant
  * @default
  * @type {number}
- * @public
+ * @private
  * @readonly
  */
 var SEND_INTERVAL = 1000 * 10
@@ -28,7 +28,7 @@ var SEND_INTERVAL = 1000 * 10
  * @constant
  * @default
  * @type {number}
- * @public
+ * @private
  * @readonly
  */
 var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7

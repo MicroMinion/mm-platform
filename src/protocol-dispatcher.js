@@ -4,7 +4,7 @@ var inherits = require('inherits')
 var TransportManager = require('./transport-manager.js')
 var debug = require('debug')('flunky-platform:protocol-dispatcher')
 var isBuffer = require('is-buffer')
-var ns = require('.util/ns.js')
+var ns = require('./util/ns.js')
 var nacl = require('tweetnacl')
 
 // TODO: Filter out only trusted keys when receicing devices or contacts so that receive logic becomes simpeler
@@ -18,10 +18,16 @@ var expect = require('chai').expect
  * @enum {number}
  * @constant
  * @default
- * @public
+ * @private
  */
 var verificationState = require('../constants/verificationState.js')
 
+/**
+ * Dispatches different types of messages to/from TransportManager
+ *
+ * @constructor
+ * @param {Object} options
+ */
 var ProtocolDispatcher = function (options) {
   debug('initialize')
   this.options = options
@@ -47,6 +53,10 @@ var ProtocolDispatcher = function (options) {
 
 inherits(ProtocolDispatcher, EventEmitter)
 
+/**
+ * @public
+ * @param {Messaging} messaging
+ */
 ProtocolDispatcher.prototype.setMessaging = function (messaging) {
   var dispatcher = this
   messaging.on('self.devices.update', function (topic, publicKey, data) {
@@ -58,6 +68,9 @@ ProtocolDispatcher.prototype.setMessaging = function (messaging) {
   this.transportManager.setMessaging(messaging)
 }
 
+/**
+ * @private
+ */
 ProtocolDispatcher.prototype._setupTransportManager = function () {
   var dispatcher = this
   this.transportManager = new TransportManager(this.options)
@@ -80,6 +93,9 @@ ProtocolDispatcher.prototype._setupTransportManager = function () {
   })
 }
 
+/**
+ * @private
+ */
 ProtocolDispatcher.prototype._processBuffer = function (publicKey) {
   expect(publicKey).to.be.a('string')
   debug('_processBuffer')
@@ -99,6 +115,11 @@ ProtocolDispatcher.prototype._processBuffer = function (publicKey) {
   }
 }
 
+/**
+ * @private
+ * @param {string} publicKey
+ * @param {Buffer} message
+ */
 ProtocolDispatcher.prototype._processMessage = function (publicKey, message) {
   expect(publicKey).to.be.a('string')
   expect(isBuffer(message)).to.be.true
@@ -109,6 +130,14 @@ ProtocolDispatcher.prototype._processMessage = function (publicKey, message) {
   this.emit(protocol, scope, publicKey, message.slice(2))
 }
 
+/**
+ * Send a message to TransportManager
+ *
+ * @public
+ * @param {string} protocol
+ * @param {string} publicKey
+ * @param {Buffer} message
+ */
 ProtocolDispatcher.prototype.send = function (protocol, publicKey, message) {
   debug('send')
   expect(protocol).to.be.a('string')
@@ -125,7 +154,7 @@ ProtocolDispatcher.prototype.send = function (protocol, publicKey, message) {
  * Messages from these contacts will be triggered in the "Friends" namespace
  *
  * @param {Object.<string, Object>} contacts
- * @public
+ * @private
  */
 ProtocolDispatcher.prototype._setContacts = function (contacts) {
   debug('setContacts')
@@ -137,7 +166,7 @@ ProtocolDispatcher.prototype._setContacts = function (contacts) {
  * Messages from these devices will be triggered in the 'Self' namespace
  *
  * @param {Object.<string, Object>} devices
- * @public
+ * @private
  */
 ProtocolDispatcher.prototype._setDevices = function (devices) {
   debug('setDevices')

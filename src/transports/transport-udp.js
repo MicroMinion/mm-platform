@@ -23,6 +23,9 @@ if (_.isUndefined(window.chrome)) {
   dgram = require('chrome-dgram')
 }
 
+/**
+ * @constructor
+ */
 var UDPTransport = function (options) {
   AbstractTransport.call(this, options)
   this.enabled = false

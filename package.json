@@ -6,7 +6,9 @@
   "directories": {
     "doc": "docs"
   },
-  "scripts": {},
+  "scripts": {
+    "docs": "jsdoc -r -d docs src"
+  },
   "repository": {
     "type": "git",
     "url": "git@bitbucket.org:nodatacenter/flunky-platform.git"

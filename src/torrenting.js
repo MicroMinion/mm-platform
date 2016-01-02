@@ -8,6 +8,12 @@ var nacl = require('tweetnacl')
 
 var PROTOCOL = 'bt'
 
+/**
+ * Interface for sending/receiving BitTorrent packets
+ *
+ * @constructor
+ * @param {ProtocolDispatcher} dispatcher
+ */
 var Torrenting = function (dispatcher) {
   EventEmitter.call(this, {
     delimiter: '.'
@@ -18,6 +24,9 @@ var Torrenting = function (dispatcher) {
 
 inherits(Torrenting, EventEmitter)
 
+/**
+ * @private
+ */
 Torrenting.prototype._setupDispatcher = function () {
   var torrenting = this
   this.dispatcher.on(PROTOCOL, function (scope, publicKey, message) {
@@ -28,6 +37,13 @@ Torrenting.prototype._setupDispatcher = function () {
     torrenting.emit(scope + '.' + infoHash, publicKey, message)
   })
 }
+/**
+ * Send BitTorrent packet
+ *
+ * @param {Buffer} infoHash
+ * @param {string} publicKey
+ * @param {Buffer} message
+ */
 Torrenting.prototype.send = function (infoHash, publicKey, message) {
   expect(publicKey).to.be.a('string')
   expect(isBuffer(message)).to.be.true

@@ -20,6 +20,9 @@ var turnArgs = {
 
 var lifetime = 600
 
+/**
+ * @constructor
+ */
 var UDPTurnTransport = function (options) {
   debug('initializing')
   AbstractTransport.call(this, options)
@@ -196,8 +199,11 @@ UDPTurnTransport.prototype._stopRefreshLoop = function () {
   clearInterval(this.refreshTimer)
 }
 
-/** connection stream */
-
+/**
+  * Connection Stream
+  * @constructor
+  * @private
+  */
 var UDPConnectionStream = function (opts) {
   debug('initialize connection stream')
   expect(opts).to.not.be.undefined

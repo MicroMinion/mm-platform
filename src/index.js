@@ -8,6 +8,13 @@ var TCPTransport = require('./transports/transport-tcp.js')
 // var UDPTurnTransport = require('./transports/transport-udp-turn.js')
 // var UDPTransport = require('./transports/transport-udp.js')
 
+/**
+ * Platform API
+ *
+ * @constructor
+ * @param {Object} options
+ * @param {Object} options.storage - KAD-FS compatible storage interface
+ */
 var Platform = function (options) {
   assert(options.storage)
   this.__dispatcher = new ProtocolDispatcher(options)
@@ -15,7 +22,19 @@ var Platform = function (options) {
     options = {}
   }
   options.dispatcher = this.__dispatcher
+  /**
+   * Interface for sending JSON style messages
+   *
+   * @public
+   * @type Messaging
+   */
   this.messaging = new Messaging(options)
+  /**
+   * Interface for sending BitTorrent packets
+   *
+   * @public
+   * @type Torrenting
+   */
   this.torrenting = new Torrenting(this.__dispatcher)
   this.__dispatcher.setMessaging(this.messaging)
   this.addTransport(TCPTransport)
@@ -39,6 +58,12 @@ Platform.prototype.enable = function () {
   this.__dispatcher.transportManager.enable()
 }
 
+/**
+ * Add new Transport Class
+ *
+ * @param {AbstractTransport} TransportClass - Implementation of AbstractTransport
+ * @public
+ */
 Platform.prototype.addTransport = function (TransportClass) {
   this.__dispatcher.transportManager.addTransport(TransportClass)
 }

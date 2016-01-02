@@ -52,7 +52,7 @@ inherits(AbstractTransport, events.EventEmitter)
  * ready event
  *
  * @event AbstractTransport#ready
- * @type {object} connectionInfo
+ * @type {object}
  */
 
 /**

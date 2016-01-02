@@ -14,6 +14,9 @@ var expect = chai.expect
 
 var SENDER_ID = '559190877287'
 
+/**
+ * @constructor
+ */
 function GCMTransport (options) {
   debug('initialize')
   AbstractTransport.call(this, options)

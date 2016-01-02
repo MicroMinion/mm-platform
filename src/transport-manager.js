@@ -14,13 +14,16 @@ var expect = chai.expect
  * @constant
  * @default
  * @type {number}
- * @public
+ * @private
  * @readonly
  */
 var PUBLISH_CONNECTION_INFO_INTERVAL = 1000 * 60
 
 var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
+/**
+ * @constructor
+ */
 var TransportManager = function (options) {
   debug('initialize')
   this.options = options
