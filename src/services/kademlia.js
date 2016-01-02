@@ -43,14 +43,11 @@ var FlunkyTransport = function (options) {
 
 FlunkyTransport.prototype._onMessage = function (topic, publicKey, data) {
   debugTransport('_onMessage')
-  debugTransport(data)
   data = new Buffer(JSON.stringify(data), 'utf8')
   this._handleMessage(data, {publicKey: publicKey})
 }
 
 FlunkyTransport.prototype._createContact = function (options) {
-  debugTransport('_createContact')
-  debugTransport(JSON.stringify(options))
   return new FlunkyContact(options)
 }
 

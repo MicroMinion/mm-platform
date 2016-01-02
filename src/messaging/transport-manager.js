@@ -146,6 +146,7 @@ TransportManager.prototype.isDisabled = function () {
  */
 TransportManager.prototype.send = function (publicKey, message) {
   debug('send ' + publicKey)
+  console.log('TRANSPORT MANAGER SEND ' + message)
   var connection = this.getConnection(publicKey)
   if (connection) {
     return this._send(message, connection)
@@ -164,7 +165,9 @@ TransportManager.prototype.send = function (publicKey, message) {
  * @access private
  */
 TransportManager.prototype._send = function (message, connection) {
+  console.log('_send Transport Manager')
   var deferred = Q.defer()
+  console.log(message.toString())
   connection.write(message, function (err) {
     if (err) {
       deferred.reject(err)
@@ -181,9 +184,10 @@ TransportManager.prototype._send = function (message, connection) {
  * If we don't have connectionInfo assocated with publicKey, a lookup is performed first
  */
 TransportManager.prototype.connect = function (publicKey) {
-  debug('connect ' + publicKey)
+  console.log('connect ' + publicKey)
   var manager = this
   if (this.isConnected(publicKey)) {
+    console.log('CONNECTED')
     var deferred = Q.defer()
     process.nextTick(function () {
       deferred.resolve(manager.getConnection(publicKey))
@@ -196,13 +200,16 @@ TransportManager.prototype.connect = function (publicKey) {
 }
 
 TransportManager.prototype.getConnection = function (publicKey) {
-  debug('getConnection ' + publicKey)
+  // debug('getConnection ' + publicKey)
   var connection
   _.forEach(this.transports, function (transport) {
     if (!connection) {
       connection = transport.getConnection(publicKey)
     }
   })
+  if (connection === null) {
+    console.log('CONNECTION NULL')
+  }
   return connection
 }
 
@@ -215,7 +222,7 @@ TransportManager.prototype.getConnection = function (publicKey) {
  * @access private
  */
 TransportManager.prototype._connect = function (connectionInfo) {
-  debug('_connect ' + connectionInfo.publicKey)
+  // debug('_connect ' + connectionInfo.publicKey)
   var deferred = Q.defer()
   var promise = deferred.promise
   _.forEach(this.transports, function (transport) {

@@ -121,6 +121,7 @@ ProtocolDispatcher.prototype.processMessage = function (publicKey, message) {
 }
 
 ProtocolDispatcher.prototype.send = function (protocol, publicKey, message) {
+  debug('send')
   expect(protocol).to.be.a('string')
   expect(protocol.length).to.equal(2)
   expect(publicKey).to.be.a('string')

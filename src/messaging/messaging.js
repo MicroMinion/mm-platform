@@ -288,6 +288,7 @@ Messaging.prototype._trigger = function (publicKey) {
   expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
   if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0) {
     this.dispatcher.connect(publicKey)
+      .then(this._flushQueue.bind(this, publicKey))
   }
 }
 

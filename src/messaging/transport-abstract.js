@@ -2,8 +2,8 @@
 
 var events = require('events')
 var chai = require('chai')
-var PacketStream = require('./curvecp/index.js').PacketStream
-var MessageStream = require('./curvecp/index.js').MessageStream
+var PacketStream = require('curvecp').PacketStream
+var MessageStream = require('curvecp').MessageStream
 var inherits = require('inherits')
 var _ = require('lodash')
 var Q = require('q')
@@ -89,7 +89,7 @@ AbstractTransport.prototype.enable = function () {
 }
 
 AbstractTransport.prototype._listAddresses = function () {
-  debug('_listAddresses')
+  // debug('_listAddresses')
   var deferred = Q.defer()
   var result = []
   if (_.isUndefined(window.chrome) || _.isUndefined(window.chrome.system) || _.isUndefined(window.chrome.system.network)) {
@@ -111,7 +111,7 @@ AbstractTransport.prototype._listAddresses = function () {
         var iface = networkIfaceArray[i]
         result.push(iface.address)
       }
-      debug(result)
+      // debug(result)
       deferred.resolve(result)
     })
   }
@@ -129,7 +129,7 @@ AbstractTransport.prototype._listAddresses = function () {
  * @return {Promise}
  */
 AbstractTransport.prototype.connect = function (connectionInfo) {
-  debug('connect ' + connectionInfo.publicKey)
+  // debug('connect ' + connectionInfo.publicKey)
   var transport = this
   if (_.has(this.inProgressConnections, connectionInfo.publicKey)) {
     return this.inProgressConnections[connectionInfo.publicKey].promise
@@ -161,29 +161,29 @@ AbstractTransport.prototype._wrapIncomingConnection = function (connection) {
   debug('wrapIncomingConnection')
   var packetStream = new PacketStream({
     stream: connection,
-    is_server: true,
+    isServer: true,
     serverPublicKey: nacl.util.decodeBase64(this.publicKey),
     serverPrivateKey: nacl.util.decodeBase64(this.privateKey)
   })
   var messageStream = new MessageStream(packetStream)
-  this._connectEvents(messageStream)
+  this._connectEvents(messageStream, true)
 }
 
 AbstractTransport.prototype._wrapOutgoingConnection = function (publicKey, connection) {
   debug('wrapOutgoingConnection')
   var packetStream = new PacketStream({
     stream: connection,
-    is_server: false,
+    isServer: false,
     serverPublicKey: nacl.util.decodeBase64(publicKey),
     clientPublicKey: nacl.util.decodeBase64(this.publicKey),
     clientPrivateKey: nacl.util.decodeBase64(this.privateKey)
   })
   var messageStream = new MessageStream(packetStream)
-  this._connectEvents(messageStream)
+  this._connectEvents(messageStream, false)
   messageStream.connect()
 }
 
-AbstractTransport.prototype._connectEvents = function (stream) {
+AbstractTransport.prototype._connectEvents = function (stream, isServer) {
   debug('_connectEvents')
   expect(stream).to.exist
   expect(stream).to.be.an.instanceof(MessageStream)
@@ -192,33 +192,40 @@ AbstractTransport.prototype._connectEvents = function (stream) {
     connect: function () {
       var publicKey = transport._getPeer(stream)
       if (!_.has(transport.connections, publicKey)) {
-        transport.connections[publicKey] = []
+        transport.connections[publicKey] = stream
+        transport.emit('connection', publicKey)
       }
-      transport.connections[publicKey].push(stream)
-      transport.emit('connection', publicKey)
       if (_.has(transport.inProgressConnections, publicKey)) {
         transport.inProgressConnections[publicKey].resolve(stream)
         delete transport.inProgressConnections[publicKey]
       }
     },
     data: function (data) {
-      debug('data event' + data)
+      debug('data event from ' + transport._getPeer(stream) + ' ' + data)
       transport.emit('message', transport._getPeer(stream), data)
     },
     error: function (error) {
-      debug('handling error of curve stream')
+      debug('handling error of CurveCP stream')
       debug(error)
     },
     close: function () {
-      stream.removeListener('connect', functions.connect)
-      stream.removeListener('data', functions.data)
+      if (!isServer) {
+        stream.removeListener('connect', functions.connect)
+      }
+      if (isServer) {
+        stream.removeListener('data', functions.data)
+      }
       stream.removeListener('error', functions.error)
       stream.removeListener('close', functions.close)
       transport._deleteStream(stream)
     }
   }
-  stream.on('connect', functions.connect)
-  stream.on('data', functions.data)
+  if (!isServer) {
+    stream.on('connect', functions.connect)
+  }
+  if (isServer) {
+    stream.on('data', functions.data)
+  }
   stream.on('error', functions.error)
   stream.on('close', functions.close)
 }
@@ -240,9 +247,8 @@ AbstractTransport.prototype._deleteStream = function (stream) {
 }
 
 AbstractTransport.prototype._getPeer = function (stream) {
-  debug('getPeer')
-  stream = stream.stream
-  var publicKey = stream.is_server ? stream.clientPublicKey : stream.serverPublicKey
+  stream = stream._stream
+  var publicKey = stream.isServer ? stream.clientPublicKey : stream.serverPublicKey
   if (!publicKey) {
     return
   }
@@ -251,14 +257,10 @@ AbstractTransport.prototype._getPeer = function (stream) {
 }
 
 AbstractTransport.prototype.getConnection = function (publicKey) {
-  debug('getConnection ' + publicKey)
-  if (_.has(this.connections, publicKey)) {
-    return _.last(this.connections[publicKey])
-  }
+  return this.connections[publicKey]
 }
 
 AbstractTransport.prototype.isConnected = function (publicKey) {
-  debug('isConnected ' + publicKey)
   return Boolean(this.getConnection(publicKey))
 }
 

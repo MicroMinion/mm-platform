@@ -27,6 +27,7 @@
     "chai": "^3.2.0",
     "chrome-net": "^3.0.1",
     "create-torrent": "^3.15.1",
+    "curvecp": "^0.5.0",
     "debug": "^2.2.0",
     "end-of-stream": "^1.1.0",
     "extend.js": "0.0.2",
