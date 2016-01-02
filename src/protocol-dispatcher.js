@@ -4,7 +4,7 @@ var inherits = require('inherits')
 var TransportManager = require('./transport-manager.js')
 var debug = require('debug')('flunky-platform:messaging:protocol-dispatcher')
 var isBuffer = require('is-buffer')
-var ns = require('../util/ns.js')
+var ns = require('.util/ns.js')
 var nacl = require('tweetnacl')
 
 // TODO: Filter out only trusted keys when receicing devices or contacts so that receive logic becomes simpeler

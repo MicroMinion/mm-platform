@@ -3,12 +3,12 @@ var _ = require('lodash')
 var chai = require('chai')
 var Q = require('q')
 var extend = require('extend.js')
-var AbstractTransport = require('./transport-abstract.js')
+var AbstractTransport = require('./transports/transport-abstract.js')
 var debug = require('debug')('flunky-platform:messaging:transport-manager')
 
-var TCPTransport = require('./transport-tcp.js')
-var GCMTransport = require('./transport-gcm.js')
-var UDPTurnTransport = require('./transport-udp-turn.js')
+var TCPTransport = require('./transports/transport-tcp.js')
+var GCMTransport = require('./transports/transport-gcm.js')
+var UDPTurnTransport = require('./transports/transport-udp-turn.js')
 
 var expect = chai.expect
 
