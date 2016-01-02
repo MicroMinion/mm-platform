@@ -12,7 +12,7 @@ var TCPTransport = require('./transports/transport-tcp.js')
  * Platform API
  *
  * @constructor
- * @param {Object} options
+ * @param {Object} options - Options that will be passed down to ProtocolDispatcher, Messaging, Torrenting, TransportManager and individual Transports
  * @param {Object} options.storage - KAD-FS compatible storage interface
  */
 var Platform = function (options) {

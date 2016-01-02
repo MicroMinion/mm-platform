@@ -24,6 +24,8 @@ var DIRECTORY_LOOKUP_TIMEOUT = 10000
 /**
  * @constructor
  * @public
+ * @param {Object} options
+ * @param {Object} options.storage - KAD-FS storage interface
  */
 var TransportManager = function (options) {
   debug('initialize')
@@ -79,8 +81,8 @@ TransportManager.prototype.setMessaging = function (messaging) {
     manager.connectionInfo.publicKey = data.publicKey
     manager._initializeTransports()
   })
-  this.messaging.on('self.messaging.connectionInfo', this._processConnectionInfo.bind(this))
-  this.messaging.on('self.messaging.requestMyConnectionInfo', function (topic, publicKey, data) {
+  this.messaging.on('self.transports.connectionInfo', this._processConnectionInfo.bind(this))
+  this.messaging.on('self.transports.requestMyConnectionInfo', function (topic, publicKey, data) {
     manager._publishConnectionInfo()
   })
 }
@@ -181,6 +183,8 @@ TransportManager.prototype._initializeTransport = function (TransportClass) {
  *
  * Connection needs to exist before executing this method
  * @public
+ * @param {string} publicKey 32 byte Base64 encoded publicKey
+ * @param {Buffer} message
  */
 TransportManager.prototype.send = function (publicKey, message) {
   debug('send ' + publicKey)
@@ -314,7 +318,7 @@ TransportManager.prototype._saveDirectoryCache = function () {
 TransportManager.prototype._publishConnectionInfo = function () {
   debug('publishConnectionInfo')
   debug(this.connectionInfo)
-  this.messaging.send('messaging.myConnectionInfo', 'local', this.connectionInfo)
+  this.messaging.send('transports.myConnectionInfo', 'local', this.connectionInfo)
 }
 
 /**
@@ -353,7 +357,7 @@ TransportManager.prototype._lookupKey = function (publicKey) {
   expect(this.directoryLookup).to.not.have.ownProperty(publicKey)
   var deferred = Q.defer()
   var manager = this
-  this.messaging.send('messaging.requestConnectionInfo', 'local', publicKey)
+  this.messaging.send('transports.requestConnectionInfo', 'local', publicKey)
   this.directoryLookup[publicKey] = deferred
   setTimeout(function () {
     if (_.has(manager.directoryLookup, publicKey)) {

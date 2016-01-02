@@ -9,10 +9,19 @@ var nacl = require('tweetnacl')
 var PROTOCOL = 'bt'
 
 /**
+ * Emit messages of the format scope.infoHash
+ * @event Torrenting#message
+ * @param {string} publicKey sender of BitTorrent packet
+ * @param {Buffer} message BitTorrent message
+ */
+
+/**
  * Interface for sending/receiving BitTorrent packets
  *
  * @constructor
  * @param {ProtocolDispatcher} dispatcher
+ * @fires Torrenting#message
+ * @listens ProtocolDispatcher#bt
  */
 var Torrenting = function (dispatcher) {
   EventEmitter.call(this, {

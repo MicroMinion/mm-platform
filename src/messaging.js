@@ -12,6 +12,13 @@ var expect = chai.expect
 var PROTOCOL = 'ms'
 
 /**
+ * Emit messages of the format scope.topic (example public.directory.get)
+ * @event Messaging#message
+ * @param {string} publicKey sender of message
+ * @param {Object} message JSON message
+ */
+
+/**
  * Interval for triggering send queues in milliseconds
  *
  * @constant
@@ -39,6 +46,11 @@ var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
  *
  * @constructor
  * @public
+ * @fires Messaging#message
+ * @param {Object} options
+ * @param {ProtocolDispatcher} options.dispatcher
+ * @param {Object} options.storage KAD-FS storage interface
+ * @listens ProtocolDispatcher#ms
  */
 var Messaging = function (options) {
   if (!options) {

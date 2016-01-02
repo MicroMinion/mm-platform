@@ -6,9 +6,6 @@ var debug = require('debug')('flunky-platform:protocol-dispatcher')
 var isBuffer = require('is-buffer')
 var ns = require('./util/ns.js')
 var nacl = require('tweetnacl')
-
-// TODO: Filter out only trusted keys when receicing devices or contacts so that receive logic becomes simpeler
-
 var expect = require('chai').expect
 
 /**
@@ -20,7 +17,29 @@ var expect = require('chai').expect
  * @default
  * @private
  */
-var verificationState = require('../constants/verificationState.js')
+var verificationState = require('./constants/verificationState.js')
+
+/**
+ * Message event
+ *
+ * Events of type 'ms' (or any other protocol) are emitted from ProtocolDispatcher
+ *
+ * @event ProtocolDispatcher#ms
+ * @param {String} scope Scope: either public, friends, self
+ * @param {String} publicKey identification of sender (32 byte Base64 encoded publicKey)
+ * @param {Buffer} message
+ */
+
+/**
+* Torrent packet event
+*
+* Events of type 'bt' (or any other protocol) are emitted from ProtocolDispatcher
+*
+* @event ProtocolDispatcher#bt
+* @param {String} scope Scope: either public, friends, self
+* @param {String} publicKey identification of sender (32 byte Base64 encoded publicKey)
+* @param {Buffer} message
+*/
 
 /**
  * Dispatches different types of messages to/from TransportManager
@@ -29,6 +48,9 @@ var verificationState = require('../constants/verificationState.js')
  * @param {Object} options
  * @fires ProtocolDispatcher#ms
  * @fires ProtocolDispatcher#bt
+ * @listens TransportManager#message
+ * @listens Messaging#self.devices.update
+ * @listens Messaging#self.contacts.update
  */
 var ProtocolDispatcher = function (options) {
   debug('initialize')
@@ -52,17 +74,6 @@ var ProtocolDispatcher = function (options) {
    */
   this.contacts = {}
 
-  /**
-   * Message event
-   *
-   * @event ProtocolDispatcher#ms
-   */
-
-/**
- * Torrent packet event
- *
- * @event ProtocolDispatcher#bt
- */
 }
 
 inherits(ProtocolDispatcher, EventEmitter)
