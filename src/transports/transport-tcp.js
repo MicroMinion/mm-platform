@@ -9,7 +9,7 @@ var expect = require('chai').expect
 
 var net
 
-if (_.isUndefined(window.chrome)) {
+if (_.isUndefined(global.window) || _.isUndefined(global.window.chrome)) {
   net = require('net')
 } else {
   net = require('chrome-net')
