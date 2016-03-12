@@ -73,7 +73,6 @@ var ProtocolDispatcher = function (options) {
    * @type {Object.<string, Object>}
    */
   this.contacts = {}
-
 }
 
 inherits(ProtocolDispatcher, EventEmitter)
