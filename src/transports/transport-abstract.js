@@ -92,7 +92,7 @@ AbstractTransport.prototype._listAddresses = function () {
   // debug('_listAddresses')
   var deferred = Q.defer()
   var result = []
-  if (_.isUndefined(window.chrome) || _.isUndefined(window.chrome.system) || _.isUndefined(window.chrome.system.network)) {
+  if (_.isUndefined(global.window) || _.isUndefined(window.chrome) || _.isUndefined(window.chrome.system) || _.isUndefined(window.chrome.system.network)) {
     process.nextTick(function () {
       var interfaces = os.networkInterfaces()
       _.forEach(interfaces, function (interface_) {
