@@ -8,6 +8,8 @@ var events = require('events')
 
 var expect = chai.expect
 
+var DIRECTORY_LOOKUP_TIMEOUT = 10000
+
 /**
  * Interval for publishing connection info in directory
  *
@@ -18,8 +20,6 @@ var expect = chai.expect
  * @readonly
  */
 var PUBLISH_CONNECTION_INFO_INTERVAL = 1000 * 60
-
-var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
 /**
  * @constructor
@@ -42,24 +42,9 @@ var TransportManager = function (options) {
   this.directoryCache = {}
   this.directoryLookup = {}
   this._loadDirectoryCache()
-  /**
-   * Our own connection information, to be published in directory
-   *
-   * @access private
-   * @type {Object}
-   */
-  this.connectionInfo = {}
   setInterval(function () {
     manager._publishConnectionInfo()
   }, PUBLISH_CONNECTION_INFO_INTERVAL)
-  /*
-   * Transport objects
-   *
-   * @access private
-   */
-  this.transports = []
-  this.transportClasses = []
-  events.EventEmitter.call(this)
 }
 
 inherits(TransportManager, events.EventEmitter)
@@ -199,23 +184,6 @@ TransportManager.prototype.send = function (publicKey, message) {
     })
     return deferred.promise
   }
-}
-
-/**
- * Send a message using a connection object
- *
- * @private
- */
-TransportManager.prototype._send = function (message, connection) {
-  var deferred = Q.defer()
-  connection.write(message, function (err) {
-    if (err) {
-      deferred.reject(err)
-    } else {
-      deferred.resolve()
-    }
-  })
-  return deferred.promise
 }
 
 /**

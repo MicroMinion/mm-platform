@@ -197,46 +197,4 @@ ProtocolDispatcher.prototype._setDevices = function (devices) {
   this.devices = devices
 }
 
-/**
- * SCOPING LOGIC
- */
-
-/**
- * Get scope of a publicKey
- *
- * @param {string} publicKey
- * @return {string} one of "self", "friends", "public"
- * @private
- */
-ProtocolDispatcher.prototype._getScope = function (publicKey) {
-  debug('getScope')
-  expect(publicKey).to.be.a('string')
-  expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
-  if (this._inScope(publicKey, this.devices)) {
-    return 'self'
-  } else {
-    var friends = _.any(_.values(this.contacts), function (value, index, collection) {
-      return this._inScope(publicKey, value.keys)
-    }, this)
-    if (friends) {
-      return 'friends'
-    } else {
-      return 'public'
-    }
-  }
-}
-
-/**
- * @private
- * @param {string} publicKey
- * @param {Object} searchObject
- * @return {boolean} true or false if the publicKey is a property of searchObject and it's verificationState is verified
- */
-ProtocolDispatcher.prototype._inScope = function (publicKey, searchObject) {
-  debug('inScope')
-  return _.any(searchObject, function (value, index, collection) {
-    return index === publicKey && value.verificationState >= verificationState.VERIFIED
-  })
-}
-
 module.exports = ProtocolDispatcher

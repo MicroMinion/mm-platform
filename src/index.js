@@ -39,26 +39,68 @@ Platform.prototype._setupTransport = function () {
     platform._wrapConnection(socket, false)
   })
   this._connections = []
+  /**
+   * Our own connection information, to be published in directory
+   *
+   * @access private
+   * @type {Object}
+   */
   this._connectionInfo = {}
+  this._transport.on('active', function (connectionInfo) {
+    platform._connectionInfo = connectionInfo
+  })
+}
+
+Platform.prototype.getConnectionInfo = function () {
+  return this._connectionInfo
 }
 
 Platform.prototype._wrapConnection = function (socket, server) {
   // TODO: Add constructor arguments
-  var curveMessages = new curvecp.MessageProtocol()
-  var curvePackets = new curvecp.PacketProtocol()
-  var netstrings = new ns.NetStringProtocol()
-  var flunkyMessages = new FlunkyProtocol()
-  /* Connect chain for incoming packets */
-  socket.pipe(curvePackets.in)
-  curvePackets.in.pipe(curveMessages.in)
-  curveMessages.in.pipe(netstrings.in)
-  netstrings.in.pipe(flunkyMessages.in)
-  /* Connect chain for outgoing packets */
-  flunkyMessages.out.pipe(netstrings.out)
-  netstrings.out.pipe(curveMessages.out)
-  curveMessages.out.pipe(curvePackets.out)
-  curvePackets.out.pipe(socket)
-// TODO: Add stream to connections to that it can be used for writing
+  var curvePackets = new curvecp.PacketStream({
+    stream: socket,
+    isServer: server,
+  })
+  this._wrapStream(curvePackets, socket)
+  var curveMessages = new curvecp.MessageStream({
+    stream: curvePackets
+  })
+  this._wrapStream(curveMessages, curvePackets)
+  var netstrings = new ns.NetStringStream({
+    stream: curveMessages
+  })
+  this._wrapStream(netstrings, curveMessages)
+  var flunkyMessages = new FlunkyProtocol({
+    stream: netstrings,
+    friends: this._options.friends,
+    devices: this._options.devices
+  })
+  this._wrapStream(flunkyMessages, netstrings)
+  this._connectEvents(flunkyMessages)
+}
+
+Platform.prototype._connectEvents = function (stream) {
+  var platform = this
+  this._connections.append(stream)
+  stream.on('data', function (message) {
+    platform.emit('message', message)
+  })
+// TODO: Connect other events
+}
+
+Platform.prototype._wrapStream = function (outer, inner) {
+  inner.on('close', function () {
+    outer.emit('close')
+  })
+  inner.on('end', function () {
+    outer.emit('end')
+  })
+  inner.on('error', function (err) {
+    outer.emit('error', err)
+  })
+  inner.on('finish', function () {
+    outer.emit('finish')
+  })
 }
 
 /**
@@ -69,11 +111,31 @@ Platform.prototype._wrapConnection = function (socket, server) {
  *  payload: message blob (buffer)
  */
 Platform.prototype.send = function (message, options) {
-  // TODO: Search for existing connections
+  var connection = this._getConnection(message.destination)
+  if (!options) {
+    options = {}
+  }
+  if (!options.callback) {
+    options.callback = function (err) {}
+  }
+  if (connection) {
+    this._send(message, connection, options.callback)
+  } else {
+    // TODO: Search for existing connections
 
-  // TODO: Connect if no connection exists (first lookup Directory info)
+    // TODO: Connect if no connection exists (first lookup Directory info)
 
-  // TODO: Write to outgoing FlunkyMessages stream
+    // TODO: Write to outgoing FlunkyMessages stream
+  }
+}
+
+/**
+ * Send a message using a connection object
+ *
+ * @private
+ */
+Platform.prototype._send = function (message, connection, callback) {
+  connection.write(message, callback)
 }
 
 Platform.prototype._setupAPI = function () {
