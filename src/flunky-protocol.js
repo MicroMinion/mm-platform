@@ -18,7 +18,7 @@ var FlunkyProtocol = function (options) {
   var flunkyProtocol = this
   this.stream.on('data', function (data) {
     var message = FlunkyMessage.decode(data)
-    message.publicKey = flunkyProtocol.remoteAddress
+    message.sender = flunkyProtocol.remoteAddress
     message.scope = flunkyProtocol._getScope(message.publicKey)
     flunkyProtocol.emit('data', message)
   })
@@ -64,7 +64,12 @@ FlunkyProtocol.prototype.destroy = function () {
 FlunkyProtocol.prototype._read = function (size) {}
 
 FlunkyProtocol.prototype._write = function (chunk, encoding, callback) {
-  this.stream.write(FlunkyMessage.encode(chunk), 'buffer', callback)
+  var message = {
+    topic: chunk.topic,
+    protocol: chunk.protocol,
+    payload: chunk.payload
+  }
+  this.stream.write(FlunkyMessage.encode(message), 'buffer', callback)
 }
 
 /**
