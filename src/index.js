@@ -26,14 +26,15 @@ var nacl_util = require('tweetnacl-util')
  */
 var Platform = function (options) {
   assert(options.storage)
-  assert(options.identity)
-  this._setupAPI()
+  EventEmitter.call(this)
+
   if (!options.friends) {
     options.friends = new Circle()
   }
   if (!options.devices) {
     options.devices = new Circle()
   }
+  this._setupAPI(options)
   if (!options.directory) {
     options.directory = new Directory({
       storage: options.storage,
@@ -191,9 +192,10 @@ Platform.prototype._send = function (message, connection, callback) {
   connection.write(message, callback)
 }
 
-Platform.prototype._setupAPI = function () {
+Platform.prototype._setupAPI = function (options) {
   var offlineBuffer = new OfflineBuffer({
-    platform: this
+    platform: this,
+    storage: options.storage
   })
   this.messaging = new FlunkyAPI({
     protocol: 'ms',

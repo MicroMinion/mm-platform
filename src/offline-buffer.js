@@ -29,7 +29,8 @@ var SEND_INTERVAL = 1000 * 10
 // var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
 
 var OfflineBuffer = function (options) {
-  this.platform = options
+  this.platform = options.platform
+  this.storage = options.storage
   EventEmitter.call(this)
   var self = this
   this.platform.on('message', function (message) {
