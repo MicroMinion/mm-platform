@@ -11,6 +11,7 @@ var Circle = require('./empty-circle.js')
 var Directory = require('./directory.js')
 var debug = require('debug')('flunky-platform')
 var _ = require('lodash')
+var nacl_util = require('tweetnacl-util')
 
 /**
  * Flunky Platform
@@ -82,11 +83,20 @@ Platform.prototype._getConnection = function (publicKey) {
 }
 
 Platform.prototype._wrapConnection = function (socket, server) {
-  // TODO: Add constructor arguments
-  var curvePackets = new curvecp.PacketStream({
-    stream: socket,
-    isServer: server
-  })
+  var packetStreamOptions = {
+    isServer: server,
+    stream: socket
+  }
+  var publicKey = nacl_util.decodeBase64(this._options.identity.publicKey)
+  var privateKey = nacl_util.decodeBase64(this._options.identity.privateKey)
+  if (server) {
+    packetStreamOptions.serverPublicKey = publicKey
+    packetStreamOptions.serverPrivateKey = privateKey
+  } else {
+    packetStreamOptions.clientPublicKey = publicKey
+    packetStreamOptions.clientPrivateKey = privateKey
+  }
+  var curvePackets = new curvecp.PacketStream(packetStreamOptions)
   var curveMessages = new curvecp.MessageStream({
     stream: curvePackets
   })
@@ -148,7 +158,6 @@ Platform.prototype.send = function (message, options) {
     this._queueMessage(message, connection, options.callback)
   } else {
     var socket = new transports.Socket()
-    // TODO: Include publicKey info
     connection = this._wrapConnection(socket, false)
     this._queueMessage(message, connection, options.callback)
     connection.connect(message.destination)

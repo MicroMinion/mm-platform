@@ -6,13 +6,16 @@ Flunky platform is a secure messaging layer that allows applications to establis
 
 ``` js
 var FlunkyPlatform = require('flunky-platform')
+var kadfs = require('kad-fs')
+var path = require('path')
 
 //Create FlunkyPlatform instance
 var platform = new FlunkyPlatform({
   identity: new Keypair() //TODO
-  storage: //TODO: kad-fs compatible storage interface (make optional?)
+  storage: kadfs(path.join('./data', 'platform'))
 })
 
+//Attach message listener
 platform.on('message', function(message) {
   console.log(message.topic)
   console.log(message.sender)
@@ -21,8 +24,9 @@ platform.on('message', function(message) {
   console.log(message.payload)
 })
 
+//Sending a message. Destination can be any publicKey to contact other hosts
 platform.send({
-  destination: <publicKey>
+  destination: 'local'
   topic: 'test'
   protocol: 'ms',
   payload: 'test'

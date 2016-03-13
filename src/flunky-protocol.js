@@ -41,24 +41,28 @@ var FlunkyProtocol = function (options) {
   this.stream.on('timeout', function () {
     // TODO
   })
+  this.stream.on('lookup', function (err, address, family) {
+    flunkyProtocol.emit('lookup', err, address, family)
+  })
 }
 
 inherits(FlunkyProtocol, Duplex)
-
-FlunkyProtocol.prototype.address = function () {
-  return this.stream.address()
-}
 
 FlunkyProtocol.prototype.connect = function (publicKey) {
   var self = this
   this.directory.getConnectionInfo(publicKey, function (err, result) {
     if (err) {
       self.emit('error', err)
+      self.emit('lookup', err, null, null)
     } else {
-      self.emit('lookup', result)
-      self.stream.connect(result)
+      self.emit('lookup', null, result, 'flunky')
+      self.stream.connect(publicKey, result)
     }
   })
+}
+
+FlunkyProtocol.prototype.isConnected = function () {
+  return this.stream.isConnected()
 }
 
 FlunkyProtocol.prototype._read = function (size) {}
@@ -89,5 +93,15 @@ FlunkyProtocol.prototype._getScope = function (publicKey) {
     return 'public'
   }
 }
+
+FlunkyProtocol.prototype.destroy = function () {
+  this.stream.destroy()
+}
+
+Object.defineProperty(FlunkyProtocol.prototype, 'remoteAddress', {
+  get: function () {
+    return this.stream.remoteAddress
+  }
+})
 
 module.exports = FlunkyProtocol

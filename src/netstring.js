@@ -49,3 +49,23 @@ NetstringStream.prototype._processBuffer = function () {
 NetstringStream.prototype._write = function (chunk, encoding, callback) {
   this.stream.write(ns.nsWrite(chunk), encoding, callback)
 }
+
+NetstringStream.prototype.destroy = function () {
+  this.stream.destroy()
+}
+
+NetstringStream.prototype.isConnected = function () {
+  return this.stream.isConnected()
+}
+
+NetstringStream.prototype.connect = function (publicKey, connectionInfo) {
+  this.stream.connect(publicKey, connectionInfo)
+}
+
+Object.defineProperty(NetstringStream.prototype, 'remoteAddress', {
+  get: function () {
+    return this.stream.remoteAddress
+  }
+})
+
+module.exports = NetstringStream
