@@ -1,6 +1,6 @@
 var assert = require('assert')
 var inherits = require('inherits')
-var FlunkyTransport = require('flunky-transports').TcpTransport
+var transports = require('flunky-transports')
 var OfflineBuffer = require('./offline-buffer.js')
 var FlunkyAPI = require('./flunky-api.js')
 var EventEmitter = require('events').EventEmitter
@@ -8,13 +8,19 @@ var curvecp = require('curvecp')
 var ns = require('netstring-streams')
 var FlunkyProtocol = require('./flunky-protocol.js')
 var Circle = require('./empty-circle.js')
+var debug = require('debug')('flunky-platform')
+var _ = require('lodash')
 
 /**
  * Flunky Platform
  *
  * @constructor
- * @param {Object} options - Options that will be passed down to ProtocolDispatcher, Messaging, Torrenting, TransportManager and individual Transports
+ * @param {Object} options - Options that will be passed down to transport
  * @param {Object} options.storage - KAD-FS compatible storage interface
+ * @param {Object} options.directory - Directory lookup object
+ * @param {Object} options.identity - Public/Private keypair
+ * @param {Circle} options.friends - Circle object with list of trusted keys
+ * @param {Circle} options.devices - Circle object with list of trusted keys
  */
 var Platform = function (options) {
   assert(options.storage)
@@ -27,6 +33,7 @@ var Platform = function (options) {
     options.devices = new Circle()
   }
   this._options = options
+  this._connections = []
   this._setupTransport()
   this._setupAPI()
 }
@@ -35,29 +42,37 @@ inherits(Platform, EventEmitter)
 
 Platform.prototype._setupTransport = function () {
   var platform = this
-  this._transport = new FlunkyTransport()
-  this._transport.activate()
+  this._transport = transports.createServer(this._options)
+  this._transport.on('close', function () {
+    platform._setupTransport()
+  })
   this._transport.on('connection', function (socket) {
     platform._wrapConnection(socket, true)
   })
-  this._transport.on('connect', function (socket) {
-    platform._wrapConnection(socket, false)
+  this._transport.on('error', function (err) {
+    debug('ERROR in transport component')
+    debug(err)
   })
-  this._connections = []
-  /**
-   * Our own connection information, to be published in directory
-   *
-   * @access private
-   * @type {Object}
-   */
-  this._connectionInfo = {}
-  this._transport.on('active', function (connectionInfo) {
-    platform._connectionInfo = connectionInfo
+  this._transport.on('listening', function () {
+    platform.emit('ready')
   })
+  this._transport.listen()
 }
 
 Platform.prototype.getConnectionInfo = function () {
-  return this._connectionInfo
+  return this._transport.address()
+}
+
+Platform.prototype._getConnection = function (publicKey) {
+  var connections = _.filter(this._connections, function (connection) {
+    return connection.remoteAddress === publicKey
+  }, this)
+  _.sortBy(connections, function (connection) {
+    if (connection.connected) { return 1 } else { return 0 }
+  })
+  if (_.size(connections) > 0) {
+    return connections[0]
+  }
 }
 
 Platform.prototype._wrapConnection = function (socket, server) {
@@ -66,75 +81,81 @@ Platform.prototype._wrapConnection = function (socket, server) {
     stream: socket,
     isServer: server
   })
-  this._wrapStream(curvePackets, socket)
   var curveMessages = new curvecp.MessageStream({
     stream: curvePackets
   })
-  this._wrapStream(curveMessages, curvePackets)
   var netstrings = new ns.NetStringStream({
     stream: curveMessages
   })
-  this._wrapStream(netstrings, curveMessages)
   var flunkyMessages = new FlunkyProtocol({
     stream: netstrings,
     friends: this._options.friends,
     devices: this._options.devices
   })
-  this._wrapStream(flunkyMessages, netstrings)
   this._connectEvents(flunkyMessages)
+  return flunkyMessages
 }
 
 Platform.prototype._connectEvents = function (stream) {
   var platform = this
-  this._connections.append(stream)
+  this._connections.push(stream)
   stream.on('data', function (message) {
     platform.emit('message', message)
   })
-// TODO: Connect other events
-}
-
-Platform.prototype._wrapStream = function (outer, inner) {
-  inner.on('close', function () {
-    outer.emit('close')
+  stream.on('close', function () {
+    platform._connections.splice(platform._connections.indexOf(stream), 1)
+    stream.destroy()
   })
-  inner.on('end', function () {
-    outer.emit('end')
+  stream.on('end', function () {
+    debug('other end has closed connection')
   })
-  inner.on('error', function (err) {
-    outer.emit('error', err)
-  })
-  inner.on('finish', function () {
-    outer.emit('finish')
+  stream.on('error', function (err) {
+    debug('ERROR in socket')
+    debug(err)
   })
 }
 
 /**
- * _write message: message is an object with the following properties
+ * send message: message is an object with the following properties
  *  topic: string that contains message type/topic
  *  protocol: message protocol (determines encoding of data)
  *  destination: publicKey of destination host
  *  payload: message blob (buffer)
  */
 Platform.prototype.send = function (message, options) {
-  var connection = this._getConnection(message.destination)
   if (!options) {
     options = {}
   }
   if (!options.callback) {
     options.callback = function (err) {
       if (err) {
+        debug('ERROR in socket')
+        debug(err)
       }
     }
   }
-  if (connection) {
+  var connection = this._getConnection(message.destination)
+  if (connection && connection.isConnected()) {
     this._send(message, connection, options.callback)
+  } else if (connection) {
+    this._queueMessage(message, connection, options.callback)
   } else {
-    // TODO: Search for existing connections
-
-    // TODO: Connect if no connection exists (first lookup Directory info)
-
-    // TODO: Write to outgoing FlunkyMessages stream
+    var socket = new transports.Socket()
+    // TODO: Include publicKey info
+    connection = this._wrapConnection(socket, false)
+    this._queueMessage(message, connection, options.callback)
+    connection.connect(message.destination)
   }
+}
+
+Platform.prototype._queueMessage = function (message, connection, callback) {
+  var platform = this
+  connection.once('connect', function () {
+    platform._send(message, connection, callback)
+  })
+  connection.once('error', function (err) {
+    callback(err)
+  })
 }
 
 /**
