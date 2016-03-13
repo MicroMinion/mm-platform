@@ -39,7 +39,7 @@ var FlunkyProtocol = function (options) {
     flunkyProtocol.emit('error', err)
   })
   this.stream.on('timeout', function () {
-    // TODO
+    flunkyProtocol.emit('timeout')
   })
   this.stream.on('lookup', function (err, address, family) {
     flunkyProtocol.emit('lookup', err, address, family)

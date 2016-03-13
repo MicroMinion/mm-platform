@@ -1,3 +1,8 @@
+var debug = require('debug')('flunky-platform:netstring')
+var inherits = require('inherits')
+var Duplex = require('stream').Duplex
+var ns = require('./ns.js')
+
 var NetstringStream = function (options) {
   this.stream = options.stream
   this.buffer = new Buffer()
@@ -11,14 +16,40 @@ var NetstringStream = function (options) {
       self.buffer = new Buffer()
     }
   })
+  Duplex.call(this, {
+    allowHalfOpen: false
+  })
+  this.stream.on('close', function () {
+    self.emit('close')
+  })
+  this.stream.on('connect', function () {
+    self.emit('connect')
+  })
+  this.stream.on('drain', function () {
+    self.emit('drain')
+  })
+  this.stream.on('end', function () {
+    self.emit('end')
+  })
+  this.stream.on('error', function (err) {
+    self.emit('error', err)
+  })
+  this.stream.on('timeout', function () {
+    self.emit('timeout')
+  })
+  this.stream.on('lookup', function (err, address, family) {
+    self.emit('lookup', err, address, family)
+  })
 }
+
+inherits(NetstringStream, Duplex)
 
 /**
  * @private
  */
 NetstringStream.prototype._processBuffer = function () {
   debug('_processBuffer')
-  self = this
+  var self = this
   var buffer = this.buffer
   if (buffer.length === 0) {
     return
