@@ -1,6 +1,13 @@
+var debug = require('debug')('flunky-platform:directory')
+var Q = require('q')
+var _ = require('lodash')
+var expect = require('chai').expect
+
 var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
-var Directory = function () {
+var CACHE_REFRESH_INTERVAL = 1000 * 60 * 5
+
+var Directory = function (options) {
   /**
    * Connection information from previously used public keys
    *
@@ -9,13 +16,35 @@ var Directory = function () {
    */
   this.directoryCache = {}
   this.directoryLookup = {}
-  this._loadDirectoryCache()
+  this.storage = options.storage
+  this.messaging = options.messaging
+  this.messaging.on('self.transports.connectionInfo', this._processConnectionInfo)
+}
+
+Directory.prototype.getConnectionInfo = function (publicKey, callback) {
+  debug('_findKey')
+  if (_.has(this.directoryCache, publicKey)) {
+    var cacheResult = this.directoryCache[publicKey]
+    process.nextTick(function () {
+      callback(null, cacheResult)
+    })
+    if (!this.directoryCache[publicKey].lastUpdate || Math.abs(new Date() - new Date(this.directoryCache[publicKey].lastUpdate)) > CACHE_REFRESH_INTERVAL) {
+      if (!_.has(this.directoryLookup, publicKey)) {
+        this._lookupKey(publicKey)
+      }
+    }
+  } else if (_.has(this.directoryLookup, publicKey)) {
+    this.directoryLookup[publicKey].push(callback)
+  } else {
+    this._lookupKey(publicKey)
+    this.directoryLookup[publicKey] = [callback]
+  }
 }
 
 /**
  * @private
  */
-TransportManager.prototype._loadDirectoryCache = function () {
+Directory.prototype._loadDirectoryCache = function () {
   debug('loadDirectoryCache')
   var manager = this
   var options = {
@@ -29,68 +58,38 @@ TransportManager.prototype._loadDirectoryCache = function () {
       })
     }
   }
-  Q.nfcall(this.storage.get.bind(this.storage), 'flunky-transport-directoryCache').then(options.success)
+  Q.nfcall(this.storage.get.bind(this.storage), 'flunky-platform-directoryCache').then(options.success)
 }
 
 /**
  * @private
  */
-TransportManager.prototype._saveDirectoryCache = function () {
+Directory.prototype._saveDirectoryCache = function () {
   debug('saveDirectoryCache')
-  this.storage.put('flunky-transport-directoryCache', JSON.stringify(this.directoryCache))
-}
-
-/**
- * Lookup connectivity information in directory
- *
- * @private
- * @param {string} publicKey - publicKey of destination
- * @return {Promise}
- */
-TransportManager.prototype._findKey = function (publicKey) {
-  debug('_findKey')
-  if (_.has(this.directoryCache, publicKey)) {
-    var deferred = Q.defer()
-    var cacheResult = this.directoryCache[publicKey]
-    process.nextTick(function () {
-      deferred.resolve(cacheResult)
-    })
-    if (!this.directoryCache[publicKey].lastUpdate || Math.abs(new Date() - new Date(this.directoryCache[publicKey].lastUpdate)) > PUBLISH_CONNECTION_INFO_INTERVAL) {
-      if (!_.has(this.directoryLookup, publicKey)) {
-        this._lookupKey(publicKey)
-      }
-    }
-    return deferred.promise
-  } else if (_.has(this.directoryLookup, publicKey)) {
-    return this.directoryLookup[publicKey].promise
-  } else {
-    return this._lookupKey(publicKey)
-  }
+  this.storage.put('flunky-platform-directoryCache', JSON.stringify(this.directoryCache))
 }
 
 /**
  * @private
  */
-TransportManager.prototype._lookupKey = function (publicKey) {
+Directory.prototype._lookupKey = function (publicKey) {
   debug('_lookupKey')
-  expect(this.directoryLookup).to.not.have.ownProperty(publicKey)
-  var deferred = Q.defer()
   var manager = this
   this.messaging.send('transports.requestConnectionInfo', 'local', publicKey)
-  this.directoryLookup[publicKey] = deferred
   setTimeout(function () {
     if (_.has(manager.directoryLookup, publicKey)) {
-      manager.directoryLookup[publicKey].reject('key lookup timeout')
+      _.forEach(manager.directoryLookup[publicKey], function (callback) {
+        callback(new Error('key lookup timeout'), null)
+      })
       delete manager.directoryLookup[publicKey]
     }
   }, DIRECTORY_LOOKUP_TIMEOUT)
-  return deferred.promise
 }
 
 /**
  * @private
  */
-TransportManager.prototype._processConnectionInfo = function (topic, publicKey, data) {
+Directory.prototype._processConnectionInfo = function (topic, publicKey, data) {
   debug('connectionInfo event')
   if (!_.has(this.directoryCache, data.publicKey)) {
     this.directoryCache[data.publicKey] = {}
@@ -99,7 +98,11 @@ TransportManager.prototype._processConnectionInfo = function (topic, publicKey, 
   this.directoryCache[data.publicKey].lastUpdate = new Date().toJSON()
   this._saveDirectoryCache()
   if (_.has(this.directoryLookup, data.publicKey)) {
-    this.directoryLookup[data.publicKey].resolve(data)
+    _.forEach(this.directoryLookup[data.publicKey], function (callback) {
+      callback(null, data)
+    })
     delete this.directoryLookup[data.publicKey]
   }
 }
+
+module.exports = Directory

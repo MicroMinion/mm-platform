@@ -8,6 +8,7 @@ var curvecp = require('curvecp')
 var ns = require('netstring-streams')
 var FlunkyProtocol = require('./flunky-protocol.js')
 var Circle = require('./empty-circle.js')
+var Directory = require('./directory.js')
 var debug = require('debug')('flunky-platform')
 var _ = require('lodash')
 
@@ -24,18 +25,23 @@ var _ = require('lodash')
  */
 var Platform = function (options) {
   assert(options.storage)
-  assert(options.directory)
   assert(options.identity)
+  this._setupAPI()
   if (!options.friends) {
     options.friends = new Circle()
   }
   if (!options.devices) {
     options.devices = new Circle()
   }
+  if (!options.directory) {
+    options.directory = new Directory({
+      storage: options.storage,
+      messaging: this.messaging
+    })
+  }
   this._options = options
   this._connections = []
   this._setupTransport()
-  this._setupAPI()
 }
 
 inherits(Platform, EventEmitter)
@@ -90,7 +96,8 @@ Platform.prototype._wrapConnection = function (socket, server) {
   var flunkyMessages = new FlunkyProtocol({
     stream: netstrings,
     friends: this._options.friends,
-    devices: this._options.devices
+    devices: this._options.devices,
+    directory: this._options.directory
   })
   this._connectEvents(flunkyMessages)
   return flunkyMessages

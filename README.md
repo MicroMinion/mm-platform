@@ -11,7 +11,6 @@ var FlunkyPlatform = require('flunky-platform')
 var platform = new FlunkyPlatform({
   identity: new Keypair() //TODO
   storage: //TODO: kad-fs compatible storage interface (make optional?)
-  directory: //TODO: directory interface to lookup connectionInfo
 })
 
 platform.on('message', function(message) {
