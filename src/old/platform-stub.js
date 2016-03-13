@@ -4,7 +4,7 @@ var inherits = require('inherits')
 var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
 
 var Platform = {
-  this.messaging = new Messaging()
+  messaging = new Messaging()
 }
 
 Platform.prototype.enable = function() {}

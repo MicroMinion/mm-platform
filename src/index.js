@@ -59,7 +59,7 @@ Platform.prototype._wrapConnection = function (socket, server) {
   // TODO: Add constructor arguments
   var curvePackets = new curvecp.PacketStream({
     stream: socket,
-    isServer: server,
+    isServer: server
   })
   this._wrapStream(curvePackets, socket)
   var curveMessages = new curvecp.MessageStream({

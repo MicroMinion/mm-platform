@@ -2,13 +2,13 @@ var inherits = require('inherits')
 var Duplex = require('stream').Duplex
 var protobuf = require('protocol-buffers')
 
-var FlunkyMessage = protobuf("
+var FlunkyMessage = protobuf('
 message FlunkyMessage {
   required string topic = 1;
   required string protocol = 2;
   required bytes payload = 3;
 }
-").FlunkyMessage
+').FlunkyMessage
 
 var FlunkyProtocol = function (options) {
   Duplex.call(this, {
