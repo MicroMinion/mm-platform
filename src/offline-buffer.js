@@ -1,5 +1,10 @@
 var EventEmitter = require('events').EventEmitter
 var inherits = require('inherits')
+var expect = require('chai').expect
+var debug = require('debug')('flunky-platform:offline-buffer')
+var _ = require('lodash')
+var Q = require('q')
+var nacl = require('tweetnacl')
 
 /**
  * Interval for triggering send queues in milliseconds
@@ -21,7 +26,7 @@ var SEND_INTERVAL = 1000 * 10
  * @private
  * @readonly
  */
-var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
+// var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
 
 var OfflineBuffer = function (options) {
   this.platform = options
@@ -43,12 +48,12 @@ var OfflineBuffer = function (options) {
   this._sendQueuesRetrieved = false
   this._loadSendQueues()
   this.on('self.transport.connection', function (topic, local, publicKey) {
-    messaging._flushQueue(publicKey)
+    self._flushQueue(publicKey)
   })
   setInterval(function () {
     debug('trigger send queues periodically')
-    _.forEach(_.keys(messaging.sendQueues), function (publicKey) {
-      messaging._trigger(publicKey)
+    _.forEach(_.keys(self.sendQueues), function (publicKey) {
+      self._trigger(publicKey)
     })
   }, SEND_INTERVAL)
 }
@@ -57,6 +62,8 @@ inherits(OfflineBuffer, EventEmitter)
 
 OfflineBuffer.prototype.send = function (message, options) {
   // TODO: Implement offline behavior
+  var self = this
+  var publicKey = message.destination
   if (!options.realtime) {
     options.realtime = true
   }
@@ -65,8 +72,8 @@ OfflineBuffer.prototype.send = function (message, options) {
   }
   this.sendQueues[publicKey][message.id] = message
   setTimeout(function () {
-    if (_.has(messaging.sendQueues[publicKey], message.id)) {
-      delete messaging.sendQueues[publicKey][message.id]
+    if (_.has(self.sendQueues[publicKey], message.id)) {
+      delete self.sendQueues[publicKey][message.id]
     }
   }, message.expireAfter)
   this._saveSendQueues([publicKey])
@@ -79,7 +86,7 @@ OfflineBuffer.prototype.send = function (message, options) {
 /**
  * @private
  */
-Messaging.prototype._loadSendQueues = function () {
+OfflineBuffer.prototype._loadSendQueues = function () {
   debug('loadSendQueues')
   var messaging = this
   var options = {
@@ -113,7 +120,7 @@ Messaging.prototype._loadSendQueues = function () {
 /**
  * @private
  */
-Messaging.prototype._saveSendQueues = function (publicKeys) {
+OfflineBuffer.prototype._saveSendQueues = function (publicKeys) {
   debug('saveSendQueues')
   expect(publicKeys).to.be.an('array')
   if (!this._sendQueuesRetrieved) {
@@ -128,7 +135,7 @@ Messaging.prototype._saveSendQueues = function (publicKeys) {
  * @private
  * @param {string} publicKey - publicKey of destination for which messages need to be send
  */
-Messaging.prototype._trigger = function (publicKey) {
+OfflineBuffer.prototype._trigger = function (publicKey) {
   debug('trigger')
   expect(publicKey).to.be.a('string')
   expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
@@ -143,7 +150,7 @@ Messaging.prototype._trigger = function (publicKey) {
  * @param {string} publicKey - destination
  * @private
  */
-Messaging.prototype._flushQueue = function (publicKey) {
+OfflineBuffer.prototype._flushQueue = function (publicKey) {
   debug('flushQueue')
   expect(publicKey).to.be.a('string')
   expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
@@ -151,7 +158,7 @@ Messaging.prototype._flushQueue = function (publicKey) {
   _.forEach(this.sendQueues[publicKey], function (message) {
     if (Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
       debug('SEND: ' + JSON.stringify(message))
-      this.dispatcher.send(PROTOCOL, publicKey, new Buffer(JSON.stringify(message)))
+      this.dispatcher.send(publicKey, new Buffer(JSON.stringify(message)))
         .then(function () {
           delete messaging.sendQueues[publicKey][message.id]
           messaging._saveSendQueues([publicKey])
