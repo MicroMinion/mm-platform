@@ -15,6 +15,7 @@ var FlunkyProtocol = function (options) {
   this.stream = options.stream
   this.friends = options.friends
   this.devices = options.devices
+  this.directory = options.directory
   var flunkyProtocol = this
   this.stream.on('data', function (data) {
     var message = FlunkyMessage.decode(data)
@@ -37,11 +38,6 @@ var FlunkyProtocol = function (options) {
   this.stream.on('error', function (err) {
     flunkyProtocol.emit('error', err)
   })
-  this.stream.on('lookup', function (err, address, family) {
-    if (err) {
-    }
-  // TODO
-  })
   this.stream.on('timeout', function () {
     // TODO
   })
@@ -53,12 +49,16 @@ FlunkyProtocol.prototype.address = function () {
   return this.stream.address()
 }
 
-FlunkyProtocol.prototype.connect = function () {
-  this.stream.connect()
-}
-
-FlunkyProtocol.prototype.destroy = function () {
-  // TODO: Implement
+FlunkyProtocol.prototype.connect = function (publicKey) {
+  var self = this
+  this.directory.getConnectionInfo(publicKey, function (err, result) {
+    if (err) {
+      self.emit('error', err)
+    } else {
+      self.emit('lookup', result)
+      self.stream.connect(result)
+    }
+  })
 }
 
 FlunkyProtocol.prototype._read = function (size) {}
