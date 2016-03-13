@@ -18,7 +18,23 @@ var Directory = function (options) {
   this.directoryLookup = {}
   this.storage = options.storage
   this.messaging = options.messaging
+  var self = this
   this.messaging.on('self.transports.connectionInfo', this._processConnectionInfo)
+  setInterval(function () {
+    if (self._connectionInfo) {
+      var connectionInfo = self._connectionInfo
+      connectionInfo.publicKey = self.publicKey
+      self.messaging.send('transports.myConnectionInfo', connectionInfo)
+    }
+  }, CACHE_REFRESH_INTERVAL)
+}
+
+Directory.prototype.setPublicKey = function (publicKey) {
+  this.publicKey = publicKey
+}
+
+Directory.prototype.setMyConnectionInfo = function (connectionInfo) {
+  this._connectionInfo = connectionInfo
 }
 
 Directory.prototype.getConnectionInfo = function (publicKey, callback) {

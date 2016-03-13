@@ -40,12 +40,20 @@ var Platform = function (options) {
       messaging: this.messaging
     })
   }
+  if (options.identity) {
+    options.directory.setPublicKey(options.identity.publicKey)
+  }
   this._options = options
   this._connections = []
   this._setupTransport()
 }
 
 inherits(Platform, EventEmitter)
+
+Platform.prototype.setIdentity = function (identity) {
+  this._options.identity = identity
+  this._options.directory.setPublicKey(identity.publicKey)
+}
 
 Platform.prototype._setupTransport = function () {
   var platform = this
@@ -61,7 +69,7 @@ Platform.prototype._setupTransport = function () {
     debug(err)
   })
   this._transport.on('listening', function () {
-    platform.emit('ready')
+    platform._options.directory.setMyConnectionInfo(platform._transport.address())
   })
   this._transport.listen()
 }
