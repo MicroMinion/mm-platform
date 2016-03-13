@@ -1,0 +1,5 @@
+message FlunkyMessage {
+  required string topic = 1;
+  required string protocol = 2;
+  required bytes payload = 3;
+}
