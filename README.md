@@ -24,8 +24,9 @@ platform.on('message', function(message) {
 
 platform.send({
   destination: <publicKey>
+  topic: 'test'
   protocol: 'ms',
-
+  payload: 'test'
 })
 ```
 
