@@ -1,6 +1,6 @@
 var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
-var debug = require('flunky-platform:flunky-api')
+var debug = require('debug')('flunky-platform:flunky-api')
 
 var FlunkyAPI = function (options) {
   this.platform = options.platform

@@ -5,9 +5,9 @@ var OfflineBuffer = require('./offline-buffer.js')
 var FlunkyAPI = require('./flunky-api.js')
 var EventEmitter = require('events').EventEmitter
 var curvecp = require('curvecp')
-var ns = require('netstring-streams')
+var NetstringStream = require('./netstring.js')
 var FlunkyProtocol = require('./flunky-protocol.js')
-var Circle = require('./empty-circle.js')
+var Circle = require('./circle-empty.js')
 var Directory = require('./directory.js')
 var debug = require('debug')('flunky-platform')
 var _ = require('lodash')
@@ -108,7 +108,7 @@ Platform.prototype._wrapConnection = function (socket, server) {
   var curveMessages = new curvecp.MessageStream({
     stream: curvePackets
   })
-  var netstrings = new ns.NetStringStream({
+  var netstrings = new NetstringStream({
     stream: curveMessages
   })
   var flunkyMessages = new FlunkyProtocol({

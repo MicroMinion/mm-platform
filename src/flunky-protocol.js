@@ -3,8 +3,9 @@ var Duplex = require('stream').Duplex
 var protobuf = require('protocol-buffers')
 var fs = require('fs')
 var expect = require('chai').expect
+var path = require('path')
 
-var FlunkyMessage = protobuf(fs.readFileSync('flunky-protocol.proto')).FlunkyMessage
+var FlunkyMessage = protobuf(fs.readFileSync(path.join(path.resolve(__dirname), 'flunky-protocol.proto'))).FlunkyMessage
 
 var FlunkyProtocol = function (options) {
   Duplex.call(this, {

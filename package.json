@@ -28,11 +28,11 @@
     "is-buffer": "^1.0.2",
     "lodash": "^3.10.1",
     "node-uuid": "^1.4.3",
+    "protocol-buffers": "^3.1.6",
     "q": "^1.4.1",
     "string_decoder": "^0.10.31",
     "tweetnacl": "^0.13.1",
-    "flunky-transports": "git+ssh://git@bitbucket.org:nodatacenter/flunky-transports.git"
+    "tweetnacl-util": "^0.13.3"
   },
-  "devDependencies": {
-  }
+  "devDependencies": {}
 }
