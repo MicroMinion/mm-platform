@@ -7,6 +7,7 @@ var EventEmitter = require('events').EventEmitter
 var curvecp = require('curvecp')
 var ns = require('netstring-streams')
 var FlunkyProtocol = require('./flunky-protocol.js')
+var Circle = require('./empty-circle.js')
 
 /**
  * Flunky Platform
@@ -19,8 +20,12 @@ var Platform = function (options) {
   assert(options.storage)
   assert(options.directory)
   assert(options.identity)
-  assert(options.friends)
-  assert(options.devices)
+  if (!options.friends) {
+    options.friends = new Circle()
+  }
+  if (!options.devices) {
+    options.devices = new Circle()
+  }
   this._options = options
   this._setupTransport()
   this._setupAPI()
@@ -116,7 +121,10 @@ Platform.prototype.send = function (message, options) {
     options = {}
   }
   if (!options.callback) {
-    options.callback = function (err) {}
+    options.callback = function (err) {
+      if (err) {
+      }
+    }
   }
   if (connection) {
     this._send(message, connection, options.callback)
