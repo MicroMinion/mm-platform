@@ -1,6 +1,6 @@
 var assert = require('assert')
 var inherits = require('inherits')
-var FlunkyTransport = require('flunky-transports')
+var FlunkyTransport = require('flunky-transports').TcpTransport
 var OfflineBuffer = require('./offline-buffer.js')
 var FlunkyAPI = require('./flunky-api.js')
 var EventEmitter = require('events').EventEmitter

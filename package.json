@@ -31,6 +31,7 @@
     "q": "^1.4.1",
     "string_decoder": "^0.10.31",
     "tweetnacl": "^0.13.1",
+    "flunky-transports": "git+ssh://git@bitbucket.org:nodatacenter/flunky-transports.git"
   },
   "devDependencies": {
   }
