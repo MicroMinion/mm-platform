@@ -1,3 +1,5 @@
+'use strict'
+
 var debug = require('debug')('flunky-platform:directory')
 var Q = require('q')
 var _ = require('lodash')

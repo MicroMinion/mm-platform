@@ -1,3 +1,5 @@
+'use strict'
+
 var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
 var debug = require('debug')('flunky-platform:flunky-api')

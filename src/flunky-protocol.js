@@ -1,3 +1,5 @@
+'use strict'
+
 var inherits = require('inherits')
 var Duplex = require('stream').Duplex
 var protobuf = require('protocol-buffers')

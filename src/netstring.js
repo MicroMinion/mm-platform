@@ -1,3 +1,5 @@
+'use strict'
+
 var debug = require('debug')('flunky-platform:netstring')
 var inherits = require('inherits')
 var Duplex = require('stream').Duplex
