@@ -99,7 +99,7 @@ Platform.prototype._listen = function () {
       self._transport.listen()
     }
   }
-  Q.nfcall(this._options.storage.get.bind(this.options.storage), 'myConnectionInfo').then(options.success, options.error)
+  Q.nfcall(this._options.storage.get.bind(this._options.storage), 'myConnectionInfo').then(options.success, options.error)
 }
 
 Platform.prototype.getConnectionInfo = function () {

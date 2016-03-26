@@ -26,7 +26,7 @@ FlunkyAPI.prototype.send = function (topic, destination, payload, options) {
   if (this._isLocal(destination)) {
     process.nextTick(function () {
       self.emit('self.' + topic, destination, payload)
-      if (options.callback) {
+      if (options && options.callback) {
         options.callback()
       }
     })
