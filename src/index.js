@@ -15,6 +15,7 @@ var Directory = require('./directory.js')
 var debug = require('debug')('flunky-platform')
 var _ = require('lodash')
 var nacl_util = require('tweetnacl-util')
+var Q = require('q')
 
 /**
  * Flunky Platform
@@ -68,7 +69,7 @@ Platform.prototype._setupTransport = function () {
   this._transport.on('close', function () {
     platform._setupTransport()
   })
-  this._transport.on('connection', function (socket, connectionInfo) {
+  this._transport.on('connection', function (socket) {
     platform._wrapConnection(socket, true)
   })
   this._transport.on('error', function (err) {
@@ -79,10 +80,26 @@ Platform.prototype._setupTransport = function () {
   //  platform._options.directory.setMyConnectionInfo(connectionInfo)
   // })
   this._transport.on('listening', function () {
+    platform._options.storage.put('myConnectionInfo', JSON.stringify(platform._transport.address()))
     platform._options.directory.setMyConnectionInfo(platform._transport.address())
   })
-  // this._transport.activate()
-  this._transport.listen()
+  this._listen()
+}
+
+Platform.prototype._listen = function () {
+  var self = this
+  var options = {
+    success: function (value) {
+      value = JSON.parse(value)
+      self._transport.listen(value)
+    },
+    error: function (errorMessage) {
+      debug('error in loading connectionInfo from storage')
+      debug(errorMessage)
+      self._transport.listen()
+    }
+  }
+  Q.nfcall(this._options.storage.get.bind(this.options.storage), 'myConnectionInfo').then(options.success, options.error)
 }
 
 Platform.prototype.getConnectionInfo = function () {
