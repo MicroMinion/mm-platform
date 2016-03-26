@@ -1,6 +1,9 @@
+'use strict'
+
 var assert = require('assert')
 var inherits = require('inherits')
-var transports = require('flunky-transports')
+// var TCPTransport = require('flunky-transports').TcpTransport
+var transport = require('net-udp')
 var OfflineBuffer = require('./offline-buffer.js')
 var FlunkyAPI = require('./flunky-api.js')
 var EventEmitter = require('events').EventEmitter
@@ -58,24 +61,32 @@ Platform.prototype.setIdentity = function (identity) {
 
 Platform.prototype._setupTransport = function () {
   var platform = this
-  this._transport = transports.createServer(this._options)
+  // TODO: Storage of connectionInfo, and reUse as option
+  // TODO: connectionInfo in options object
+  // this._transport = new TCPTransport(this._options)
+  this._transport = transport.createServer()
   this._transport.on('close', function () {
     platform._setupTransport()
   })
-  this._transport.on('connection', function (socket) {
+  this._transport.on('connection', function (socket, connectionInfo) {
     platform._wrapConnection(socket, true)
   })
   this._transport.on('error', function (err) {
     debug('ERROR in transport component')
     debug(err)
   })
+  // this._transport.on('active', function (connectionInfo) {
+  //  platform._options.directory.setMyConnectionInfo(connectionInfo)
+  // })
   this._transport.on('listening', function () {
     platform._options.directory.setMyConnectionInfo(platform._transport.address())
   })
+  // this._transport.activate()
   this._transport.listen()
 }
 
 Platform.prototype.getConnectionInfo = function () {
+  // return this._transport.getConnectionInfo()
   return this._transport.address()
 }
 
@@ -166,7 +177,7 @@ Platform.prototype.send = function (message, options) {
   } else if (connection) {
     this._queueMessage(message, connection, options.callback)
   } else {
-    var socket = new transports.Socket()
+    var socket = new transport.Socket()
     connection = this._wrapConnection(socket, false)
     this._queueMessage(message, connection, options.callback)
     connection.connect(message.destination)
