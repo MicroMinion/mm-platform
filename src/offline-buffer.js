@@ -1,10 +1,12 @@
+'use strict'
+
 var EventEmitter = require('events').EventEmitter
 var inherits = require('inherits')
 var expect = require('chai').expect
 var debug = require('debug')('flunky-platform:offline-buffer')
 var _ = require('lodash')
+var uuid = require('node-uuid')
 var Q = require('q')
-var nacl = require('tweetnacl')
 
 /**
  * Interval for triggering send queues in milliseconds
@@ -26,15 +28,23 @@ var SEND_INTERVAL = 1000 * 10
  * @private
  * @readonly
  */
-// var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
+var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
 
 var OfflineBuffer = function (options) {
   this.platform = options.platform
   this.storage = options.storage
   EventEmitter.call(this)
   var self = this
+  if (options.name) {
+    this.name = options.name
+  } else {
+    this.name = 'offline'
+  }
   this.platform.on('message', function (message) {
     self.emit('message', message)
+  })
+  this.platform.on('connection', function (publicKey) {
+    self._flushQueue(publicKey)
   })
 
   /**
@@ -48,9 +58,6 @@ var OfflineBuffer = function (options) {
   this.sendQueues = {}
   this._sendQueuesRetrieved = false
   this._loadSendQueues()
-  this.on('self.transport.connection', function (topic, local, publicKey) {
-    self._flushQueue(publicKey)
-  })
   setInterval(function () {
     debug('trigger send queues periodically')
     _.forEach(_.keys(self.sendQueues), function (publicKey) {
@@ -61,75 +68,6 @@ var OfflineBuffer = function (options) {
 
 inherits(OfflineBuffer, EventEmitter)
 
-OfflineBuffer.prototype.send = function (message, options) {
-  // TODO: Implement offline behavior
-  var self = this
-  var publicKey = message.destination
-  if (!options.realtime) {
-    options.realtime = true
-  }
-  if (!this.sendQueues[publicKey]) {
-    this.sendQueues[publicKey] = {}
-  }
-  this.sendQueues[publicKey][message.id] = message
-  setTimeout(function () {
-    if (_.has(self.sendQueues[publicKey], message.id)) {
-      delete self.sendQueues[publicKey][message.id]
-    }
-  }, message.expireAfter)
-  this._saveSendQueues([publicKey])
-  if (options.realtime) {
-    process.nextTick(this._trigger.bind(this, publicKey))
-  }
-  this.platform.send(message, options)
-}
-
-/**
- * @private
- */
-OfflineBuffer.prototype._loadSendQueues = function () {
-  debug('loadSendQueues')
-  var messaging = this
-  var options = {
-    success: function (value) {
-      debug('success in loading sendqueue')
-      value = JSON.parse(value)
-      expect(value).to.be.an('object')
-      _.foreach(value, function (publicKey) {
-        expect(publicKey).to.be.a('string')
-        expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
-        if (!_.has(messaging.sendQueues, publicKey)) {
-          messaging.sendQueues[publicKey] = {}
-        }
-        _.forEach(value, function (message, uuid) {
-          if (!_.has(messaging.sendQueues[publicKey][uuid])) {
-            messaging.sendQueues[publicKey][uuid] = message
-          }
-        })
-      })
-      messaging._sendQueuesRetrieved = true
-    },
-    error: function (errorMessage) {
-      debug('error in loading sendqueue')
-      debug(errorMessage)
-      messaging._sendQueuesRetrieved = true
-    }
-  }
-  Q.nfcall(this.storage.get.bind(this.storage), 'flunky-messaging-sendQueues').then(options.success, options.error)
-}
-
-/**
- * @private
- */
-OfflineBuffer.prototype._saveSendQueues = function (publicKeys) {
-  debug('saveSendQueues')
-  expect(publicKeys).to.be.an('array')
-  if (!this._sendQueuesRetrieved) {
-    return
-  }
-  this.storage.put('flunky-messaging-sendQueues', JSON.stringify(this.sendQueues))
-}
-
 /**
  * Trigger sending of messages
  *
@@ -139,9 +77,32 @@ OfflineBuffer.prototype._saveSendQueues = function (publicKeys) {
 OfflineBuffer.prototype._trigger = function (publicKey) {
   debug('trigger')
   expect(publicKey).to.be.a('string')
-  expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
   if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0) {
     this._flushQueue(publicKey)
+  }
+}
+
+OfflineBuffer.prototype.send = function (message, options) {
+  var publicKey = message.destination
+  if (!options) {
+    options = {}
+  }
+  if (!options.realtime) {
+    options.realtime = true
+  }
+  if (!options.expireAfter) {
+    options.expireAfter = MAX_EXPIRE_TIME
+  }
+  if (!this.sendQueues[publicKey]) {
+    this.sendQueues[publicKey] = {}
+  }
+  if (options.realtime) {
+    this.platform.send(message, options)
+  } else {
+    var id = uuid.v4()
+    options.timestamp = new Date().toJSON()
+    this.sendQueues[publicKey][id] = {message: message, options: options}
+    this._saveSendQueues()
   }
 }
 
@@ -154,23 +115,74 @@ OfflineBuffer.prototype._trigger = function (publicKey) {
 OfflineBuffer.prototype._flushQueue = function (publicKey) {
   debug('flushQueue')
   expect(publicKey).to.be.a('string')
-  expect(nacl.util.decodeBase64(publicKey)).to.have.length(32)
-  var messaging = this
-  _.forEach(this.sendQueues[publicKey], function (message) {
-    if (Math.abs(new Date() - new Date(message.timestamp)) < message.expireAfter) {
+  var self = this
+  _.forEach(this.sendQueues[publicKey], function (queueItem, id) {
+    var options = queueItem.options
+    var message = queueItem.message
+    if (Math.abs(new Date() - new Date(options.timestamp)) < options.expireAfter) {
       debug('SEND: ' + JSON.stringify(message))
-      this.dispatcher.send(publicKey, new Buffer(JSON.stringify(message)))
-        .then(function () {
-          delete messaging.sendQueues[publicKey][message.id]
-          messaging._saveSendQueues([publicKey])
-        })
-        .fail(function (error) {
-          debug('message sending failed')
-          debug(error)
-        })
-        .done()
+      var callback = function (err) {
+        if (!err) {
+          if (options.callback) {
+            options.callback()
+          }
+          delete self.sendQueues[publicKey][id]
+          self._saveSendQueues()
+        }
+      }
+      self.platform.send(message, {callback: callback})
+    } else {
+      if (options.callback) {
+        options.callback(new Error('Timeout'))
+      }
+      delete self.sendQueues[publicKey][id]
+      self._saveSendQueues()
     }
   }, this)
+}
+
+/**
+ * @private
+ */
+OfflineBuffer.prototype._loadSendQueues = function () {
+  debug('loadSendQueues')
+  var self = this
+  var options = {
+    success: function (value) {
+      debug('success in loading sendqueue')
+      value = JSON.parse(value)
+      expect(value).to.be.an('object')
+      _.foreach(value, function (publicKey) {
+        expect(publicKey).to.be.a('string')
+        if (!_.has(self.sendQueues, publicKey)) {
+          self.sendQueues[publicKey] = {}
+        }
+        _.forEach(value, function (message, uuid) {
+          if (!_.has(self.sendQueues[publicKey][uuid])) {
+            self.sendQueues[publicKey][uuid] = message
+          }
+        })
+      })
+      self._sendQueuesRetrieved = true
+    },
+    error: function (errorMessage) {
+      debug('error in loading sendqueue')
+      debug(errorMessage)
+      self._sendQueuesRetrieved = true
+    }
+  }
+  Q.nfcall(this.storage.get.bind(this.storage), this.name + 'Buffer').then(options.success, options.error)
+}
+
+/**
+ * @private
+ */
+OfflineBuffer.prototype._saveSendQueues = function () {
+  debug('saveSendQueues')
+  if (!this._sendQueuesRetrieved) {
+    return
+  }
+  this.storage.put(this.name + 'Buffer', JSON.stringify(this.sendQueues))
 }
 
 module.exports = OfflineBuffer
