@@ -112,7 +112,11 @@ Platform.prototype._getConnection = function (publicKey) {
     return connection.remoteAddress === publicKey
   }, this)
   _.sortBy(connections, function (connection) {
-    if (connection.connected) { return 1 } else { return 0 }
+    if (connection.connected) {
+      return 1
+    } else {
+      return 0
+    }
   })
   if (_.size(connections) > 0) {
     return connections[0]
