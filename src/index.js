@@ -136,10 +136,14 @@ Platform.prototype._wrapConnection = function (socket, server) {
 Platform.prototype._connectEvents = function (stream) {
   var platform = this
   this._connections.push(stream)
+  stream.on('connect', function () {
+    platform.emit('connection', stream.remoteAddress)
+  })
   stream.on('data', function (message) {
     platform.emit('message', message)
   })
   stream.on('close', function () {
+    platform.emit('disconnected', stream.remoteAddress)
     platform._connections.splice(platform._connections.indexOf(stream), 1)
     stream.destroy()
   })
