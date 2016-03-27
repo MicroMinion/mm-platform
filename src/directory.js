@@ -36,10 +36,11 @@ var Directory = function (options) {
 Directory.prototype._sendMyConnectionInfo = function () {
   debug('_sendMyConnectionInfo')
   if (this._connectionInfo) {
-    var connectionInfo = this._connectionInfo
+    var connectionInfo = {}
     if (this.ready) {
       connectionInfo.boxId = this.identity.getBoxId()
       connectionInfo.signId = this.identity.getSignId()
+      connectionInfo.udp = this._connectionInfo
       this.platform.messaging.send('transports.myConnectionInfo', 'local', connectionInfo)
     }
   }
