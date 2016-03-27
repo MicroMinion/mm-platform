@@ -6,6 +6,7 @@ var protobuf = require('protocol-buffers')
 var fs = require('fs')
 var expect = require('chai').expect
 var path = require('path')
+var debug = require('debug')('flunky-platform:flunky-protocol')
 
 var FlunkyMessage = protobuf(fs.readFileSync(path.join(path.resolve(__dirname), 'flunky-protocol.proto'))).FlunkyMessage
 
@@ -20,6 +21,14 @@ var FlunkyProtocol = function (options) {
   this.devices = options.devices
   this.directory = options.directory
   var flunkyProtocol = this
+  this.directory.on('lookup', function (boxId, signId) {
+    if (!flunkyProtocol.remoteAddress) {
+      if (boxId === flunkyProtocol.stream.remoteAddress) {
+        flunkyProtocol.remoteAddress = signId
+        flunkyProtocol.emit('connect')
+      }
+    }
+  })
   this.stream.on('data', function (data) {
     var message = FlunkyMessage.decode(data)
     message.sender = flunkyProtocol.remoteAddress
@@ -30,7 +39,11 @@ var FlunkyProtocol = function (options) {
     flunkyProtocol.emit('close')
   })
   this.stream.on('connect', function () {
-    flunkyProtocol.emit('connect')
+    if (!flunkyProtocol.remoteAddress) {
+      flunkyProtocol.directory.getSignId(flunkyProtocol.stream.remoteAddress)
+    } else {
+      flunkyProtocol.emit('connect')
+    }
   })
   this.stream.on('drain', function () {
     flunkyProtocol.emit('drain')
@@ -52,7 +65,9 @@ var FlunkyProtocol = function (options) {
 inherits(FlunkyProtocol, Duplex)
 
 FlunkyProtocol.prototype.connect = function (publicKey) {
+  debug('connect')
   var self = this
+  this.remoteAddress = publicKey
   this.directory.getConnectionInfo(publicKey, function (err, result) {
     if (err) {
       self.emit('error', err)
@@ -100,11 +115,5 @@ FlunkyProtocol.prototype._getScope = function (publicKey) {
 FlunkyProtocol.prototype.destroy = function () {
   this.stream.destroy()
 }
-
-Object.defineProperty(FlunkyProtocol.prototype, 'remoteAddress', {
-  get: function () {
-    return this.stream.remoteAddress
-  }
-})
 
 module.exports = FlunkyProtocol

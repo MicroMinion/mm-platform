@@ -3,6 +3,7 @@
 var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
 var debug = require('debug')('flunky-platform:flunky-api')
+var expect = require('chai').expect
 
 var FlunkyAPI = function (options) {
   this.platform = options.platform
@@ -22,6 +23,9 @@ var FlunkyAPI = function (options) {
 inherits(FlunkyAPI, EventEmitter)
 
 FlunkyAPI.prototype.send = function (topic, destination, payload, options) {
+  debug('send')
+  expect(topic).to.be.a('string')
+  expect(destination).to.be.a('string')
   var self = this
   if (this._isLocal(destination)) {
     process.nextTick(function () {

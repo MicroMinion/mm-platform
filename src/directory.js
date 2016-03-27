@@ -4,6 +4,8 @@ var debug = require('debug')('flunky-platform:directory')
 var Q = require('q')
 var _ = require('lodash')
 var expect = require('chai').expect
+var events = require('events')
+var inherits = require('inherits')
 
 var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
@@ -16,8 +18,11 @@ var Directory = function (options) {
    * @access private
    * @type {Object.<string, Object>}
    */
+
   this.directoryCache = {}
   this.directoryLookup = {}
+  this.mapping = {}
+  events.EventEmitter.call(this)
   this.storage = options.storage
   this.platform = options.platform
   this.identity = options.identity
@@ -27,11 +32,14 @@ var Directory = function (options) {
     self.ready = true
   })
   this.platform.messaging.on('self.transports.connectionInfo', this._processConnectionInfo.bind(this))
+  this.platform.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
   setInterval(function () {
     debug('_cacheRefreshInterval')
     self._sendMyConnectionInfo()
   }, CACHE_REFRESH_INTERVAL)
 }
+
+inherits(Directory, events.EventEmitter)
 
 Directory.prototype._sendMyConnectionInfo = function () {
   debug('_sendMyConnectionInfo')
@@ -54,6 +62,7 @@ Directory.prototype.setMyConnectionInfo = function (connectionInfo) {
 
 Directory.prototype.getConnectionInfo = function (signId, callback) {
   debug('_findKey')
+  debug(signId)
   if (_.has(this.directoryCache, signId)) {
     var cacheResult = this.directoryCache[signId]
     process.nextTick(function () {
@@ -122,6 +131,7 @@ Directory.prototype._lookupKey = function (signId) {
  */
 Directory.prototype._processConnectionInfo = function (topic, local, data) {
   debug('connectionInfo event')
+  debug(data)
   if (!_.has(this.directoryCache, data.signId)) {
     this.directoryCache[data.signId] = {}
   }
@@ -133,6 +143,27 @@ Directory.prototype._processConnectionInfo = function (topic, local, data) {
       callback(null, data)
     })
     delete this.directoryLookup[data.signId]
+  }
+}
+
+Directory.prototype.getSignId = function (boxId) {
+  var self = this
+  _.forEach(this.directoryCache, function (connectionInfo) {
+    if (connectionInfo.boxId === boxId) {
+      process.nextTick(function () {
+        self.emit('lookup', boxId, connectionInfo.signId)
+      })
+      return
+    }
+  })
+  this.mapping[boxId] = {}
+  this.platform.messaging.send('directory.get', 'local', boxId)
+}
+
+Directory.prototype._processGetReply = function (topic, sender, data) {
+  if (_.has(this.mapping, data.key)) {
+    this.mapping[data.key] = data.value
+    this.emit('lookup', data.key, data.value)
   }
 }
 

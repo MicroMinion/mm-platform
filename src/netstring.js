@@ -83,6 +83,8 @@ NetstringStream.prototype._write = function (chunk, encoding, callback) {
   this.stream.write(ns.nsWrite(chunk), encoding, callback)
 }
 
+NetstringStream.prototype._read = function (size) {}
+
 NetstringStream.prototype.destroy = function () {
   this.stream.destroy()
 }

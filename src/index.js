@@ -190,6 +190,7 @@ Platform.prototype._connectEvents = function (stream) {
  *  payload: message blob (buffer)
  */
 Platform.prototype.send = function (message, options) {
+  debug('send')
   if (!options) {
     options = {}
   }
