@@ -26,7 +26,7 @@ var Directory = function (options) {
   this.identity.on('ready', function () {
     self.ready = true
   })
-  this.platform.messaging.on('self.transports.connectionInfo', this._processConnectionInfo)
+  this.platform.messaging.on('self.transports.connectionInfo', this._processConnectionInfo.bind(this))
   setInterval(function () {
     debug('_cacheRefreshInterval')
     self._sendMyConnectionInfo()
@@ -120,7 +120,7 @@ Directory.prototype._lookupKey = function (signId) {
 /**
  * @private
  */
-Directory.prototype._processConnectionInfo = function (topic, senderBoxId, data) {
+Directory.prototype._processConnectionInfo = function (topic, local, data) {
   debug('connectionInfo event')
   if (!_.has(this.directoryCache, data.signId)) {
     this.directoryCache[data.signId] = {}

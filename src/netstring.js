@@ -7,7 +7,7 @@ var ns = require('./ns.js')
 
 var NetstringStream = function (options) {
   this.stream = options.stream
-  this.buffer = new Buffer()
+  this.buffer = new Buffer(0)
   var self = this
   this.stream.on('data', function (data) {
     Buffer.concat([self.buffer, data])
