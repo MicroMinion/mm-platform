@@ -15,7 +15,7 @@ var Directory = require('./directory.js')
 var debug = require('debug')('flunky-platform')
 var _ = require('lodash')
 var Q = require('q')
-var kadfs = require('kadfs')
+var kadfs = require('kad-fs')
 var path = require('path')
 
 var storageDir = './data'
@@ -49,6 +49,7 @@ var Platform = function (options) {
     })
   }
   this.identity = options.identity
+  this._setupAPI(options)
   if (!options.directory) {
     options.directory = new Directory({
       storage: options.storage,
@@ -58,7 +59,6 @@ var Platform = function (options) {
   }
   this._options = options
   this._connections = []
-  this._setupAPI(options)
   this._setupTransport()
 }
 

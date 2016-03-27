@@ -21,7 +21,11 @@ var Directory = function (options) {
   this.storage = options.storage
   this.platform = options.platform
   this.identity = options.identity
+  this.ready = this.identity.loaded()
   var self = this
+  this.identity.on('ready', function () {
+    self.ready = true
+  })
   this.platform.messaging.on('self.transports.connectionInfo', this._processConnectionInfo)
   setInterval(function () {
     self._sendMyConnectionInfo()
@@ -31,9 +35,11 @@ var Directory = function (options) {
 Directory.prototype._sendMyConnectionInfo = function () {
   if (this._connectionInfo) {
     var connectionInfo = this._connectionInfo
-    connectionInfo.boxId = this.identity.getBoxId()
-    connectionInfo.signId = this.identity.getSignId()
-    this.platform.messaging.send('transports.myConnectionInfo', connectionInfo)
+    if (this.ready) {
+      connectionInfo.boxId = this.identity.getBoxId()
+      connectionInfo.signId = this.identity.getSignId()
+      this.platform.messaging.send('transports.myConnectionInfo', connectionInfo)
+    }
   }
 }
 
