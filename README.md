@@ -11,7 +11,6 @@ var path = require('path')
 
 //Create FlunkyPlatform instance
 var platform = new FlunkyPlatform({
-  identity: new Keypair() //TODO
   storage: kadfs(path.join('./data', 'platform'))
 })
 
