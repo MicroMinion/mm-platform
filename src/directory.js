@@ -28,22 +28,25 @@ var Directory = function (options) {
   })
   this.platform.messaging.on('self.transports.connectionInfo', this._processConnectionInfo)
   setInterval(function () {
+    debug('_cacheRefreshInterval')
     self._sendMyConnectionInfo()
   }, CACHE_REFRESH_INTERVAL)
 }
 
 Directory.prototype._sendMyConnectionInfo = function () {
+  debug('_sendMyConnectionInfo')
   if (this._connectionInfo) {
     var connectionInfo = this._connectionInfo
     if (this.ready) {
       connectionInfo.boxId = this.identity.getBoxId()
       connectionInfo.signId = this.identity.getSignId()
-      this.platform.messaging.send('transports.myConnectionInfo', connectionInfo)
+      this.platform.messaging.send('transports.myConnectionInfo', 'local', connectionInfo)
     }
   }
 }
 
 Directory.prototype.setMyConnectionInfo = function (connectionInfo) {
+  debug('setMyConnectionInfo')
   this._connectionInfo = connectionInfo
   this._sendMyConnectionInfo()
 }

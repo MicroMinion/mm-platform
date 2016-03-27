@@ -49,6 +49,10 @@ var Platform = function (options) {
     })
   }
   this.identity = options.identity
+  var self = this
+  this.identity.on('ready', function () {
+    self.emit('ready')
+  })
   this._setupAPI(options)
   if (!options.directory) {
     options.directory = new Directory({
@@ -65,6 +69,7 @@ var Platform = function (options) {
 inherits(Platform, EventEmitter)
 
 Platform.prototype._setupTransport = function () {
+  debug('_setupTransport')
   var platform = this
   // this._transport = new TCPTransport(this._options)
   this._transport = transport.createServer()
@@ -82,6 +87,7 @@ Platform.prototype._setupTransport = function () {
   //  platform._options.directory.setMyConnectionInfo(connectionInfo)
   // })
   this._transport.on('listening', function () {
+    debug('listening')
     platform._options.storage.put('myConnectionInfo', JSON.stringify(platform._transport.address()))
     platform._options.directory.setMyConnectionInfo(platform._transport.address())
   })
@@ -92,8 +98,12 @@ Platform.prototype._listen = function () {
   var self = this
   var options = {
     success: function (value) {
-      value = JSON.parse(value)
-      self._transport.listen(value)
+      if (value.length === 0) {
+        self._transport.listen()
+      } else {
+        value = JSON.parse(value)
+        self._transport.listen(value)
+      }
     },
     error: function (errorMessage) {
       debug('error in loading connectionInfo from storage')
@@ -230,11 +240,13 @@ Platform.prototype._setupAPI = function (options) {
   })
   this.messaging = new FlunkyAPI({
     protocol: 'ms',
-    platform: offlineBuffer
+    platform: offlineBuffer,
+    identity: this.identity
   })
   this.torrenting = new FlunkyAPI({
     protocol: 'bt',
-    platform: this
+    platform: this,
+    identity: this.identity
   })
 }
 
