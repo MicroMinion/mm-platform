@@ -1,6 +1,6 @@
 'use strict'
 
-var assert = require('assert')
+var Identity = require('./identity')
 var inherits = require('inherits')
 // var TCPTransport = require('flunky-transports').TcpTransport
 var transport = require('net-udp')
@@ -14,8 +14,11 @@ var Circle = require('./circle-empty.js')
 var Directory = require('./directory.js')
 var debug = require('debug')('flunky-platform')
 var _ = require('lodash')
-var nacl_util = require('tweetnacl-util')
 var Q = require('q')
+var kadfs = require('kadfs')
+var path = require('path')
+
+var storageDir = './data'
 
 /**
  * Flunky Platform
@@ -29,41 +32,40 @@ var Q = require('q')
  * @param {Circle} options.devices - Circle object with list of trusted keys
  */
 var Platform = function (options) {
-  assert(options.storage)
   EventEmitter.call(this)
-
+  if (!options.storage) {
+    options.storage = kadfs(path.join(storageDir, 'platform'))
+  }
   if (!options.friends) {
     options.friends = new Circle()
   }
   if (!options.devices) {
     options.devices = new Circle()
   }
-  this._setupAPI(options)
+  if (!options.identity) {
+    options.identity = new Identity({
+      platform: this,
+      storage: options.storage
+    })
+  }
+  this.identity = options.identity
   if (!options.directory) {
     options.directory = new Directory({
       storage: options.storage,
-      messaging: this.messaging
+      platform: this,
+      identity: options.identity
     })
-  }
-  if (options.identity) {
-    options.directory.setPublicKey(options.identity.publicKey)
   }
   this._options = options
   this._connections = []
+  this._setupAPI(options)
   this._setupTransport()
 }
 
 inherits(Platform, EventEmitter)
 
-Platform.prototype.setIdentity = function (identity) {
-  this._options.identity = identity
-  this._options.directory.setPublicKey(identity.publicKey)
-}
-
 Platform.prototype._setupTransport = function () {
   var platform = this
-  // TODO: Storage of connectionInfo, and reUse as option
-  // TODO: connectionInfo in options object
   // this._transport = new TCPTransport(this._options)
   this._transport = transport.createServer()
   this._transport.on('close', function () {
@@ -102,11 +104,6 @@ Platform.prototype._listen = function () {
   Q.nfcall(this._options.storage.get.bind(this._options.storage), 'myConnectionInfo').then(options.success, options.error)
 }
 
-Platform.prototype.getConnectionInfo = function () {
-  // return this._transport.getConnectionInfo()
-  return this._transport.address()
-}
-
 Platform.prototype._getConnection = function (publicKey) {
   var connections = _.filter(this._connections, function (connection) {
     return connection.remoteAddress === publicKey
@@ -128,14 +125,12 @@ Platform.prototype._wrapConnection = function (socket, server) {
     isServer: server,
     stream: socket
   }
-  var publicKey = nacl_util.decodeBase64(this._options.identity.publicKey)
-  var privateKey = nacl_util.decodeBase64(this._options.identity.privateKey)
   if (server) {
-    packetStreamOptions.serverPublicKey = publicKey
-    packetStreamOptions.serverPrivateKey = privateKey
+    packetStreamOptions.serverPublicKey = this.identity.box.publicKey
+    packetStreamOptions.serverPrivateKey = this.identity.box.secretKey
   } else {
-    packetStreamOptions.clientPublicKey = publicKey
-    packetStreamOptions.clientPrivateKey = privateKey
+    packetStreamOptions.clientPublicKey = this.identity.box.publicKey
+    packetStreamOptions.clientPrivateKey = this.identity.box.secretKey
   }
   var curvePackets = new curvecp.PacketStream(packetStreamOptions)
   var curveMessages = new curvecp.MessageStream({

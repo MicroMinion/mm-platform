@@ -19,43 +19,46 @@ var Directory = function (options) {
   this.directoryCache = {}
   this.directoryLookup = {}
   this.storage = options.storage
-  this.messaging = options.messaging
+  this.platform = options.platform
+  this.identity = options.identity
   var self = this
-  this.messaging.on('self.transports.connectionInfo', this._processConnectionInfo)
+  this.platform.messaging.on('self.transports.connectionInfo', this._processConnectionInfo)
   setInterval(function () {
-    if (self._connectionInfo) {
-      var connectionInfo = self._connectionInfo
-      connectionInfo.publicKey = self.publicKey
-      self.messaging.send('transports.myConnectionInfo', connectionInfo)
-    }
+    self._sendMyConnectionInfo()
   }, CACHE_REFRESH_INTERVAL)
 }
 
-Directory.prototype.setPublicKey = function (publicKey) {
-  this.publicKey = publicKey
+Directory.prototype._sendMyConnectionInfo = function () {
+  if (this._connectionInfo) {
+    var connectionInfo = this._connectionInfo
+    connectionInfo.boxId = this.identity.getBoxId()
+    connectionInfo.signId = this.identity.getSignId()
+    this.platform.messaging.send('transports.myConnectionInfo', connectionInfo)
+  }
 }
 
 Directory.prototype.setMyConnectionInfo = function (connectionInfo) {
   this._connectionInfo = connectionInfo
+  this._sendMyConnectionInfo()
 }
 
-Directory.prototype.getConnectionInfo = function (publicKey, callback) {
+Directory.prototype.getConnectionInfo = function (signId, callback) {
   debug('_findKey')
-  if (_.has(this.directoryCache, publicKey)) {
-    var cacheResult = this.directoryCache[publicKey]
+  if (_.has(this.directoryCache, signId)) {
+    var cacheResult = this.directoryCache[signId]
     process.nextTick(function () {
       callback(null, cacheResult)
     })
-    if (!this.directoryCache[publicKey].lastUpdate || Math.abs(new Date() - new Date(this.directoryCache[publicKey].lastUpdate)) > CACHE_REFRESH_INTERVAL) {
-      if (!_.has(this.directoryLookup, publicKey)) {
-        this._lookupKey(publicKey)
+    if (!this.directoryCache[signId].lastUpdate || Math.abs(new Date() - new Date(this.directoryCache[signId].lastUpdate)) > CACHE_REFRESH_INTERVAL) {
+      if (!_.has(this.directoryLookup, signId)) {
+        this._lookupKey(signId)
       }
     }
-  } else if (_.has(this.directoryLookup, publicKey)) {
-    this.directoryLookup[publicKey].push(callback)
+  } else if (_.has(this.directoryLookup, signId)) {
+    this.directoryLookup[signId].push(callback)
   } else {
-    this._lookupKey(publicKey)
-    this.directoryLookup[publicKey] = [callback]
+    this._lookupKey(signId)
+    this.directoryLookup[signId] = [callback]
   }
 }
 
@@ -90,16 +93,16 @@ Directory.prototype._saveDirectoryCache = function () {
 /**
  * @private
  */
-Directory.prototype._lookupKey = function (publicKey) {
+Directory.prototype._lookupKey = function (signId) {
   debug('_lookupKey')
   var manager = this
-  this.messaging.send('transports.requestConnectionInfo', 'local', publicKey)
+  this.platform.messaging.send('transports.requestConnectionInfo', 'local', signId)
   setTimeout(function () {
-    if (_.has(manager.directoryLookup, publicKey)) {
-      _.forEach(manager.directoryLookup[publicKey], function (callback) {
+    if (_.has(manager.directoryLookup, signId)) {
+      _.forEach(manager.directoryLookup[signId], function (callback) {
         callback(new Error('key lookup timeout'), null)
       })
-      delete manager.directoryLookup[publicKey]
+      delete manager.directoryLookup[signId]
     }
   }, DIRECTORY_LOOKUP_TIMEOUT)
 }
@@ -107,19 +110,19 @@ Directory.prototype._lookupKey = function (publicKey) {
 /**
  * @private
  */
-Directory.prototype._processConnectionInfo = function (topic, publicKey, data) {
+Directory.prototype._processConnectionInfo = function (topic, senderBoxId, data) {
   debug('connectionInfo event')
-  if (!_.has(this.directoryCache, data.publicKey)) {
-    this.directoryCache[data.publicKey] = {}
+  if (!_.has(this.directoryCache, data.signId)) {
+    this.directoryCache[data.signId] = {}
   }
-  this.directoryCache[data.publicKey] = data
-  this.directoryCache[data.publicKey].lastUpdate = new Date().toJSON()
+  this.directoryCache[data.signId] = data
+  this.directoryCache[data.signId].lastUpdate = new Date().toJSON()
   this._saveDirectoryCache()
-  if (_.has(this.directoryLookup, data.publicKey)) {
-    _.forEach(this.directoryLookup[data.publicKey], function (callback) {
+  if (_.has(this.directoryLookup, data.signId)) {
+    _.forEach(this.directoryLookup[data.signId], function (callback) {
       callback(null, data)
     })
-    delete this.directoryLookup[data.publicKey]
+    delete this.directoryLookup[data.signId]
   }
 }
 

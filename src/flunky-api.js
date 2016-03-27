@@ -49,7 +49,7 @@ FlunkyAPI.prototype._isLocal = function (publicKey) {
     return true
   }
   if (this.profile) {
-    return this.identity.publicKey === publicKey
+    return this.identity.getSignId() === publicKey
   }
   return false
 }

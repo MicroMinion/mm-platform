@@ -167,7 +167,6 @@ OfflineBuffer.prototype._loadSendQueues = function () {
     },
     error: function (errorMessage) {
       debug('error in loading sendqueue')
-      debug(errorMessage)
       self._sendQueuesRetrieved = true
     }
   }

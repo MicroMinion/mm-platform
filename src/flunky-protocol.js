@@ -23,7 +23,7 @@ var FlunkyProtocol = function (options) {
   this.stream.on('data', function (data) {
     var message = FlunkyMessage.decode(data)
     message.sender = flunkyProtocol.remoteAddress
-    message.scope = flunkyProtocol._getScope(message.publicKey)
+    message.scope = flunkyProtocol._getScope(message.sender)
     flunkyProtocol.emit('data', message)
   })
   this.stream.on('close', function () {
@@ -59,7 +59,7 @@ FlunkyProtocol.prototype.connect = function (publicKey) {
       self.emit('lookup', err, null, null)
     } else {
       self.emit('lookup', null, result, 'flunky')
-      self.stream.connect(publicKey, result)
+      self.stream.connect(result)
     }
   })
 }
