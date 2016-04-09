@@ -21,7 +21,7 @@
   "author": "Thomas Delaet <thomas@delaet.org>",
   "dependencies": {
     "ak-eventemitter": "0.0.5",
-    "curvecp": "^0.6.0",
+    "curvecp": "^0.6.1",
     "debug": "^2.2.0",
     "ed2curve": "^0.1.4",
     "inherits": "^2.0.1",
