@@ -2,11 +2,11 @@
 
 var EventEmitter = require('events').EventEmitter
 var inherits = require('inherits')
-var expect = require('chai').expect
 var debug = require('debug')('flunky-platform:offline-buffer')
 var _ = require('lodash')
 var uuid = require('node-uuid')
-var Q = require('q')
+var assert = require('assert')
+var validation = require('./validation.js')
 
 /**
  * Interval for triggering send queues in milliseconds
@@ -31,6 +31,9 @@ var SEND_INTERVAL = 1000 * 10
 var MAX_EXPIRE_TIME = 1000 * 60 * 60 * 24 * 7
 
 var OfflineBuffer = function (options) {
+  assert(validation.validOptions(options))
+  assert(_.has(options, 'platform'))
+  assert(_.has(options, 'storage'))
   this.platform = options.platform
   this.storage = options.storage
   EventEmitter.call(this)
@@ -41,9 +44,11 @@ var OfflineBuffer = function (options) {
     this.name = 'offline'
   }
   this.platform.on('message', function (message) {
+    assert(validation.validReceivedMessage(message))
     self.emit('message', message)
   })
   this.platform.on('connection', function (publicKey) {
+    assert(validation.validKeyString(publicKey))
     self._flushQueue(publicKey)
   })
 
@@ -61,6 +66,7 @@ var OfflineBuffer = function (options) {
   setInterval(function () {
     debug('trigger send queues periodically')
     _.forEach(_.keys(self.sendQueues), function (publicKey) {
+      assert(validation.validKeyString(publicKey))
       self._trigger(publicKey)
     })
   }, SEND_INTERVAL)
@@ -76,13 +82,15 @@ inherits(OfflineBuffer, EventEmitter)
  */
 OfflineBuffer.prototype._trigger = function (publicKey) {
   debug('trigger')
-  expect(publicKey).to.be.a('string')
+  assert(validation.validKeyString(publicKey))
   if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0) {
     this._flushQueue(publicKey)
   }
 }
 
 OfflineBuffer.prototype.send = function (message, options) {
+  assert(validation.validSendMessage(message))
+  assert(validation.validOptions(options))
   var publicKey = message.destination
   if (!options) {
     options = {}
@@ -114,7 +122,7 @@ OfflineBuffer.prototype.send = function (message, options) {
  */
 OfflineBuffer.prototype._flushQueue = function (publicKey) {
   debug('flushQueue')
-  expect(publicKey).to.be.a('string')
+  assert(validation.validKeyString(publicKey))
   var self = this
   _.forEach(this.sendQueues[publicKey], function (queueItem, id) {
     var options = queueItem.options
@@ -147,30 +155,37 @@ OfflineBuffer.prototype._flushQueue = function (publicKey) {
 OfflineBuffer.prototype._loadSendQueues = function () {
   debug('loadSendQueues')
   var self = this
-  var options = {
-    success: function (value) {
-      debug('success in loading sendqueue')
-      value = JSON.parse(value)
-      expect(value).to.be.an('object')
-      _.foreach(value, function (publicKey) {
-        expect(publicKey).to.be.a('string')
-        if (!_.has(self.sendQueues, publicKey)) {
-          self.sendQueues[publicKey] = {}
+  var success = function (value) {
+    debug('success in loading sendqueue')
+    assert(validation.validString(value))
+    value = JSON.parse(value)
+    assert(_.isObject(value))
+    _.foreach(value, function (publicKey) {
+      assert(validation.validKeyString(publicKey))
+      if (!_.has(self.sendQueues, publicKey)) {
+        self.sendQueues[publicKey] = {}
+      }
+      _.forEach(value, function (message, uuid) {
+        if (!_.has(self.sendQueues[publicKey][uuid])) {
+          self.sendQueues[publicKey][uuid] = message
         }
-        _.forEach(value, function (message, uuid) {
-          if (!_.has(self.sendQueues[publicKey][uuid])) {
-            self.sendQueues[publicKey][uuid] = message
-          }
-        })
       })
-      self._sendQueuesRetrieved = true
-    },
-    error: function (errorMessage) {
-      debug('error in loading sendqueue')
-      self._sendQueuesRetrieved = true
-    }
+    })
+    self._sendQueuesRetrieved = true
   }
-  Q.nfcall(this.storage.get.bind(this.storage), this.name + 'Buffer').then(options.success, options.error)
+  var error = function (errorMessage) {
+    assert(_.isError(errorMessage))
+    debug('error in loading sendqueue')
+    debug(errorMessage)
+    self._sendQueuesRetrieved = true
+  }
+  this.storage.get(this.name + 'Buffer', function (err, result) {
+    if (err) {
+      error(err)
+    } else {
+      success(result)
+    }
+  })
 }
 
 /**

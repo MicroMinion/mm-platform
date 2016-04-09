@@ -21,7 +21,6 @@
   "author": "Thomas Delaet <thomas@delaet.org>",
   "dependencies": {
     "ak-eventemitter": "0.0.5",
-    "chai": "^3.2.0",
     "curvecp": "^0.6.0",
     "debug": "^2.2.0",
     "ed2curve": "^0.1.4",
@@ -30,7 +29,6 @@
     "lodash": "^3.10.1",
     "node-uuid": "^1.4.7",
     "protocol-buffers": "^3.1.6",
-    "q": "^1.4.1",
     "string_decoder": "^0.10.31",
     "tweetnacl": "^0.14.1",
     "tweetnacl-util": "^0.13.3"

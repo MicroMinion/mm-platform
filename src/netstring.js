@@ -4,18 +4,30 @@ var debug = require('debug')('flunky-platform:netstring')
 var inherits = require('inherits')
 var Duplex = require('stream').Duplex
 var ns = require('./ns.js')
+var assert = require('assert')
+var validation = require('./validation.js')
+var _ = require('lodash')
 
 var NetstringStream = function (options) {
+  assert(validation.validOptions(options))
+  assert(_.has(options, 'stream'))
   this.stream = options.stream
-  this.buffer = new Buffer(0)
   var self = this
   this.stream.on('data', function (data) {
-    Buffer.concat([self.buffer, data])
+    debug('data received')
+    assert(_.isBuffer(data))
+    debug(data.toString())
+    if (!self.buffer) {
+      self.buffer = data
+    } else {
+      self.buffer = Buffer.concat([self.buffer, data])
+    }
     try {
       self._processBuffer()
     } catch (e) {
+      assert(_.isError(e))
       debug(e)
-      self.buffer = new Buffer()
+      delete self.buffer
     }
   })
   Duplex.call(this, {
@@ -51,8 +63,10 @@ inherits(NetstringStream, Duplex)
  */
 NetstringStream.prototype._processBuffer = function () {
   debug('_processBuffer')
+  assert(_.isBuffer(this.buffer))
   var self = this
-  var buffer = this.buffer
+  var buffer = new Buffer(this.buffer)
+  debug(buffer.length)
   if (buffer.length === 0) {
     return
   }
@@ -63,8 +77,6 @@ NetstringStream.prototype._processBuffer = function () {
     process.nextTick(function () {
       self.emit('data', ns.nsPayload(buffer))
     })
-    this._processMessage(ns.nsPayload(buffer))
-    this.buffers = new Buffer(buffer.length - messageLength)
     buffer.copy(this.buffer, 0, messageLength)
     debug('buffer length after processing: ' + this.buffer.length)
     this._processBuffer()
@@ -80,6 +92,9 @@ NetstringStream.prototype._processBuffer = function () {
  * @param {Buffer} message
  */
 NetstringStream.prototype._write = function (chunk, encoding, callback) {
+  assert(_.isBuffer(chunk))
+  assert(validation.validCallback(callback))
+  assert(_.isBuffer(ns.nsWrite(chunk)))
   this.stream.write(ns.nsWrite(chunk), encoding, callback)
 }
 
@@ -94,6 +109,7 @@ NetstringStream.prototype.isConnected = function () {
 }
 
 NetstringStream.prototype.connect = function (connectionInfo) {
+  assert(validation.validConnectionInfo(connectionInfo))
   this.stream.connect(connectionInfo)
 }
 

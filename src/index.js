@@ -14,11 +14,12 @@ var Circle = require('./circle-empty.js')
 var Directory = require('./directory.js')
 var debug = require('debug')('flunky-platform')
 var _ = require('lodash')
-var Q = require('q')
 var kadfs = require('kad-fs')
 var path = require('path')
+var assert = require('assert')
+var validation = require('./validation.js')
 
-var storageDir = './data'
+var DEFAULT_STORAGE_DIR = './data'
 
 /**
  * Flunky Platform
@@ -32,20 +33,24 @@ var storageDir = './data'
  * @param {Circle} options.devices - Circle object with list of trusted keys
  */
 var Platform = function (options) {
+  assert(validation.validOptions(options))
   EventEmitter.call(this)
   if (!options.storage) {
-    options.storage = kadfs(path.join(storageDir, 'platform'))
+    options.storage = kadfs(path.join(DEFAULT_STORAGE_DIR, 'platform'))
   }
+  this.storage = options.storage
   if (!options.friends) {
     options.friends = new Circle()
   }
+  this.friends = options.friends
   if (!options.devices) {
     options.devices = new Circle()
   }
+  this.devices = options.devices
   if (!options.identity) {
     options.identity = new Identity({
       platform: this,
-      storage: options.storage
+      storage: this.storage
     })
   }
   this.identity = options.identity
@@ -53,15 +58,15 @@ var Platform = function (options) {
   this.identity.on('ready', function () {
     self.emit('ready')
   })
-  this._setupAPI(options)
+  this._setupAPI()
   if (!options.directory) {
     options.directory = new Directory({
-      storage: options.storage,
+      storage: this.storage,
       platform: this,
-      identity: options.identity
+      identity: this.identity
     })
   }
-  this._options = options
+  this.directory = options.directory
   this._connections = []
   this._setupTransport()
 }
@@ -70,51 +75,60 @@ inherits(Platform, EventEmitter)
 
 Platform.prototype._setupTransport = function () {
   debug('_setupTransport')
-  var platform = this
-  // this._transport = new TCPTransport(this._options)
+  var self = this
+  // this._transport = new TCPTransport(options)
   this._transport = transport.createServer()
   this._transport.on('close', function () {
-    platform._setupTransport()
+    self._setupTransport()
   })
   this._transport.on('connection', function (socket) {
-    platform._wrapConnection(socket, true)
+    assert(validation.validStream(socket))
+    self._wrapConnection(socket, true)
   })
   this._transport.on('error', function (err) {
+    assert(_.isError(err))
     debug('ERROR in transport component')
     debug(err)
   })
   // this._transport.on('active', function (connectionInfo) {
-  //  platform._options.directory.setMyConnectionInfo(connectionInfo)
+  //  platform.directory.setMyConnectionInfo(connectionInfo)
   // })
   this._transport.on('listening', function () {
     debug('listening')
-    platform._options.storage.put('myConnectionInfo', JSON.stringify(platform._transport.address()))
-    platform._options.directory.setMyConnectionInfo(platform._transport.address())
+    self.storage.put('myConnectionInfo', JSON.stringify(self._transport.address()))
+    self.directory.setMyConnectionInfo(self._transport.address())
   })
   this._listen()
 }
 
 Platform.prototype._listen = function () {
   var self = this
-  var options = {
-    success: function (value) {
-      if (value.length === 0) {
-        self._transport.listen()
-      } else {
-        value = JSON.parse(value)
-        self._transport.listen(value)
-      }
-    },
-    error: function (errorMessage) {
-      debug('error in loading connectionInfo from storage')
-      debug(errorMessage)
+  var success = function (value) {
+    assert(_.isPlainObject(value))
+    if (value.length === 0) {
       self._transport.listen()
+    } else {
+      value = JSON.parse(value)
+      self._transport.listen(value)
     }
   }
-  Q.nfcall(this._options.storage.get.bind(this._options.storage), 'myConnectionInfo').then(options.success, options.error)
+  var error = function (errorMessage) {
+    assert(_.isError(errorMessage))
+    debug('error in loading connectionInfo from storage')
+    debug(errorMessage)
+    self._transport.listen()
+  }
+  this.storage.get('myConnectionInfo', function (err, result) {
+    if (err) {
+      error(err)
+    } else {
+      success(result)
+    }
+  })
 }
 
 Platform.prototype._getConnection = function (publicKey) {
+  assert(validation.validKeyString(publicKey))
   var connections = _.filter(this._connections, function (connection) {
     return connection.remoteAddress === publicKey
   }, this)
@@ -131,6 +145,8 @@ Platform.prototype._getConnection = function (publicKey) {
 }
 
 Platform.prototype._wrapConnection = function (socket, server) {
+  assert(validation.validStream(socket))
+  assert(_.isBoolean(server))
   var packetStreamOptions = {
     isServer: server,
     stream: socket
@@ -151,32 +167,37 @@ Platform.prototype._wrapConnection = function (socket, server) {
   })
   var flunkyMessages = new FlunkyProtocol({
     stream: netstrings,
-    friends: this._options.friends,
-    devices: this._options.devices,
-    directory: this._options.directory
+    friends: this.friends,
+    devices: this.devices,
+    directory: this.directory
   })
   this._connectEvents(flunkyMessages)
   return flunkyMessages
 }
 
 Platform.prototype._connectEvents = function (stream) {
-  var platform = this
+  assert(validation.validStream(stream))
+  var self = this
   this._connections.push(stream)
   stream.on('connect', function () {
-    platform.emit('connection', stream.remoteAddress)
+    self.emit('connection', stream.remoteAddress)
   })
   stream.on('data', function (message) {
-    platform.emit('message', message)
+    assert(validation.validProtocolObject(message))
+    assert(_.has(message, 'sender'))
+    assert(validation.validKeyString(message.sender))
+    self.emit('message', message)
   })
   stream.on('close', function () {
-    platform.emit('disconnected', stream.remoteAddress)
-    platform._connections.splice(platform._connections.indexOf(stream), 1)
+    self.emit('disconnected', stream.remoteAddress)
+    self._connections.splice(self._connections.indexOf(stream), 1)
     stream.destroy()
   })
   stream.on('end', function () {
     debug('other end has closed connection')
   })
   stream.on('error', function (err) {
+    assert(_.isError(err))
     debug('ERROR in socket')
     debug(err)
   })
@@ -191,11 +212,16 @@ Platform.prototype._connectEvents = function (stream) {
  */
 Platform.prototype.send = function (message, options) {
   debug('send')
+  assert(validation.validProtocolObject(message))
+  assert(_.has(message, 'destination'))
+  assert(validation.validKeyString(message.destination))
+  assert(validation.validOptions(options))
   if (!options) {
     options = {}
   }
   if (!options.callback) {
     options.callback = function (err) {
+      assert(validation.validError(err))
       if (err) {
         debug('ERROR in socket')
         debug(err)
@@ -216,11 +242,15 @@ Platform.prototype.send = function (message, options) {
 }
 
 Platform.prototype._queueMessage = function (message, connection, callback) {
-  var platform = this
+  assert(validation.validSendMessage(message))
+  assert(validation.validStream(connection))
+  assert(_.isNil(callback) || _.isFunction(callback))
+  var self = this
   connection.once('connect', function () {
-    platform._send(message, connection, callback)
+    self._send(message, connection, callback)
   })
   connection.once('error', function (err) {
+    assert(_.isError(err))
     callback(err)
   })
 }
@@ -231,18 +261,25 @@ Platform.prototype._queueMessage = function (message, connection, callback) {
  * @private
  */
 Platform.prototype._send = function (message, connection, callback) {
+  assert(validation.validSendMessage(message))
+  assert(validation.validStream(connection))
+  assert(_.isNil(callback) || _.isFunction(callback))
   connection.write(message, callback)
 }
 
-Platform.prototype._setupAPI = function (options) {
+Platform.prototype._setupAPI = function () {
+  assert(_.has(this, 'storage'))
+  assert(_.has(this, 'identity'))
   var offlineBuffer = new OfflineBuffer({
     platform: this,
-    storage: options.storage
+    storage: this.storage
   })
   this.messaging = new FlunkyAPI({
     protocol: 'ms',
     platform: offlineBuffer,
-    identity: this.identity
+    identity: this.identity,
+    serialize: JSON.stringify,
+    deserialize: JSON.parse
   })
   this.torrenting = new FlunkyAPI({
     protocol: 'bt',

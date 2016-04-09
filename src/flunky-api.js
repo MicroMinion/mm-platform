@@ -3,9 +3,15 @@
 var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
 var debug = require('debug')('flunky-platform:flunky-api')
-var expect = require('chai').expect
+var validation = require('./validation.js')
+var assert = require('assert')
+var _ = require('lodash')
 
 var FlunkyAPI = function (options) {
+  assert(validation.validOptions(options))
+  assert(_.has(options, 'platform'))
+  assert(_.has(options, 'protocol'))
+  assert(_.has(options, 'identity'))
   this.platform = options.platform
   this.protocol = options.protocol
   this.identity = options.identity
@@ -13,9 +19,21 @@ var FlunkyAPI = function (options) {
   EventEmitter.call(this, {
     delimiter: '.'
   })
+  if (!options.serialize) {
+    options.serialize = function (string) { return string }
+  }
+  this.serialize = options.serialize
+  if (!options.deserialize) {
+    options.deserialize = function (data) { return data }
+  }
+  this.deserialize = options.deserialize
   this.platform.on('message', function (message) {
+    assert(validation.validProtocolObject(message))
+    assert(_.has(message, 'sender'))
+    assert(validation.validKeyString(message.sender))
     if (message.protocol === self.protocol) {
-      self.emit(message.scope + '.' + message.topic, message.sender, message.payload)
+      var topic = message.scope + '.' + message.topic
+      self.emit(topic, message.sender, self.deserialize(message.payload))
     }
   })
 }
@@ -24,8 +42,11 @@ inherits(FlunkyAPI, EventEmitter)
 
 FlunkyAPI.prototype.send = function (topic, destination, payload, options) {
   debug('send')
-  expect(topic).to.be.a('string')
-  expect(destination).to.be.a('string')
+  assert(validation.validString(topic))
+  assert(validation.validLocalKeyString(destination))
+  assert.doesNotThrow(this.serialize(payload))
+  assert(_.isString(this.serialize(payload)))
+  assert(validation.validOptions(options))
   var self = this
   if (this._isLocal(destination)) {
     process.nextTick(function () {
@@ -40,7 +61,7 @@ FlunkyAPI.prototype.send = function (topic, destination, payload, options) {
     topic: topic,
     protocol: this.protocol,
     destination: destination,
-    payload: payload
+    payload: this.serialize(payload)
   }, options)
 }
 
@@ -48,11 +69,11 @@ FlunkyAPI.prototype.send = function (topic, destination, payload, options) {
  * @private
  */
 FlunkyAPI.prototype._isLocal = function (publicKey) {
-  debug('isLocal')
+  assert(validation.validLocalKeyString(publicKey))
   if (publicKey === 'local') {
     return true
   }
-  if (this.profile) {
+  if (this.identity) {
     return this.identity.getSignId() === publicKey
   }
   return false

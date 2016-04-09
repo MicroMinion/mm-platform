@@ -1,6 +1,5 @@
 'use strict'
 
-var Q = require('q')
 var debug = require('debug')('flunky-platform:identity')
 var nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
@@ -8,6 +7,9 @@ var ed2curve = require('ed2curve')
 var crypto = require('crypto')
 var events = require('events')
 var inherits = require('inherits')
+var assert = require('assert')
+var validation = require('./validation.js')
+var _ = require('lodash')
 
 nacl.setPRNG(function (x, n) {
   var i
@@ -17,6 +19,9 @@ nacl.setPRNG(function (x, n) {
 })
 
 var Identity = function (options) {
+  assert(validation.validOptions(options))
+  assert(_.has(options, 'platform'))
+  assert(_.has(options, 'storage'))
   this.platform = options.platform
   this.storage = options.storage
   this._loadIdentity()
@@ -27,23 +32,29 @@ inherits(Identity, events.EventEmitter)
 
 Identity.prototype._loadIdentity = function () {
   var self = this
-  var options = {
-    success: function (value) {
-      if (value) {
-        var secretKey = nacl.util.decodeBase64(value)
-        self.sign = nacl.sign.keyPair.fromSecretKey(secretKey)
-      } else {
-        self._generateIdentity()
-      }
-      self.emit('ready')
-    },
-    error: function (error) {
-      debug(error)
+  var success = function (value) {
+    assert(validation.validKeyString(value))
+    if (value) {
+      var secretKey = nacl.util.decodeBase64(value)
+      self.sign = nacl.sign.keyPair.fromSecretKey(secretKey)
+    } else {
       self._generateIdentity()
-      self.emit('ready')
     }
+    self.emit('ready')
   }
-  Q.nfcall(this.storage.get.bind(this.storage), 'identity').then(options.success, options.error)
+  var error = function (error) {
+    assert(_.isError(error))
+    debug(error)
+    self._generateIdentity()
+    self.emit('ready')
+  }
+  this.storage.get('identity', function (err, result) {
+    if (err) {
+      error(err)
+    } else {
+      success(result)
+    }
+  })
 }
 
 Identity.prototype._generateIdentity = function () {
