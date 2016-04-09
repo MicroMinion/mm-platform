@@ -104,11 +104,12 @@ Platform.prototype._setupTransport = function () {
 Platform.prototype._listen = function () {
   var self = this
   var success = function (value) {
-    assert(_.isPlainObject(value))
+    assert(_.isString(value))
     if (value.length === 0) {
       self._transport.listen()
     } else {
       value = JSON.parse(value)
+      assert(_.isPlainObject(value))
       self._transport.listen(value)
     }
   }

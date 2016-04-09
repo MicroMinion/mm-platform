@@ -44,7 +44,7 @@ FlunkyAPI.prototype.send = function (topic, destination, payload, options) {
   debug('send')
   assert(validation.validString(topic))
   assert(validation.validLocalKeyString(destination))
-  assert.doesNotThrow(this.serialize(payload))
+  assert.doesNotThrow(this.serialize.bind(payload))
   assert(_.isString(this.serialize(payload)))
   assert(validation.validOptions(options))
   var self = this

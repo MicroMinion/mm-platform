@@ -33,8 +33,8 @@ inherits(Identity, events.EventEmitter)
 Identity.prototype._loadIdentity = function () {
   var self = this
   var success = function (value) {
-    assert(validation.validKeyString(value))
     if (value) {
+      assert(validation.validSecretKeyString(value))
       var secretKey = nacl.util.decodeBase64(value)
       self.sign = nacl.sign.keyPair.fromSecretKey(secretKey)
     } else {

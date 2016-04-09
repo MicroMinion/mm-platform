@@ -13,6 +13,11 @@ var validLocalKeyString = function (publicKey) {
   return validKeyString(publicKey) || publicKey === 'local'
 }
 
+var validSecretKeyString = function (secretKey) {
+  return _.isString(secretKey) &&
+  nacl.util.decodeBase64(secretKey).length === nacl.sign.secretKeyLength
+}
+
 var validConnectionInfo = function (connectionInfo) {
   return _.isObject(connectionInfo) &&
   _.has(connectionInfo.signId) &&
@@ -76,5 +81,6 @@ module.exports = {
   validOptions: validOptions,
   validStream: validStream,
   validSendMessage: validSendMessage,
-  validReceivedMessage: validReceivedMessage
+  validReceivedMessage: validReceivedMessage,
+  validSecretKeyString: validSecretKeyString
 }

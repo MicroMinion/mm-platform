@@ -154,7 +154,7 @@ Directory.prototype._processConnectionInfo = function (topic, local, data) {
   debug('connectionInfo event')
   assert(topic === 'self.transports.connectionInfo')
   assert(local === 'local')
-  assert(validation.validConnectionInfo(data))
+  assert(_.isPlainObject(data))
   if (!_.has(this.directoryCache, data.signId)) {
     this.directoryCache[data.signId] = {}
   }
