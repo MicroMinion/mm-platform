@@ -132,7 +132,7 @@ Platform.prototype._getConnection = function (publicKey) {
   assert(validation.validKeyString(publicKey))
   var connections = _.filter(this._connections, function (connection) {
     return connection.remoteAddress === publicKey
-  }, this)
+  })
   _.sortBy(connections, function (connection) {
     if (connection.connected) {
       return 1
