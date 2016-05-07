@@ -89,7 +89,6 @@ OfflineBuffer.prototype._trigger = function (publicKey) {
 }
 
 OfflineBuffer.prototype.send = function (message, options) {
-  console.log(message)
   assert(validation.validSendMessage(message))
   assert(validation.validOptions(options))
   var publicKey = message.destination
