@@ -65,19 +65,18 @@ NetstringStream.prototype._processBuffer = function () {
   debug('_processBuffer')
   assert(_.isBuffer(this.buffer))
   var self = this
-  var buffer = new Buffer(this.buffer)
-  debug(buffer.length)
-  if (buffer.length === 0) {
+  if (this.buffer.length === 0) {
     return
   }
-  var messageLength = ns.nsLength(buffer)
+  var messageLength = ns.nsLength(this.buffer)
   debug('message length: ' + messageLength)
-  debug('buffer length: ' + buffer.length)
-  if (buffer.length >= messageLength) {
+  debug('buffer length: ' + this.buffer.length)
+  if (this.buffer.length >= messageLength) {
+    var payload = ns.nsPayload(self.buffer)
     process.nextTick(function () {
-      self.emit('data', ns.nsPayload(buffer))
+      self.emit('data', payload)
     })
-    buffer.copy(this.buffer, 0, messageLength)
+    this.buffer = this.buffer.slice(messageLength)
     debug('buffer length after processing: ' + this.buffer.length)
     this._processBuffer()
   }
