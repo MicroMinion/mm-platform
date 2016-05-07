@@ -89,6 +89,7 @@ OfflineBuffer.prototype._trigger = function (publicKey) {
 }
 
 OfflineBuffer.prototype.send = function (message, options) {
+  console.log(message)
   assert(validation.validSendMessage(message))
   assert(validation.validOptions(options))
   var publicKey = message.destination
@@ -109,7 +110,10 @@ OfflineBuffer.prototype.send = function (message, options) {
   } else {
     var id = uuid.v4()
     options.timestamp = new Date().toJSON()
-    this.sendQueues[publicKey][id] = {message: message, options: options}
+    this.sendQueues[publicKey][id] = {
+      message: message,
+      options: options
+    }
     this._saveSendQueues()
   }
 }
@@ -138,7 +142,9 @@ OfflineBuffer.prototype._flushQueue = function (publicKey) {
           self._saveSendQueues()
         }
       }
-      self.platform.send(message, {callback: callback})
+      self.platform.send(message, {
+        callback: callback
+      })
     } else {
       if (options.callback) {
         options.callback(new Error('Timeout'))
@@ -166,7 +172,7 @@ OfflineBuffer.prototype._loadSendQueues = function () {
         self.sendQueues[publicKey] = {}
       }
       _.forEach(value, function (message, uuid) {
-        if (!_.has(self.sendQueues[publicKey][uuid])) {
+        if (!_.has(self.sendQueues[publicKey], uuid)) {
           self.sendQueues[publicKey][uuid] = message
         }
       })

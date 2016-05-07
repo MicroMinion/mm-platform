@@ -15,10 +15,10 @@ var FlunkyMessage = protobuf(proto).FlunkyMessage
 
 var FlunkyProtocol = function (options) {
   assert(validation.validOptions(options))
-  assert(_.has(options.stream))
-  assert(_.has(options.friends))
-  assert(_.has(options.devices))
-  assert(_.has(options.directory))
+  assert(_.has(options, 'stream'))
+  assert(_.has(options, 'friends'))
+  assert(_.has(options, 'devices'))
+  assert(_.has(options, 'directory'))
   Duplex.call(this, {
     allowHalfOpen: false,
     readableObjectMode: true,

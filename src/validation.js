@@ -20,8 +20,8 @@ var validSecretKeyString = function (secretKey) {
 
 var validConnectionInfo = function (connectionInfo) {
   return _.isObject(connectionInfo) &&
-  _.has(connectionInfo.signId) &&
-  _.has(connectionInfo.boxId) &&
+  _.has(connectionInfo, 'signId') &&
+  _.has(connectionInfo, 'boxId') &&
   validKeyString(connectionInfo.signId) &&
   validKeyString(connectionInfo.boxId)
 }
@@ -44,25 +44,25 @@ var validStream = function (stream) {
 
 var validProtocolObject = function (message) {
   return _.isObject(message) &&
-  _.has(message.payload) &&
-  _.has(message.protocol) &&
-  _.has(message.topic) &&
+  _.has(message, 'payload') &&
+  _.has(message, 'protocol') &&
+  _.has(message, 'topic') &&
   _.isString(message.protocol) &&
   _.isString(message.topic) &&
-  _.isBuffer(message.payload)
+  _.isString(message.payload)
 }
 
 var validSendMessage = function (message) {
   return validProtocolObject(message) &&
-  _.has(message.destination) &&
+  _.has(message, 'destination') &&
   validKeyString(message.destination)
 }
 
 var validReceivedMessage = function (message) {
   return validProtocolObject(message) &&
-  _.has(message.sender) &&
+  _.has(message, 'sender') &&
   validKeyString(message.sender) &&
-  _.has(message.scope) &&
+  _.has(message, 'scope') &&
   validString(message.scope)
 }
 

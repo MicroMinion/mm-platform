@@ -20,11 +20,15 @@ var FlunkyAPI = function (options) {
     delimiter: '.'
   })
   if (!options.serialize) {
-    options.serialize = function (string) { return string }
+    options.serialize = function (string) {
+      return string
+    }
   }
   this.serialize = options.serialize
   if (!options.deserialize) {
-    options.deserialize = function (data) { return data }
+    options.deserialize = function (data) {
+      return data
+    }
   }
   this.deserialize = options.deserialize
   this.platform.on('message', function (message) {

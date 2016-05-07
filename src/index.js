@@ -213,9 +213,7 @@ Platform.prototype._connectEvents = function (stream) {
  */
 Platform.prototype.send = function (message, options) {
   debug('send')
-  assert(validation.validProtocolObject(message))
-  assert(_.has(message, 'destination'))
-  assert(validation.validKeyString(message.destination))
+  assert(validation.validSendMessage(message))
   assert(validation.validOptions(options))
   if (!options) {
     options = {}
