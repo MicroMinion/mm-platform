@@ -1,6 +1,6 @@
 'use strict'
 
-var debug = require('debug')('flunky-platform:identity')
+var debug = require('debug')('mm-platform:identity')
 var nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
 var ed2curve = require('ed2curve')

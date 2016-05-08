@@ -1,6 +1,6 @@
 'use strict'
 
-var debug = require('debug')('flunky-platform:netstring')
+var debug = require('debug')('mm-platform:netstring')
 var inherits = require('inherits')
 var Duplex = require('stream').Duplex
 var ns = require('./ns.js')

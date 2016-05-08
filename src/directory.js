@@ -1,6 +1,6 @@
 'use strict'
 
-var debug = require('debug')('flunky-platform:directory')
+var debug = require('debug')('mm-platform:directory')
 var _ = require('lodash')
 var events = require('events')
 var inherits = require('inherits')
@@ -53,7 +53,7 @@ Directory.prototype._sendMyConnectionInfo = function () {
     if (this.ready) {
       connectionInfo.boxId = this.identity.getBoxId()
       connectionInfo.signId = this.identity.getSignId()
-      // FIXME: When integrating flunky-transports
+      // FIXME: When integrating 1tp
       connectionInfo.udp = this._connectionInfo
       this.platform.messaging.send('transports.myConnectionInfo', 'local', connectionInfo)
     }

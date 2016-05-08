@@ -1,16 +1,16 @@
-# Flunky platform
+# MicroMinion platform
 
-Flunky platform is a secure messaging layer that allows applications to establish end-to-end connectivity between two nodes using a variety of underlying transport mechanisms
+MicroMinion platform is a secure messaging layer that allows applications to establish end-to-end connectivity between two nodes using a variety of underlying transport mechanisms
 
 ## Quick start
 
 ``` js
-var FlunkyPlatform = require('flunky-platform')
+var MicroMinionPlatform = require('mm-platform')
 var kadfs = require('kad-fs')
 var path = require('path')
 
-//Create FlunkyPlatform instance
-var platform = new FlunkyPlatform({
+//Create MicroMinionPlatform instance
+var platform = new MicroMinionPlatform({
   storage: kadfs(path.join('./data', 'platform'))
 })
 

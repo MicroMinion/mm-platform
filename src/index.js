@@ -2,17 +2,17 @@
 
 var Identity = require('./identity')
 var inherits = require('inherits')
-// var TCPTransport = require('flunky-transports').TcpTransport
+var UdpTransport = require('1tp').UdpTransport
 var transport = require('net-udp')
 var OfflineBuffer = require('./offline-buffer.js')
-var FlunkyAPI = require('./flunky-api.js')
+var API = require('./api.js')
 var EventEmitter = require('events').EventEmitter
 var curvecp = require('curvecp')
 var NetstringStream = require('./netstring.js')
-var FlunkyProtocol = require('./flunky-protocol.js')
+var MMProtocol = require('./mm-protocol.js')
 var Circle = require('./circle-empty.js')
 var Directory = require('./directory.js')
-var debug = require('debug')('flunky-platform')
+var debug = require('debug')('mm-platform')
 var _ = require('lodash')
 var kadfs = require('kad-fs')
 var path = require('path')
@@ -22,7 +22,7 @@ var validation = require('./validation.js')
 var DEFAULT_STORAGE_DIR = './data'
 
 /**
- * Flunky Platform
+ * MicroMinion Platform
  *
  * @constructor
  * @param {Object} options - Options that will be passed down to transport
@@ -166,14 +166,14 @@ Platform.prototype._wrapConnection = function (socket, server) {
   var netstrings = new NetstringStream({
     stream: curveMessages
   })
-  var flunkyMessages = new FlunkyProtocol({
+  var messages = new MMProtocol({
     stream: netstrings,
     friends: this.friends,
     devices: this.devices,
     directory: this.directory
   })
-  this._connectEvents(flunkyMessages)
-  return flunkyMessages
+  this._connectEvents(messages)
+  return messages
 }
 
 Platform.prototype._connectEvents = function (stream) {
@@ -273,14 +273,14 @@ Platform.prototype._setupAPI = function () {
     platform: this,
     storage: this.storage
   })
-  this.messaging = new FlunkyAPI({
+  this.messaging = new API({
     protocol: 'ms',
     platform: offlineBuffer,
     identity: this.identity,
     serialize: JSON.stringify,
     deserialize: JSON.parse
   })
-  this.torrenting = new FlunkyAPI({
+  this.torrenting = new API({
     protocol: 'bt',
     platform: this,
     identity: this.identity

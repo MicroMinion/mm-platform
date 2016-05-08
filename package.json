@@ -1,5 +1,5 @@
 {
-  "name": "flunky-platform",
+  "name": "mm-platform",
   "version": "0.0.1",
   "description": "P2P encrypted messaging platform",
   "main": "src/index.js",
@@ -11,12 +11,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@bitbucket.org:nodatacenter/flunky-platform.git"
+    "url": "https://github.com/MicroMinion/mm-platform.git"
   },
   "license": "MIT",
   "keywords": [
     "paas",
-    "flunkybox"
+    "p2p",
+    "encrypted messaging"
   ],
   "author": "Thomas Delaet <thomas@delaet.org>",
   "dependencies": {
@@ -27,7 +28,7 @@
     "inherits": "^2.0.1",
     "kad-fs": "0.0.4",
     "lodash": "^4.9.0",
-    "net-udp": "0.0.3",
+    "1tp": "^0.0.1",
     "node-uuid": "^1.4.7",
     "protocol-buffers": "^3.1.6",
     "string_decoder": "^0.10.31",

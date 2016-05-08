@@ -2,7 +2,7 @@
 
 var EventEmitter = require('events').EventEmitter
 var inherits = require('inherits')
-var debug = require('debug')('flunky-platform:offline-buffer')
+var debug = require('debug')('mm-platform:offline-buffer')
 var _ = require('lodash')
 var uuid = require('node-uuid')
 var assert = require('assert')

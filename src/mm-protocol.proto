@@ -1,4 +1,4 @@
-message FlunkyMessage {
+message Message {
   required string topic = 1;
   required string protocol = 2;
   required string payload = 3;

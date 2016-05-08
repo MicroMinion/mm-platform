@@ -2,12 +2,12 @@
 
 var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
-var debug = require('debug')('flunky-platform:flunky-api')
+var debug = require('debug')('mm-platform:api')
 var validation = require('./validation.js')
 var assert = require('assert')
 var _ = require('lodash')
 
-var FlunkyAPI = function (options) {
+var API = function (options) {
   assert(validation.validOptions(options))
   assert(_.has(options, 'platform'))
   assert(_.has(options, 'protocol'))
@@ -42,9 +42,9 @@ var FlunkyAPI = function (options) {
   })
 }
 
-inherits(FlunkyAPI, EventEmitter)
+inherits(API, EventEmitter)
 
-FlunkyAPI.prototype.send = function (topic, destination, payload, options) {
+API.prototype.send = function (topic, destination, payload, options) {
   debug('send')
   assert(validation.validString(topic))
   assert(validation.validLocalKeyString(destination))
@@ -72,7 +72,7 @@ FlunkyAPI.prototype.send = function (topic, destination, payload, options) {
 /**
  * @private
  */
-FlunkyAPI.prototype._isLocal = function (publicKey) {
+API.prototype._isLocal = function (publicKey) {
   assert(validation.validLocalKeyString(publicKey))
   if (publicKey === 'local') {
     return true
@@ -83,4 +83,4 @@ FlunkyAPI.prototype._isLocal = function (publicKey) {
   return false
 }
 
-module.exports = FlunkyAPI
+module.exports = API
