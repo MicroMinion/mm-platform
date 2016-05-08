@@ -2,8 +2,7 @@
 
 var Identity = require('./identity')
 var inherits = require('inherits')
-var UdpTransport = require('1tp').UdpTransport
-var transport = require('net-udp')
+var transport = require('1tp').net
 var OfflineBuffer = require('./offline-buffer.js')
 var API = require('./api.js')
 var EventEmitter = require('events').EventEmitter
@@ -76,7 +75,6 @@ inherits(Platform, EventEmitter)
 Platform.prototype._setupTransport = function () {
   debug('_setupTransport')
   var self = this
-  // this._transport = new TCPTransport(options)
   this._transport = transport.createServer()
   this._transport.on('close', function () {
     self._setupTransport()
@@ -90,9 +88,6 @@ Platform.prototype._setupTransport = function () {
     debug('ERROR in transport component')
     debug(err)
   })
-  // this._transport.on('active', function (connectionInfo) {
-  //  platform.directory.setMyConnectionInfo(connectionInfo)
-  // })
   this._transport.on('listening', function () {
     debug('listening')
     self.storage.put('myConnectionInfo', JSON.stringify(self._transport.address()))

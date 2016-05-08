@@ -51,10 +51,9 @@ Directory.prototype._sendMyConnectionInfo = function () {
     assert(_.isObject(this._connectionInfo))
     var connectionInfo = {}
     if (this.ready) {
+      connectionInfo = this._connectionInfo
       connectionInfo.boxId = this.identity.getBoxId()
       connectionInfo.signId = this.identity.getSignId()
-      // FIXME: When integrating 1tp
-      connectionInfo.udp = this._connectionInfo
       this.platform.messaging.send('transports.myConnectionInfo', 'local', connectionInfo)
     }
   }
