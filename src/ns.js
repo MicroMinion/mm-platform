@@ -3,7 +3,7 @@
 var assert = require('assert')
 var events = require('events')
 var inherits = require('inherits')
-var string_decoder = require('string_decoder')
+var StringDecoder = require('string_decoder').StringDecoder
 
 // Get the length of the netstring payload (i.e. excluding header and footer)
 // pointed to by Buffer or String 'buf'. Returns -1 if the buffer is
@@ -217,7 +217,6 @@ var Stream = function (s) {
 inherits(Stream, events.EventEmitter)
 
 Stream.prototype.setEncoding = function (encoding) {
-  var StringDecoder = string_decoder.StringDecoder
   this._decoder = new StringDecoder(encoding)
 }
 
