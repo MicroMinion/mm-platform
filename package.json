@@ -20,7 +20,13 @@
     "p2p",
     "encrypted messaging"
   ],
-  "author": "Thomas Delaet <thomas@delaet.org>",
+  "author": {
+    "name": "Thomas Delaet",
+    "email": "thomas@delaet.org"
+  },
+  "engines": {
+    "node": ">=4.x.x"
+  },
   "dependencies": {
     "ak-eventemitter": "0.0.5",
     "curvecp": "^0.6.1",
