@@ -1,6 +1,6 @@
 {
   "name": "mm-platform",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "description": "P2P encrypted messaging platform",
   "main": "src/index.js",
   "directories": {
@@ -29,13 +29,13 @@
   },
   "dependencies": {
     "ak-eventemitter": "0.0.5",
-    "curvecp": "^0.6.1",
+    "curvecp": "^0.7.0",
     "debug": "^2.2.0",
     "ed2curve": "^0.1.4",
     "inherits": "^2.0.1",
     "kad-fs": "0.0.4",
-    "lodash": "^4.9.0",
-    "1tp": "^0.0.1",
+    "lodash": "^4.13.1",
+    "1tp": "^0.2.0",
     "node-uuid": "^1.4.7",
     "protocol-buffers": "^3.1.6",
     "tweetnacl": "^0.14.3",

@@ -107,9 +107,9 @@ NetstringStream.prototype.isConnected = function () {
   return this.stream.isConnected()
 }
 
-NetstringStream.prototype.connect = function (connectionInfo) {
-  assert(validation.validConnectionInfo(connectionInfo))
-  this.stream.connect(connectionInfo)
+NetstringStream.prototype.connect = function (boxId, connectionInfo) {
+  // assert(validation.validConnectionInfo(connectionInfo))
+  this.stream.connect(boxId, connectionInfo)
 }
 
 Object.defineProperty(NetstringStream.prototype, 'remoteAddress', {
