@@ -1,6 +1,6 @@
 {
   "name": "mm-platform",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "P2P encrypted messaging platform",
   "main": "src/index.js",
   "directories": {
@@ -8,7 +8,9 @@
   },
   "scripts": {
     "docs": "jsdoc -r -d docs src",
-    "check-updates": "npm-check"
+    "check-updates": "npm-check",
+    "test": "echo",
+    "2npm": "publish"
   },
   "repository": {
     "type": "git",
@@ -41,5 +43,7 @@
     "tweetnacl": "^0.14.3",
     "tweetnacl-util": "^0.13.3"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "publish": "^0.6.0"
+  }
 }
