@@ -18,12 +18,13 @@ var validSecretKeyString = function (secretKey) {
   nacl.util.decodeBase64(secretKey).length === nacl.sign.secretKeyLength
 }
 
-var validConnectionInfo = function (connectionInfo) {
-  return _.isObject(connectionInfo) &&
-  _.has(connectionInfo, 'signId') &&
-  _.has(connectionInfo, 'boxId') &&
-  validKeyString(connectionInfo.signId) &&
-  validKeyString(connectionInfo.boxId)
+var validNodeInfo = function (nodeInfo) {
+  return _.isObject(nodeInfo) &&
+  _.has(nodeInfo, 'signId') &&
+  _.has(nodeInfo, 'boxId') &&
+  validKeyString(nodeInfo.signId) &&
+  validKeyString(nodeInfo.boxId) &&
+  _.has(nodeInfo, 'connectionInfo')
 }
 
 var validString = function (string) {
@@ -73,7 +74,7 @@ var validCallback = function (callback) {
 module.exports = {
   validKeyString: validKeyString,
   validLocalKeyString: validLocalKeyString,
-  validConnectionInfo: validConnectionInfo,
+  validNodeInfo: validNodeInfo,
   validProtocolObject: validProtocolObject,
   validCallback: validCallback,
   validError: validError,

@@ -9,7 +9,6 @@ var path = require('path')
 var debug = require('debug')('mm-platform:mm-protocol')
 var validation = require('./validation.js')
 var _ = require('lodash')
-var utils = require('./utils.js')
 
 var proto = fs.readFileSync(path.join(path.resolve(__dirname), 'mm-protocol.proto'))
 var Message = protobuf(proto).Message
@@ -85,7 +84,7 @@ MMProtocol.prototype.connect = function (publicKey) {
   assert(validation.validKeyString(publicKey))
   var self = this
   this.remoteAddress = publicKey
-  this.directory.getConnectionInfo(publicKey, function (err, result) {
+  this.directory.getNodeInfo(publicKey, function (err, result) {
     if (err) {
       assert(_.isError(err))
       assert(_.isNil(result))
@@ -93,9 +92,9 @@ MMProtocol.prototype.connect = function (publicKey) {
       self.emit('lookup', err, null, null)
     } else {
       assert(_.isNil(err))
-      assert(validation.validConnectionInfo(result))
+      assert(validation.validNodeInfo(result))
       self.emit('lookup', null, result, 'mm')
-      self.stream.connect(result.boxId, utils.connectionToArray(result))
+      self.stream.connect(result.boxId, result.connectionInfo)
     }
   })
 }

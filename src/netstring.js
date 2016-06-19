@@ -108,7 +108,6 @@ NetstringStream.prototype.isConnected = function () {
 }
 
 NetstringStream.prototype.connect = function (boxId, connectionInfo) {
-  // assert(validation.validConnectionInfo(connectionInfo))
   this.stream.connect(boxId, connectionInfo)
 }
 

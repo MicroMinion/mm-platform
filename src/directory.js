@@ -17,7 +17,7 @@ var Directory = function (options) {
   assert(_.has(options, 'platform'))
   assert(_.has(options, 'identity'))
   /**
-   * Connection information from previously used public keys
+   * Node information from previously used public keys
    *
    * @access private
    * @type {Object.<string, Object>}
@@ -35,26 +35,26 @@ var Directory = function (options) {
   this.identity.on('ready', function () {
     self.ready = true
   })
-  this.messaging.on('self.transports.connectionInfo', this._processConnectionInfo.bind(this))
+  this.messaging.on('self.transports.nodeInfo', this._processNodeInfo.bind(this))
   this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
   setInterval(function () {
     debug('_cacheRefreshInterval')
-    self._sendMyConnectionInfo()
+    self._sendMyNodeInfo()
   }, CACHE_REFRESH_INTERVAL)
 }
 
 inherits(Directory, events.EventEmitter)
 
-Directory.prototype._sendMyConnectionInfo = function () {
-  debug('_sendMyConnectionInfo')
+Directory.prototype._sendMyNodeInfo = function () {
+  debug('_sendMyNodeInfo')
   if (this._connectionInfo) {
-    assert(_.isObject(this._connectionInfo))
-    var connectionInfo = {}
+    assert(_.isArray(this._connectionInfo))
+    var nodeInfo = {}
     if (this.ready) {
-      connectionInfo = this._connectionInfo
-      connectionInfo.boxId = this.identity.getBoxId()
-      connectionInfo.signId = this.identity.getSignId()
-      this.platform.messaging.send('transports.myConnectionInfo', 'local', connectionInfo)
+      nodeInfo.connectionInfo = this._connectionInfo
+      nodeInfo.boxId = this.identity.getBoxId()
+      nodeInfo.signId = this.identity.getSignId()
+      this.platform.messaging.send('transports.myNodeInfo', 'local', nodeInfo)
     }
   }
 }
@@ -63,10 +63,10 @@ Directory.prototype.setMyConnectionInfo = function (connectionInfo) {
   debug('setMyConnectionInfo')
   assert(_.isObject(connectionInfo))
   this._connectionInfo = connectionInfo
-  this._sendMyConnectionInfo()
+  this._sendMyNodeInfo()
 }
 
-Directory.prototype.getConnectionInfo = function (signId, callback) {
+Directory.prototype.getNodeInfo = function (signId, callback) {
   debug('_findKey')
   assert(_.isFunction(callback))
   assert(validation.validKeyString(signId))
@@ -135,7 +135,7 @@ Directory.prototype._lookupKey = function (signId) {
   debug('_lookupKey')
   assert(validation.validKeyString(signId))
   var self = this
-  this.platform.messaging.send('transports.requestConnectionInfo', 'local', signId)
+  this.platform.messaging.send('transports.requestNodeInfo', 'local', signId)
   setTimeout(function () {
     if (_.has(self.directoryLookup, signId)) {
       _.forEach(self.directoryLookup[signId], function (callback) {
@@ -149,9 +149,9 @@ Directory.prototype._lookupKey = function (signId) {
 /**
  * @private
  */
-Directory.prototype._processConnectionInfo = function (topic, local, data) {
-  debug('connectionInfo event')
-  assert(topic === 'self.transports.connectionInfo')
+Directory.prototype._processNodeInfo = function (topic, local, data) {
+  debug('nodeInfo event')
+  assert(topic === 'self.transports.nodeInfo')
   assert(local === 'local')
   assert(_.isPlainObject(data))
   if (!_.has(this.directoryCache, data.signId)) {
@@ -175,10 +175,10 @@ Directory.prototype.getSignId = function (boxId) {
   if (_.has(this.mapping, boxId)) {
     result = this.mapping[boxId]
   } else {
-    _.forEach(this.directoryCache, function (connectionInfo) {
-      assert(validation.validConnectionInfo(connectionInfo))
-      if (connectionInfo.boxId === boxId) {
-        result = connectionInfo.signId
+    _.forEach(this.directoryCache, function (nodeInfo) {
+      assert(validation.validNodeInfo(nodeInfo))
+      if (nodeInfo.boxId === boxId) {
+        result = nodeInfo.signId
       }
     })
   }

@@ -17,7 +17,6 @@ var kadfs = require('kad-fs')
 var path = require('path')
 var assert = require('assert')
 var validation = require('./validation.js')
-var utils = require('./utils.js')
 
 var DEFAULT_STORAGE_DIR = './data'
 
@@ -76,7 +75,7 @@ inherits(Platform, EventEmitter)
 Platform.prototype._setupTransport = function () {
   debug('_setupTransport')
   var self = this
-  this._transport = transport.createServer()
+  this._transport = new transport.Server()
   this._transport.on('close', function () {
     self._setupTransport()
   })
@@ -91,7 +90,7 @@ Platform.prototype._setupTransport = function () {
   })
   this._transport.on('listening', function () {
     debug('listening')
-    var connectionInfo = utils.connectionToDictionary(self._transport.address())
+    var connectionInfo = self._transport.address()
     self.storage.put('myConnectionInfo', JSON.stringify(connectionInfo))
     self.directory.setMyConnectionInfo(connectionInfo)
   })
@@ -107,8 +106,8 @@ Platform.prototype._listen = function () {
     } else {
       debug(value)
       value = JSON.parse(value)
-      assert(_.isPlainObject(value))
-      self._transport.listen(utils.connectionToArray(value))
+      assert(_.isArray(value))
+      self._transport.listen(value)
     }
   }
   var error = function (errorMessage) {
