@@ -30,14 +30,14 @@
     "node": ">=4.x.x"
   },
   "dependencies": {
-    "ak-eventemitter": "0.0.5",
-    "curvecp": "^0.7.0",
+    "ak-eventemitter": "0.0.6",
+    "curvecp": "^0.7.2",
     "debug": "^2.2.0",
     "ed2curve": "^0.1.4",
     "inherits": "^2.0.1",
     "kad-fs": "0.0.4",
     "lodash": "^4.13.1",
-    "1tp": "^0.2.0",
+    "1tp": "^0.2.1",
     "node-uuid": "^1.4.7",
     "protocol-buffers": "^3.1.6",
     "tweetnacl": "^0.14.3",
