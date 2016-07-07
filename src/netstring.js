@@ -54,6 +54,9 @@ var NetstringStream = function (options) {
   this.stream.on('lookup', function (err, address, family) {
     self.emit('lookup', err, address, family)
   })
+  this.stream.on('finish', function () {
+    self.emit('finish')
+  })
 }
 
 inherits(NetstringStream, Duplex)

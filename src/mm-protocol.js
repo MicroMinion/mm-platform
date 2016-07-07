@@ -13,6 +13,8 @@ var _ = require('lodash')
 var proto = fs.readFileSync(path.join(path.resolve(__dirname), 'mm-protocol.proto'))
 var Message = protobuf(proto).Message
 
+var DIRECTORY_TIMEOUT = 5 * 1000
+
 var MMProtocol = function (options) {
   assert(validation.validOptions(options))
   assert(_.has(options, 'stream'))
@@ -43,11 +45,16 @@ var MMProtocol = function (options) {
   this.stream.on('data', function (data) {
     debug('data received')
     assert(_.isBuffer(data))
-    var message = Message.decode(data)
-    message.sender = self.remoteAddress
-    message.scope = self._getScope(message.sender)
-    assert(validation.validReceivedMessage(message))
-    self.emit('data', message)
+    try {
+      var message = Message.decode(data)
+      message.sender = self.remoteAddress
+      message.scope = self._getScope(message.sender)
+      assert(validation.validReceivedMessage(message))
+      self.emit('data', message)
+    } catch (e) {
+      debug('invalid message received - dropped')
+      debug(e)
+    }
   })
   this.stream.on('close', function () {
     self.emit('close')
@@ -55,6 +62,12 @@ var MMProtocol = function (options) {
   this.stream.on('connect', function () {
     if (!self.remoteAddress) {
       self.directory.getSignId(self.stream.remoteAddress)
+      setTimeout(function () {
+        if (!self.remoteAddress) {
+          self.emit('error', new Error('Directory Lookup Timeout'))
+          debug('directory timeout')
+        }
+      }, DIRECTORY_TIMEOUT)
     } else {
       self.emit('connect')
     }

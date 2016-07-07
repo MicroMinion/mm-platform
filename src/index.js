@@ -77,6 +77,7 @@ Platform.prototype._setupTransport = function () {
   var self = this
   this._transport = new transport.Server()
   this._transport.on('close', function () {
+    self._transport.removeAllListeners()
     self._setupTransport()
   })
   this._transport.on('connection', function (socket) {
@@ -126,12 +127,13 @@ Platform.prototype._listen = function () {
 }
 
 Platform.prototype._getConnection = function (publicKey) {
+  debug('_getConnection ' + publicKey)
   assert(validation.validKeyString(publicKey))
   var connections = _.filter(this._connections, function (connection) {
     return connection.remoteAddress === publicKey
   })
   _.sortBy(connections, function (connection) {
-    if (connection.connected) {
+    if (connection.isConnected()) {
       return 1
     } else {
       return 0
@@ -174,10 +176,12 @@ Platform.prototype._wrapConnection = function (socket, server) {
 }
 
 Platform.prototype._connectEvents = function (stream) {
+  debug('_connectEvents')
   assert(validation.validStream(stream))
   var self = this
   this._connections.push(stream)
   stream.on('connect', function () {
+    debug('connected ' + stream.remoteAddress)
     self.emit('connection', stream.remoteAddress)
   })
   stream.on('data', function (message) {
@@ -187,17 +191,26 @@ Platform.prototype._connectEvents = function (stream) {
     self.emit('message', message)
   })
   stream.on('close', function () {
-    self.emit('disconnected', stream.remoteAddress)
+    debug('disconnected ' + stream.remoteAddress)
     self._connections.splice(self._connections.indexOf(stream), 1)
-    stream.destroy()
+    self.emit('disconnected', stream.remoteAddress)
   })
   stream.on('end', function () {
     debug('other end has closed connection')
+    stream.destroy()
+  })
+  stream.on('finish', function () {
+    debug('end of stream reached')
+    stream.destroy()
   })
   stream.on('error', function (err) {
     assert(_.isError(err))
     debug('ERROR in socket')
     debug(err)
+    stream.destroy()
+  })
+  stream.on('timeout', function () {
+    stream.destroy()
   })
 }
 
@@ -226,10 +239,13 @@ Platform.prototype.send = function (message, options) {
   }
   var connection = this._getConnection(message.destination)
   if (connection && connection.isConnected()) {
+    debug('connection exists and is connected')
     this._send(message, connection, options.callback)
   } else if (connection) {
+    debug('connection exists and is not connected')
     this._queueMessage(message, connection, options.callback)
   } else {
+    debug('connection does not exists - creating new')
     var socket = new transport.Socket()
     connection = this._wrapConnection(socket, false)
     this._queueMessage(message, connection, options.callback)

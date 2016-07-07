@@ -34,6 +34,7 @@ var Directory = function (options) {
   var self = this
   this.identity.on('ready', function () {
     self.ready = true
+    self._sendMyNodeInfo()
   })
   this.messaging.on('self.transports.nodeInfo', this._processNodeInfo.bind(this))
   this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
@@ -51,6 +52,7 @@ Directory.prototype._sendMyNodeInfo = function () {
     assert(_.isArray(this._connectionInfo))
     var nodeInfo = {}
     if (this.ready) {
+      debug('ready to send')
       nodeInfo.connectionInfo = this._connectionInfo
       nodeInfo.boxId = this.identity.getBoxId()
       nodeInfo.signId = this.identity.getSignId()
