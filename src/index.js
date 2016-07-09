@@ -132,6 +132,7 @@ Platform.prototype._getConnection = function (publicKey) {
   var connections = _.filter(this._connections, function (connection) {
     return connection.remoteAddress === publicKey
   })
+  debug('connections found ' + _.size(connections))
   _.sortBy(connections, function (connection) {
     if (connection.isConnected()) {
       return 1
@@ -140,7 +141,7 @@ Platform.prototype._getConnection = function (publicKey) {
     }
   })
   if (_.size(connections) > 0) {
-    return connections[0]
+    return connections[connections.length - 1]
   }
 }
 
@@ -185,6 +186,8 @@ Platform.prototype._connectEvents = function (stream) {
     self.emit('connection', stream.remoteAddress)
   })
   stream.on('data', function (message) {
+    debug('data event')
+    debug(message)
     assert(validation.validProtocolObject(message))
     assert(_.has(message, 'sender'))
     assert(validation.validKeyString(message.sender))
@@ -223,6 +226,7 @@ Platform.prototype._connectEvents = function (stream) {
  */
 Platform.prototype.send = function (message, options) {
   debug('send')
+  debug(message)
   assert(validation.validSendMessage(message))
   assert(validation.validOptions(options))
   if (!options) {
@@ -232,7 +236,7 @@ Platform.prototype.send = function (message, options) {
     options.callback = function (err) {
       assert(validation.validError(err))
       if (err) {
-        debug('ERROR in socket')
+        debug('ERROR in sending message')
         debug(err)
       }
     }
@@ -254,6 +258,7 @@ Platform.prototype.send = function (message, options) {
 }
 
 Platform.prototype._queueMessage = function (message, connection, callback) {
+  debug('_queueMessage')
   assert(validation.validSendMessage(message))
   assert(validation.validStream(connection))
   assert(_.isNil(callback) || _.isFunction(callback))
@@ -273,6 +278,8 @@ Platform.prototype._queueMessage = function (message, connection, callback) {
  * @private
  */
 Platform.prototype._send = function (message, connection, callback) {
+  debug('_send')
+  debug(message)
   assert(validation.validSendMessage(message))
   assert(validation.validStream(connection))
   assert(_.isNil(callback) || _.isFunction(callback))
