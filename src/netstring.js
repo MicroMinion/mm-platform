@@ -2,7 +2,7 @@
 
 var debug = require('debug')('mm-platform:netstring')
 var inherits = require('inherits')
-var Duplex = require('stream').Duplex
+var Duplex = require('readable-stream-no-buffering').Duplex
 var ns = require('./ns.js')
 var assert = require('assert')
 var validation = require('./validation.js')
@@ -75,13 +75,13 @@ NetstringStream.prototype._processBuffer = function () {
   debug('message length: ' + messageLength)
   debug('buffer length: ' + this.buffer.length)
   if (this.buffer.length >= messageLength) {
-    var payload = ns.nsPayload(self.buffer)
-    process.nextTick(function () {
-      self.emit('data', payload)
-    })
+    var payload = ns.nsPayload(this.buffer)
     this.buffer = this.buffer.slice(messageLength)
     debug('buffer length after processing: ' + this.buffer.length)
-    this._processBuffer()
+    this.emit('data', payload)
+    process.nextTick(function () {
+      self._processBuffer()
+    })
   }
 }
 
