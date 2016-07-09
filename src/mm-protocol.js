@@ -1,7 +1,7 @@
 'use strict'
 
 var inherits = require('inherits')
-var Duplex = require('stream').Duplex
+var Duplex = require('readable-stream-no-buffering').Duplex
 var protobuf = require('protocol-buffers')
 var fs = require('fs')
 var assert = require('assert')
@@ -113,15 +113,15 @@ MMProtocol.prototype.connect = function (publicKey) {
 }
 
 MMProtocol.prototype.isConnected = function () {
-  return this.stream.isConnected() && this.remoteAddress
+  return this.stream.isConnected() && _.isString(this.remoteAddress)
 }
 
 MMProtocol.prototype._read = function (size) {}
 
 MMProtocol.prototype._write = function (chunk, encoding, callback) {
+  debug('_write')
   assert(validation.validSendMessage(chunk))
   assert(validation.validCallback(callback))
-  debug('_write')
   var message = {
     topic: chunk.topic,
     protocol: chunk.protocol,
