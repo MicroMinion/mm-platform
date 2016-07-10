@@ -237,6 +237,7 @@ The platform supports the following constructor options:
 * **friends, devices**: 'Circle' definition of trusted nodes used for scoping received messages. The default implementation will namespace all received messages as public (except for local messages)
 * **identity**: alternative identity object. The default identity object uses 2 public/private key pairs: for signing (signId) and for encryption (boxId). When our own identity is loaded from persistent storage (or created on first time use), the platform will emit a 'ready' event.
 * **directory**: alternative directory object to lookup nodeInfo and publish our own nodeInfo
+* **connectionInfo**: hard-coded connectionInfo for [1tp](https://github.com/MicroMinion/1tp)
 
 ### Adding new messaging API's
 
