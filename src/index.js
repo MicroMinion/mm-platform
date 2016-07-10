@@ -34,6 +34,9 @@ var DEFAULT_STORAGE_DIR = './data'
 var Platform = function (options) {
   assert(validation.validOptions(options))
   EventEmitter.call(this)
+  if (!options) {
+    options = {}
+  }
   if (!options.storage) {
     options.storage = kadfs(path.join(DEFAULT_STORAGE_DIR, 'platform'))
   }
@@ -67,12 +70,12 @@ var Platform = function (options) {
   }
   this.directory = options.directory
   this._connections = []
-  this._setupTransport()
+  this._setupTransport(options.connectionInfo)
 }
 
 inherits(Platform, EventEmitter)
 
-Platform.prototype._setupTransport = function () {
+Platform.prototype._setupTransport = function (connectionInfo) {
   debug('_setupTransport')
   var self = this
   this._transport = new transport.Server()
@@ -95,11 +98,17 @@ Platform.prototype._setupTransport = function () {
     self.storage.put('myConnectionInfo', JSON.stringify(connectionInfo))
     self.directory.setMyConnectionInfo(connectionInfo)
   })
-  this._listen()
+  this._listen(connectionInfo)
 }
 
-Platform.prototype._listen = function () {
+Platform.prototype._listen = function (connectionInfo) {
   var self = this
+  if (connectionInfo) {
+    setImmediate(function () {
+      this._transport.listen(connectionInfo)
+    })
+    return
+  }
   var success = function (value) {
     assert(_.isString(value))
     if (value.length === 0) {
