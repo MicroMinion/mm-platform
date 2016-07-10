@@ -2,7 +2,7 @@
 
 MicroMinion platform is a secure messaging layer that allows applications to establish end-to-end connectivity between two nodes using a variety of underlying transport mechanisms.
 
-At the same time, it also acts as a local pub-sub system.
+It is also a local pub/sub broker
 
 ## Installation
 
@@ -15,17 +15,17 @@ npm install mm-platform
 The MicroMinion platform sends/receives messages locally and with remote peers
 
 A message is a javascript dictionary with the following fields:
-* sender: public key of sender node
-* protocol: string that determines protocol of message
-* topic: string that determines topic of message (format depends on protocol)
-* scope: string that can either have the value public, friends or self. This is to indicate the trust level of the sender (no trust level, in your friends circle or one of your own devices
-* payload: format depends on protocol
+* **sender**: public key of sender node (string, base64 encoded)
+* **protocol**: string that determines protocol of message
+* **topic**: string that determines topic of message (format depends on protocol)
+* **scope**: string that can either have the value public, friends or self. This is to indicate the trust level of the sender (no trust level, in your friends circle or one of your own devices
+* **payload**: format depends on protocol
 
 ## Supported messaging API's
 
 Out of the box, the platform supports 2 messaging API's (others can be added, see customization section).
-* messaging (protocol code 'ms'): payload is a JSON string. Topic is name-spaced message type (separated by .)
-* torrenting (protocol code 'bt'): payload is a bittorrent message. Topic is identification hash of torrent file
+* **messaging (protocol code 'ms')**: payload is a JSON string. Topic is name-spaced message type (separated by .)
+* **torrenting (protocol code 'bt')**: payload is a bittorrent message. Topic is identification hash of torrent file
 
 ```js
 //Example code to use messaging layer ('ms')
@@ -66,7 +66,7 @@ Out of the box, the mm-platform supports local messagse but needs a lookup mecha
 When the mm-platform needs to lookup connection information for a peer ID, it uses it's own messaging API to do so.
 
 The following messages are send by the platform:
-* self.transports.myNodeInfo: periodically (every 5 minutes) publish our own nodeInfo which is a dictionary with 3 keys: boxId: public key used for encryption, signId: public key used for signing and connectionInfo: 1tp connection information dictionary
+* **self.transports.myNodeInfo**: periodically (every 5 minutes) publish our own nodeInfo which is a dictionary with 3 keys: boxId: public key used for encryption, signId: public key used for signing and connectionInfo: 1tp connection information dictionary
 * self.transports.requestNodeInfo: requests outside directory service to lookup nodeInfo for a publicKey (signId is used as lookup key)
 * self.directory.get: requests outside directory service to lookup other key-value pair. Within the platform this is used to map boxId's (encryption keys) to signId's (signature keys)
 
@@ -134,20 +134,20 @@ Each of the services (in this case MulticastDNS and Kademlia) can use the platfo
 ## Events
 
 The platform will emit the following events:
-* ready: when identity is loaded from persistent storage (or created on first time use)
-* connection: when new connection is established (incoming or outgoing). Argument is signId of remote node
-* disconnected: when connection is destroyed (incoming or outgoing). Argument is signId of remote node
-* message: when new message is received
+* **ready**: when identity is loaded from persistent storage (or created on first time use)
+* **connection**: when new connection is established (incoming or outgoing). Argument is signId of remote node
+* **disconnected**: when connection is destroyed (incoming or outgoing). Argument is signId of remote node
+* **message**: when new message is received
 
 ## Customizing platform
 
 ### Initialization options
 
-The platform supports the following options:
-* storage: alternative storage mechanism. This needs to be a kadfs compatible interface
-* friends, devices: 'Circle' definition of trusted nodes used for scoping received messages. The default implementation will namespace all received messages as public (except for local messages)
-* identity: alternative identity object. The default identity object uses 2 public/private key pairs: for signing (signId) and for encryption (boxId). When our own identity is loaded from persistent storage (or created on first time use), the platform will emit a 'ready' event.
-* directory: alternative directory object to lookup nodeInfo and publish our own nodeInfo
+The platform supports the following constructor options:
+* **storage**: alternative storage mechanism. This needs to be a kadfs compatible interface
+* **friends, devices**: 'Circle' definition of trusted nodes used for scoping received messages. The default implementation will namespace all received messages as public (except for local messages)
+* **identity**: alternative identity object. The default identity object uses 2 public/private key pairs: for signing (signId) and for encryption (boxId). When our own identity is loaded from persistent storage (or created on first time use), the platform will emit a 'ready' event.
+* **directory**: alternative directory object to lookup nodeInfo and publish our own nodeInfo
 
 ### Adding new messaging API's
 
