@@ -61,18 +61,107 @@ Remote peers are identified by their signID, encoded in base64 format
 
 ## Built-in messages
 
-Out of the box, the mm-platform supports local messagse but needs a lookup mechanism to map peer id's (public keys) to connection information that can be used by the underlying 1tp library to establish connections.
+Out of the box, the mm-platform supports local messages but needs a lookup mechanism to map peer id's (public keys) to connection information that can be used by the underlying 1tp library to establish connections.
 
 When the mm-platform needs to lookup connection information for a peer ID, it uses it's own messaging API to do so.
 
-The following messages are send by the platform:
-* **self.transports.myNodeInfo**: periodically (every 5 minutes) publish our own nodeInfo which is a dictionary with 3 keys: boxId: public key used for encryption, signId: public key used for signing and connectionInfo: 1tp connection information dictionary
-* self.transports.requestNodeInfo: requests outside directory service to lookup nodeInfo for a publicKey (signId is used as lookup key)
-* self.directory.get: requests outside directory service to lookup other key-value pair. Within the platform this is used to map boxId's (encryption keys) to signId's (signature keys)
+### Data structures
 
-The platform subscribes to the following messages:
-* self.transports.nodeInfo: payload is dictionary containing signId, boxId and connectionInfo for a node
-* self.directory.getReply: payload is dictionary containing key and value pair (used by platform to map boxId to signId)
+#### nodeInfo: Javascript object with node information
+
+* **boxId**: base64 encoded public encryption key used by [nacl](https://github.com/dchest/tweetnacl-js#public-key-authenticated-encryption-box)
+* **signId**: base64 encoded public signature key used by [nacl](https://github.com/dchest/tweetnacl-js#signatures)
+* **connectionInfo**: javascript dictionary with [1tp](https://github.com/MicroMinion/1tp) connection information
+
+### Published messages
+
+#### self.transports.myNodeInfo
+
+Periodically (every 5 minutes) publish our own nodeInfo which is a dictionary with 3 keys: boxId: public key used for encryption, signId: public key used for signing and connectionInfo: 1tp connection information dictionary
+
+```js
+var MicroMinionPlatform = require('mm-platform')
+
+var platform = new MicroMinionPlatform()
+
+platform.messaging.on('self.transports.myNodeInfo', function(topic, sender, nodeInfo) {
+  console.log(topic) // 'self.transports.myNodeInfo'
+  console.log(sender) // 'local'
+  console.log(nodeInfo) // {boxId: <boxId>, signId: <signId>, connectionInfo: <1tp connectionInfo>}
+})
+```
+
+#### self.transports.requestNodeInfo
+
+requests outside directory service to lookup nodeInfo for a publicKey (signId is used as lookup key)
+
+```js
+var MicroMinionPlatform = require('mm-platform')
+
+var platform = new MicroMinionPlatform()
+
+platform.messaging.on('self.transports.requestNodeInfo', function(topic, sender, nodeId) {
+  console.log(topic) // 'self.transports.requestNodeInfo'
+  console.log(sender) // 'local'
+  console.log(nodeInfo) // signId of other node (base64 encoded string)
+})
+```
+
+#### self.directory.get
+
+requests outside directory service to lookup other key-value pair. Within the platform this is used to map boxId's (encryption keys) to signId's (signature keys)
+
+```js
+var MicroMinionPlatform = require('mm-platform')
+
+var platform = new MicroMinionPlatform()
+
+platform.messaging.on('self.directory.get', function(topic, sender, key) {
+  console.log(topic) // 'self.directory.get'
+  console.log(sender) // 'local'
+  console.log(key) // boxId of other node (base34 encoded string)
+})
+```
+
+### Subscribed messages
+
+#### self.transports.nodeInfo
+
+Payload is dictionary containing signId, boxId and connectionInfo for a node
+
+```js
+var MicroMinionPlatform = require('mm-platform')
+
+var platform = new MicroMinionPlatform()
+
+//This is our own nodeInfo.
+//This message format is used to publish remote nodeInfo (e.g., obtained through mDNS or DHT)
+//It allows the platform to establish a connection with the remote node
+var nodeInfo = {
+  boxId: platform.directory.identity.getBoxId()
+  signId: platform.directory.identity.getSignId()
+  connectionInfo: platform.directory._connectionInfo
+}
+
+platform.messaging.send('transports.nodeInfo', 'local', nodeInfo)
+```
+
+#### self.directory.getReply
+
+Payload is dictionary containing key and value pair (used by platform to map boxId to signId)
+
+```js
+var MicroMinionPlatform = require('mm-platform')
+
+var platform = new MicroMinionPlatform()
+
+platform.messaging.on('self.directory.get', function(topic, sender, key) {
+  //Lookup key in directory
+  //When send by platform, the key will be a boxId
+  var signID = "NeedToImplement"
+  platform.messaging.send('directory.getReply', 'local', {key: key, value: signId})
+})
+```
 
 ## Low-level messaging support
 
