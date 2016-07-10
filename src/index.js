@@ -102,10 +102,12 @@ Platform.prototype._setupTransport = function (connectionInfo) {
 }
 
 Platform.prototype._listen = function (connectionInfo) {
+  debug('_listen')
+  debug(connectionInfo)
   var self = this
   if (connectionInfo) {
     setImmediate(function () {
-      this._transport.listen(connectionInfo)
+      self._transport.listen(connectionInfo)
     })
     return
   }
