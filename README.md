@@ -55,13 +55,13 @@ Local messages are always scoped as 'self'
 
 ## Remote peer identification
 
-The platform relies heavily on Daniel Bernstein's nacl crypto library. It uses ecnryption (boxId) and signature (signId) keypairs and the CurveCP protocol for all communications.
+The platform relies heavily on [Daniel Bernstein's](http://cr.yp.to) [nacl crypto library](https://nacl.cr.yp.to/). It uses ecnryption (boxId) and signature (signId) keypairs and the [CurveCP](http://www.curvecp.org) protocol for all communications.
 
 Remote peers are identified by their signID, encoded in base64 format
 
 ## Built-in messages
 
-Out of the box, the mm-platform supports local messages but needs a lookup mechanism to map peer id's (public keys) to connection information that can be used by the underlying 1tp library to establish connections.
+Out of the box, the mm-platform supports local messages but needs a lookup mechanism to map peer id's (public keys) to connection information that can be used by the underlying [1tp](https://github.com/MicroMinion/1tp) library to establish connections.
 
 When the mm-platform needs to lookup connection information for a peer ID, it uses it's own messaging API to do so.
 
@@ -77,7 +77,7 @@ When the mm-platform needs to lookup connection information for a peer ID, it us
 
 #### self.transports.myNodeInfo
 
-Periodically (every 5 minutes) publish our own nodeInfo which is a dictionary with 3 keys: boxId: public key used for encryption, signId: public key used for signing and connectionInfo: 1tp connection information dictionary
+Periodically (every 5 minutes) publish our own nodeInfo which is a dictionary with 3 keys: boxId: public key used for encryption, signId: public key used for signing and connectionInfo: [1tp](https://github.com/MicroMinion/1tp) connection information dictionary
 
 ```js
 var MicroMinionPlatform = require('mm-platform')
@@ -195,7 +195,7 @@ platform.send({
 
 The core use case for which the platform was developed is to built a set of services on top of it that use the local and remote messaging functionality.
 
-An example usage of the platform can be found in the mm-dht module where we use the platform to build a DHT that also supports local discovery of peers through mDNS.
+An example usage of the platform can be found in the [mm-dht](https://github.com/MicroMinion/mm-dht) module where we use the platform to build a DHT that also supports local discovery of peers through mDNS.
 
 ```js
 var Platform = require('mm-platform')
@@ -218,7 +218,7 @@ var dht = new Kademlia({
 })
 ```
 
-Each of the services (in this case MulticastDNS and Kademlia) can use the platform object to subscribe to messages and publish messages as described above.
+Each of the services (in this case [MulticastDNS](https://github.com/MicroMinion/mm-services-mdns) and [Kademlia](https://github.com/MicroMinion/mm-services-kademlia)) can use the platform object to subscribe to messages and publish messages as described above.
 
 ## Events
 
