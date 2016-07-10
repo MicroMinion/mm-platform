@@ -104,8 +104,53 @@ platform.send({
 
 ## Building services on top of platform
 
+The core use case for which the platform was developed is to built a set of services on top of it that use the local and remote messaging functionality.
+
+An example usage of the platform can be found in the mm-dht module where we use the platform to build a DHT that also supports local discovery of peers through mDNS.
+
+```js
+var Platform = require('mm-platform')
+var MulticastDNS = require('mm-services-mdns')
+var Kademlia = require('mm-services-kademlia')
+var kadfs = require('kad-fs')
+var path = require('path')
+
+var storageDir = './data'
+
+var platform = new Platform({
+  storage: kadfs(path.join(storageDir, 'platform'))
+})
+var mdns = new MulticastDNS({
+  platform: platform,
+})
+var dht = new Kademlia({
+  platform: platform,
+  storage: kadfs(path.join(storageDir, 'dht'))
+})
+```
+
+Each of the services (in this case MulticastDNS and Kademlia) can use the platform object to subscribe to messages and publish messages as described above.
+
+## Events
+
+The platform will emit the following events:
+* ready: when identity is loaded from persistent storage (or created on first time use)
+* connection: when new connection is established (incoming or outgoing). Argument is signId of remote node
+* disconnected: when connection is destroyed (incoming or outgoing). Argument is signId of remote node
+* message: when new message is received
+
 ## Customizing platform
 
 ### Initialization options
 
+The platform supports the following options:
+* storage: alternative storage mechanism. This needs to be a kadfs compatible interface
+* friends, devices: 'Circle' definition of trusted nodes used for scoping received messages. The default implementation will namespace all received messages as public (except for local messages)
+* identity: alternative identity object. The default identity object uses 2 public/private key pairs: for signing (signId) and for encryption (boxId). When our own identity is loaded from persistent storage (or created on first time use), the platform will emit a 'ready' event.
+* directory: alternative directory object to lookup nodeInfo and publish our own nodeInfo
+
 ### Adding new messaging API's
+
+New Messaging API's can be added on top of the standard torrenting and messaging API's. Just initialize a new API object (api.js) and add it as attribute to platform.
+
+API objects can also be chained. For example, the messaging API object uses an offline buffer to make sure that no messages are being lost when offline.
