@@ -1,18 +1,16 @@
 # MicroMinion platform
 
-MicroMinion platform is a secure messaging layer that allows applications to establish end-to-end connectivity between two nodes using a variety of underlying transport mechanisms
+MicroMinion platform is a secure messaging layer that allows applications to establish end-to-end connectivity between two nodes using a variety of underlying transport mechanisms.
+
+At the same time, it also acts as a local pub-sub system.
 
 ## Quick start
 
 ``` js
 var MicroMinionPlatform = require('mm-platform')
-var kadfs = require('kad-fs')
-var path = require('path')
 
 //Create MicroMinionPlatform instance
-var platform = new MicroMinionPlatform({
-  storage: kadfs(path.join('./data', 'platform'))
-})
+var platform = new MicroMinionPlatform()
 
 //Attach message listener
 platform.on('message', function(message) {
@@ -32,4 +30,30 @@ platform.send({
 })
 ```
 
-## Design
+## Installation
+
+```bash
+npm install mm-platform
+```
+
+## Messaging API's
+
+The MicroMinion platform sends/receives messages locally and with remote peers
+
+A message contains the following fields:
+
+## Supported messaging API's
+
+## Local messages and scoping
+
+## Built-in messages
+
+## Low-level messaging support
+
+## Building services on top of platform
+
+## Customizing platform
+
+### Initialization options
+
+### Adding new messaging API's
