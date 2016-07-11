@@ -2,7 +2,7 @@
 
 var debug = require('debug')('mm-platform:netstring')
 var inherits = require('inherits')
-var Duplex = require('readable-stream-no-buffering').Duplex
+var Duplex = require('stream').Duplex
 var ns = require('./ns.js')
 var assert = require('assert')
 var validation = require('./validation.js')

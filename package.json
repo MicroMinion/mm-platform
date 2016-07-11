@@ -1,6 +1,6 @@
 {
   "name": "mm-platform",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "P2P encrypted messaging platform",
   "main": "src/index.js",
   "directories": {
@@ -40,7 +40,6 @@
     "lodash": "^4.13.1",
     "node-uuid": "^1.4.7",
     "protocol-buffers": "^3.1.6",
-    "readable-stream-no-buffering": "^2.0.6",
     "tweetnacl": "^0.14.3",
     "tweetnacl-util": "^0.13.3"
   },

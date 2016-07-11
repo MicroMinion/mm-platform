@@ -1,7 +1,7 @@
 'use strict'
 
 var inherits = require('inherits')
-var Duplex = require('readable-stream-no-buffering').Duplex
+var Duplex = require('stream').Duplex
 var protobuf = require('protocol-buffers')
 var fs = require('fs')
 var assert = require('assert')
