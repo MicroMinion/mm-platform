@@ -45,16 +45,18 @@ var MMProtocol = function (options) {
   this.stream.on('data', function (data) {
     debug('data received')
     assert(_.isBuffer(data))
-    try {
-      var message = Message.decode(data)
-      message.sender = self.remoteAddress
-      message.scope = self._getScope(message.sender)
-      assert(validation.validReceivedMessage(message))
-      self.emit('data', message)
-    } catch (e) {
-      debug('invalid message received - dropped')
-      debug(e)
+    if(self.remoteAddress) {
+      self._processData(data)
+    } else {
+      setTimeout(function() {
+        if(self.remoteAddress) {
+          self._processData(data)
+        } else {
+          debug('unable to retrieve remote address')
+        }
+      }, DIRECTORY_TIMEOUT)
     }
+
   })
   this.stream.on('close', function () {
     self.emit('close')
@@ -65,7 +67,7 @@ var MMProtocol = function (options) {
       setTimeout(function () {
         if (!self.remoteAddress) {
           self.emit('error', new Error('Directory Lookup Timeout'))
-          debug('directory timeout')
+          console.log('directory timeout, ' + self.stream.remoteAddress + ' not found')
         }
       }, DIRECTORY_TIMEOUT)
     } else {
@@ -92,6 +94,21 @@ var MMProtocol = function (options) {
 
 inherits(MMProtocol, Duplex)
 
+MMProtocol.prototype._processData = function(data) {
+  var self = this
+  try {
+    var message = Message.decode(data)
+    debug(message)
+    message.sender = self.remoteAddress
+    message.scope = self._getScope(message.sender)
+    assert(validation.validReceivedMessage(message))
+    self.emit('data', message)
+  } catch (e) {
+    debug('invalid message received - dropped')
+    debug(e)
+  }
+}
+
 MMProtocol.prototype.connect = function (publicKey) {
   debug('connect')
   assert(validation.validKeyString(publicKey))
@@ -114,6 +131,12 @@ MMProtocol.prototype.connect = function (publicKey) {
 
 MMProtocol.prototype.isConnected = function () {
   return this.stream.isConnected() && _.isString(this.remoteAddress)
+}
+
+MMProtocol.prototype.toMetadata = function () {
+  var result = this.stream.stream._stream.toMetadata()
+  result.remoteAddress = this.remoteAddress
+  return result
 }
 
 MMProtocol.prototype._read = function (size) {}
@@ -139,6 +162,8 @@ MMProtocol.prototype._write = function (chunk, encoding, callback) {
  * @private
  */
 MMProtocol.prototype._getScope = function (publicKey) {
+  debug('_getScope')
+  debug(publicKey)
   assert(validation.validKeyString(publicKey))
   if (this.devices.inScope(publicKey)) {
     return 'self'
