@@ -161,6 +161,11 @@ OfflineBuffer.prototype._loadSendQueues = function () {
   debug('loadSendQueues')
   var self = this
   var success = function (value) {
+    if (value === null) {
+      debug('error in loading sendqueue')
+      self._sendQueuesRetrieved = true
+      return
+    }
     debug('success in loading sendqueue')
     assert(validation.validString(value))
     value = JSON.parse(value)
