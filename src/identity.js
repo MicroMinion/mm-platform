@@ -89,6 +89,13 @@ Identity.prototype.getBoxId = function () {
   return nacl.util.encodeBase64(ed2curve.convertPublicKey(this.sign.publicKey))
 }
 
+Identity.prototype.toMetadata = function () {
+  return {
+    signId: this.getSignId(),
+    boxId: this.getBoxId()
+  }
+}
+
 Object.defineProperty(Identity.prototype, 'box', {
   get: function () {
     return ed2curve.convertKeyPair(this.sign)
