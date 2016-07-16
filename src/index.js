@@ -244,7 +244,9 @@ Platform.prototype._connectEvents = function (stream) {
   stream.on('error', function (err) {
     assert(_.isError(err))
     self._log.warn('MicroMinion connection error', extend(stream.toMetadata(), {
-      error: err
+      errorName: err.name,
+      errorMessage: err.message,
+      error: err.toString()
     }))
     stream.destroy()
   })
