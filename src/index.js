@@ -11,12 +11,14 @@ var NetstringStream = require('./netstring.js')
 var MMProtocol = require('./mm-protocol.js')
 var Circle = require('./circle-empty.js')
 var Directory = require('./directory.js')
-var debug = require('debug')('mm-platform')
 var _ = require('lodash')
 var kadfs = require('kad-fs')
 var path = require('path')
 var assert = require('assert')
 var validation = require('./validation.js')
+var winston = require('winston')
+var extend = require('extend.js')
+var winstonWrapper = require('winston-meta-wrapper')
 
 var DEFAULT_STORAGE_DIR = './data'
 
@@ -37,6 +39,14 @@ var Platform = function (options) {
   if (!options) {
     options = {}
   }
+  if (!options.logger) {
+    options.logger = winston
+  }
+  this._log = winstonWrapper(options.logger)
+  this._log.addMeta({
+    module: 'mm-platform'
+  })
+  this._ready = false
   if (!options.storage) {
     options.storage = kadfs(path.join(DEFAULT_STORAGE_DIR, 'platform'))
   }
@@ -58,6 +68,12 @@ var Platform = function (options) {
   this.identity = options.identity
   var self = this
   this.identity.on('ready', function () {
+    self._log.addMeta({
+      node: self.identity.getSignId()
+    })
+    self._log.info('platform initialized')
+    self._setupTransport(options.connectionInfo)
+    self._ready = true
     self.emit('ready')
   })
   this._setupAPI()
@@ -70,30 +86,37 @@ var Platform = function (options) {
   }
   this.directory = options.directory
   this._connections = []
-  this._setupTransport(options.connectionInfo)
 }
 
 inherits(Platform, EventEmitter)
 
+Platform.prototype.isReady = function () {
+  return this._ready
+}
+
 Platform.prototype._setupTransport = function (connectionInfo) {
-  debug('_setupTransport')
+  this._log.debug('_setupTransport')
   var self = this
   this._transport = new transport.Server()
   this._transport.on('close', function () {
+    self._log.warn('transport closed')
     self._transport.removeAllListeners()
     self._setupTransport()
   })
   this._transport.on('connection', function (socket) {
     assert(validation.validStream(socket))
+    // TODO: add socket.toMetadata() once it exists
+    self._log.info('new incoming 1tp connection')
     self._wrapConnection(socket, true)
   })
   this._transport.on('error', function (err) {
     assert(_.isError(err))
-    debug('ERROR in transport component')
-    debug(err)
+    self._log.error('error in transport', {
+      error: err
+    })
   })
   this._transport.on('listening', function () {
-    debug('listening')
+    self._log.info('transport opened')
     var connectionInfo = self._transport.address()
     self.storage.put('myConnectionInfo', JSON.stringify(connectionInfo))
     self.directory.setMyConnectionInfo(connectionInfo)
@@ -102,8 +125,6 @@ Platform.prototype._setupTransport = function (connectionInfo) {
 }
 
 Platform.prototype._listen = function (connectionInfo) {
-  debug('_listen')
-  debug(connectionInfo)
   var self = this
   if (connectionInfo) {
     setImmediate(function () {
@@ -112,20 +133,20 @@ Platform.prototype._listen = function (connectionInfo) {
     return
   }
   var success = function (value) {
-    assert(_.isString(value))
-    if (value.length === 0) {
+    assert(_.isString(value) || value === null)
+    if (value === null || value.length === 0) {
       self._transport.listen()
     } else {
-      debug(value)
       value = JSON.parse(value)
       assert(_.isArray(value))
       self._transport.listen(value)
     }
   }
   var error = function (errorMessage) {
+    self._log.debug('connectionInfo not stored yet', {
+      error: errorMessage
+    })
     assert(_.isError(errorMessage))
-    debug('error in loading connectionInfo from storage')
-    debug(errorMessage)
     self._transport.listen()
   }
   this.storage.get('myConnectionInfo', function (err, result) {
@@ -138,12 +159,13 @@ Platform.prototype._listen = function (connectionInfo) {
 }
 
 Platform.prototype._getConnection = function (publicKey) {
-  debug('_getConnection ' + publicKey)
+  this._log.debug('checking connection', {
+    destination: publicKey
+  })
   assert(validation.validKeyString(publicKey))
   var connections = _.filter(this._connections, function (connection) {
     return connection.remoteAddress === publicKey
   })
-  debug('connections found ' + _.size(connections))
   _.sortBy(connections, function (connection) {
     if (connection.isConnected()) {
       return 1
@@ -188,39 +210,42 @@ Platform.prototype._wrapConnection = function (socket, server) {
 }
 
 Platform.prototype._connectEvents = function (stream) {
-  debug('_connectEvents')
   assert(validation.validStream(stream))
   var self = this
   this._connections.push(stream)
   stream.on('connect', function () {
-    debug('connected ' + stream.remoteAddress)
+    self._log.info('MicroMinion connection established', stream.toMetadata())
     self.emit('connection', stream.remoteAddress)
   })
   stream.on('data', function (message) {
-    debug('data event')
-    debug(message)
+    self._log.info('MicroMinion message received', extend(stream.toMetadata(), {
+      topic: message.topic,
+      protocol: message.protocol,
+      payload: message.payload
+    }))
     assert(validation.validProtocolObject(message))
     assert(_.has(message, 'sender'))
     assert(validation.validKeyString(message.sender))
     self.emit('message', message)
   })
   stream.on('close', function () {
-    debug('disconnected ' + stream.remoteAddress)
+    self._log.info('MicroMinion connection destroyed', stream.toMetadata())
     self._connections.splice(self._connections.indexOf(stream), 1)
     self.emit('disconnected', stream.remoteAddress)
   })
   stream.on('end', function () {
-    debug('other end has closed connection')
+    self._log.debug('MicroMinion connection ended', stream.toMetadata())
     stream.destroy()
   })
   stream.on('finish', function () {
-    debug('end of stream reached')
+    self._log.debug('MicroMinion connection end of stream reached', stream.toMetadata())
     stream.destroy()
   })
   stream.on('error', function (err) {
     assert(_.isError(err))
-    debug('ERROR in socket')
-    debug(err)
+    self._log.warn('MicroMinion connection error', extend(stream.toMetadata(), {
+      error: err
+    }))
     stream.destroy()
   })
   stream.on('timeout', function () {
@@ -236,10 +261,14 @@ Platform.prototype._connectEvents = function (stream) {
  *  payload: message blob (buffer)
  */
 Platform.prototype.send = function (message, options) {
-  debug('send')
-  debug(message)
   assert(validation.validSendMessage(message))
   assert(validation.validOptions(options))
+  var self = this
+  self._log.debug('MicroMinion trying to send message', {
+    destination: message.destination,
+    protocol: message.protocol,
+    topic: message.topic
+  })
   if (!options) {
     options = {}
   }
@@ -247,20 +276,22 @@ Platform.prototype.send = function (message, options) {
     options.callback = function (err) {
       assert(validation.validError(err))
       if (err) {
-        debug('ERROR in sending message')
-        debug(err)
+        self._log.warn('MicroMinion message failed to send', {
+          destination: message.destination,
+          protocol: message.protocol,
+          topic: message.topic,
+          payload: message.payload,
+          error: err
+        })
       }
     }
   }
   var connection = this._getConnection(message.destination)
   if (connection && connection.isConnected()) {
-    debug('connection exists and is connected')
     this._send(message, connection, options.callback)
   } else if (connection) {
-    debug('connection exists and is not connected')
     this._queueMessage(message, connection, options.callback)
   } else {
-    debug('connection does not exists - creating new')
     var socket = new transport.Socket()
     connection = this._wrapConnection(socket, false)
     this._queueMessage(message, connection, options.callback)
@@ -269,11 +300,16 @@ Platform.prototype.send = function (message, options) {
 }
 
 Platform.prototype._queueMessage = function (message, connection, callback) {
-  debug('_queueMessage')
   assert(validation.validSendMessage(message))
   assert(validation.validStream(connection))
   assert(_.isNil(callback) || _.isFunction(callback))
   var self = this
+  self._log.debug('MicroMinion queuing message', extend(connection.toMetadata(), {
+    destination: message.destination,
+    protocol: message.protocol,
+    topic: message.topic,
+    payload: message.payload
+  }))
   connection.once('connect', function () {
     self._send(message, connection, callback)
   })
@@ -289,12 +325,15 @@ Platform.prototype._queueMessage = function (message, connection, callback) {
  * @private
  */
 Platform.prototype._send = function (message, connection, callback) {
-  debug('_send')
-  debug(message)
   assert(validation.validSendMessage(message))
   assert(validation.validStream(connection))
   assert(_.isNil(callback) || _.isFunction(callback))
   connection.write(message, callback)
+  this._log.info('MicroMinion message send', extend(connection.toMetadata(), {
+    topic: message.topic,
+    protocol: message.protocol,
+    payload: message.payload
+  }))
 }
 
 Platform.prototype._setupAPI = function () {
