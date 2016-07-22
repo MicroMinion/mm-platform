@@ -1,3 +1,5 @@
+'use strict'
+
 // An implementation of the http://cr.yp.to/proto/netstrings.txt format.
 
 var assert = require('assert')
