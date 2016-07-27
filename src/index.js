@@ -12,15 +12,13 @@ var MMProtocol = require('./mm-protocol.js')
 var Circle = require('./circle-empty.js')
 var Directory = require('./directory.js')
 var _ = require('lodash')
-var kadfs = require('kad-fs')
+var MemStore = require('kad-memstore-thomas')
 var path = require('path')
 var assert = require('assert')
 var validation = require('./validation.js')
 var winston = require('winston')
 var extend = require('extend.js')
 var winstonWrapper = require('winston-meta-wrapper')
-
-var DEFAULT_STORAGE_DIR = './data'
 
 /**
  * MicroMinion Platform
@@ -48,7 +46,7 @@ var Platform = function (options) {
   })
   this._ready = false
   if (!options.storage) {
-    options.storage = kadfs(path.join(DEFAULT_STORAGE_DIR, 'platform'))
+    options.storage = new MemStore()
   }
   this.storage = options.storage
   if (!options.friends) {
