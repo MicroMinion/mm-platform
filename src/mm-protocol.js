@@ -13,8 +13,6 @@ var _ = require('lodash')
 var proto = fs.readFileSync(path.join(path.resolve(__dirname), 'mm-protocol.proto'))
 var Message = protobuf(proto).Message
 
-var DIRECTORY_TIMEOUT = 5 * 1000
-
 var MMProtocol = function (options) {
   assert(validation.validOptions(options))
   assert(_.has(options, 'stream'))
@@ -31,48 +29,17 @@ var MMProtocol = function (options) {
   this.devices = options.devices
   this.directory = options.directory
   var self = this
-  this.directory.on('lookup', function (boxId, signId) {
-    debug('lookup received')
-    assert(validation.validKeyString(boxId))
-    assert(validation.validKeyString(signId))
-    if (!self.remoteAddress && self.stream.isConnected()) {
-      if (self.stream.remoteAddress && boxId === self.stream.remoteAddress) {
-        self.remoteAddress = signId
-        self.emit('connect')
-      }
-    }
-  })
   this.stream.on('data', function (data) {
     debug('data received')
     assert(_.isBuffer(data))
-    if (self.remoteAddress) {
-      self._processData(data)
-    } else {
-      setTimeout(function () {
-        if (self.remoteAddress) {
-          self._processData(data)
-        } else {
-          debug('unable to retrieve remote address')
-        }
-      }, DIRECTORY_TIMEOUT)
-    }
+    self._processData(data)
   })
 
   this.stream.on('close', function () {
     self.emit('close')
   })
   this.stream.on('connect', function () {
-    if (!self.remoteAddress) {
-      self.directory.getSignId(self.stream.remoteAddress)
-      setTimeout(function () {
-        if (!self.remoteAddress) {
-          self.emit('error', new Error('Directory Lookup Timeout'))
-          console.log('directory timeout, ' + self.stream.remoteAddress + ' not found')
-        }
-      }, DIRECTORY_TIMEOUT)
-    } else {
-      self.emit('connect')
-    }
+    self.emit('connect')
   })
   this.stream.on('drain', function () {
     self.emit('drain')
@@ -113,7 +80,6 @@ MMProtocol.prototype.connect = function (publicKey) {
   debug('connect')
   assert(validation.validKeyString(publicKey))
   var self = this
-  this.remoteAddress = publicKey
   this.directory.getNodeInfo(publicKey, function (err, result) {
     if (err) {
       assert(_.isError(err))
@@ -134,9 +100,7 @@ MMProtocol.prototype.isConnected = function () {
 }
 
 MMProtocol.prototype.toMetadata = function () {
-  var result = this.stream.stream._stream.toMetadata()
-  result.remoteAddress = this.remoteAddress
-  return result
+  return this.stream.stream._stream.toMetadata()
 }
 
 MMProtocol.prototype._read = function (size) {}
@@ -177,5 +141,11 @@ MMProtocol.prototype._getScope = function (publicKey) {
 MMProtocol.prototype.destroy = function () {
   this.stream.destroy()
 }
+
+Object.defineProperty(MMProtocol.prototype, 'remoteAddress', {
+  get: function () {
+    return this.stream.remoteAddress
+  }
+})
 
 module.exports = MMProtocol

@@ -71,36 +71,36 @@ Directory.prototype.setMyConnectionInfo = function (connectionInfo) {
   this._sendMyNodeInfo()
 }
 
-Directory.prototype.getNodeInfo = function (signId, callback) {
+Directory.prototype.getNodeInfo = function (boxId, callback) {
   this.logger.debug('get nodeInfo', {
-    signId: signId
+    boxId: boxId
   })
   assert(_.isFunction(callback))
-  assert(validation.validKeyString(signId))
-  if (_.has(this.directoryCache, signId)) {
-    var cacheResult = this.directoryCache[signId]
+  assert(validation.validKeyString(boxId))
+  if (_.has(this.directoryCache, boxId)) {
+    var cacheResult = this.directoryCache[boxId]
     process.nextTick(function () {
       callback(null, cacheResult)
     })
-    if (this._hasStaleCache(signId)) {
-      if (!_.has(this.directoryLookup, signId)) {
-        this._lookupKey(signId)
+    if (this._hasStaleCache(boxId)) {
+      if (!_.has(this.directoryLookup, boxId)) {
+        this._lookupKey(boxId)
       }
     }
-  } else if (_.has(this.directoryLookup, signId)) {
-    this.directoryLookup[signId].push(callback)
+  } else if (_.has(this.directoryLookup, boxId)) {
+    this.directoryLookup[boxId].push(callback)
   } else {
-    this._lookupKey(signId)
-    this.directoryLookup[signId] = [callback]
+    this._lookupKey(boxId)
+    this.directoryLookup[boxId] = [callback]
   }
 }
 
-Directory.prototype._hasStaleCache = function (signId) {
-  assert(validation.validKeyString(signId))
-  if (!this.directoryCache[signId].lastUpdate) {
+Directory.prototype._hasStaleCache = function (boxId) {
+  assert(validation.validKeyString(boxId))
+  if (!this.directoryCache[boxId].lastUpdate) {
     return true
   }
-  var diff = Math.abs(new Date() - new Date(this.directoryCache[signId].lastUpdate))
+  var diff = Math.abs(new Date() - new Date(this.directoryCache[boxId].lastUpdate))
   return diff > CACHE_REFRESH_INTERVAL
 }
 
@@ -136,19 +136,19 @@ Directory.prototype._saveDirectoryCache = function () {
 /**
  * @private
  */
-Directory.prototype._lookupKey = function (signId) {
+Directory.prototype._lookupKey = function (boxId) {
   this.logger.debug('lookup node Info', {
-    signId: signId
+    boxId: boxId
   })
-  assert(validation.validKeyString(signId))
+  assert(validation.validKeyString(boxId))
   var self = this
-  this.platform.messaging.send('transports.requestNodeInfo', 'local', signId)
+  this.platform.messaging.send('transports.requestNodeInfo', 'local', boxId)
   setTimeout(function () {
-    if (_.has(self.directoryLookup, signId)) {
-      _.forEach(self.directoryLookup[signId], function (callback) {
+    if (_.has(self.directoryLookup, boxId)) {
+      _.forEach(self.directoryLookup[boxId], function (callback) {
         callback(new Error('key lookup timeout'), null)
       })
-      delete self.directoryLookup[signId]
+      delete self.directoryLookup[boxId]
     }
   }, DIRECTORY_LOOKUP_TIMEOUT)
 }
@@ -160,41 +160,17 @@ Directory.prototype._processNodeInfo = function (topic, local, data) {
   assert(topic === 'self.transports.nodeInfo')
   assert(local === 'local')
   assert(_.isPlainObject(data))
-  if (!_.has(this.directoryCache, data.signId)) {
-    this.directoryCache[data.signId] = {}
+  if (!_.has(this.directoryCache, data.boxId)) {
+    this.directoryCache[data.boxId] = {}
   }
-  this.directoryCache[data.signId] = data
-  this.directoryCache[data.signId].lastUpdate = new Date().toJSON()
+  this.directoryCache[data.boxId] = data
+  this.directoryCache[data.boxId].lastUpdate = new Date().toJSON()
   this._saveDirectoryCache()
-  if (_.has(this.directoryLookup, data.signId)) {
-    _.forEach(this.directoryLookup[data.signId], function (callback) {
+  if (_.has(this.directoryLookup, data.boxId)) {
+    _.forEach(this.directoryLookup[data.boxId], function (callback) {
       callback(null, data)
     })
-    delete this.directoryLookup[data.signId]
-  }
-}
-
-Directory.prototype.getSignId = function (boxId) {
-  this.logger.debug('finding sign ID', {
-    boxId: boxId
-  })
-  assert(validation.validKeyString(boxId))
-  var result
-  if (_.has(this.mapping, boxId)) {
-    result = this.mapping[boxId]
-  } else {
-    _.forEach(this.directoryCache, function (nodeInfo) {
-      assert(validation.validNodeInfo(nodeInfo))
-      if (nodeInfo.boxId === boxId) {
-        result = nodeInfo.signId
-      }
-    })
-  }
-  if (result) {
-    this.mapping[boxId] = result
-    this.emit('lookup', boxId, result)
-  } else {
-    this.platform.messaging.send('directory.get', 'local', boxId)
+    delete this.directoryLookup[data.boxId]
   }
 }
 

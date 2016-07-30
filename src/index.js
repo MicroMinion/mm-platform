@@ -66,7 +66,7 @@ var Platform = function (options) {
   var self = this
   this.identity.on('ready', function () {
     self._log.addMeta({
-      node: self.identity.getSignId()
+      node: self.identity.getBoxId()
     })
     self._log.info('platform initialized')
     self._setupTransport(options.connectionInfo)
@@ -161,9 +161,13 @@ Platform.prototype._getConnection = function (publicKey) {
     destination: publicKey
   })
   assert(validation.validKeyString(publicKey))
-  var connections = _.filter(this._connections, function (connection) {
-    return connection.remoteAddress === publicKey
-  })
+  try {
+    var connections = _.filter(this._connections, function (connection) {
+      return connection.remoteAddress === publicKey
+    })
+  } catch (e) {
+    return
+  }
   _.sortBy(connections, function (connection) {
     if (connection.isConnected()) {
       return 1
@@ -294,8 +298,8 @@ Platform.prototype.send = function (message, options) {
   } else {
     var socket = new transport.Socket()
     connection = this._wrapConnection(socket, false)
-    this._queueMessage(message, connection, options.callback)
     connection.connect(message.destination)
+    this._queueMessage(message, connection, options.callback)
   }
 }
 
