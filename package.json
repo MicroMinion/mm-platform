@@ -1,6 +1,6 @@
 {
   "name": "mm-platform",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "P2P encrypted messaging platform",
   "main": "src/index.js",
   "directories": {
@@ -32,7 +32,7 @@
   "dependencies": {
     "1tp": "^0.4.1",
     "ak-eventemitter": "0.0.6",
-    "curvecp": "^0.9.3",
+    "curvecp": "^0.9.4",
     "debug": "^2.2.0",
     "ed2curve": "^0.1.4",
     "extend.js": "0.0.2",
