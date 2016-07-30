@@ -19,6 +19,8 @@ var winston = require('winston')
 var extend = require('extend.js')
 var winstonWrapper = require('winston-meta-wrapper')
 
+var SOCKET_TIMEOUT = 5 * 1000
+
 /**
  * MicroMinion Platform
  *
@@ -184,6 +186,7 @@ Platform.prototype._getConnection = function (publicKey) {
 Platform.prototype._wrapConnection = function (socket, destination) {
   assert(validation.validStream(socket))
   var server = _.isUndefined(destination)
+  socket.setTimeout(SOCKET_TIMEOUT)
   var packetStreamOptions = {
     isServer: server,
     stream: socket
