@@ -105,7 +105,7 @@ Platform.prototype._setupTransport = function (connectionInfo) {
     assert(validation.validStream(socket))
     // TODO: add socket.toMetadata() once it exists
     self._log.info('new incoming 1tp connection')
-    self._wrapConnection(socket, true)
+    self._wrapConnection(socket)
   })
   this._transport.on('error', function (err) {
     assert(_.isError(err))
@@ -180,9 +180,9 @@ Platform.prototype._getConnection = function (publicKey) {
   }
 }
 
-Platform.prototype._wrapConnection = function (socket, server) {
+Platform.prototype._wrapConnection = function (socket, destination) {
   assert(validation.validStream(socket))
-  assert(_.isBoolean(server))
+  var server = _.isUndefined(destination)
   var packetStreamOptions = {
     isServer: server,
     stream: socket
@@ -195,6 +195,9 @@ Platform.prototype._wrapConnection = function (socket, server) {
     packetStreamOptions.clientPrivateKey = this.identity.box.secretKey
   }
   var curvePackets = new curvecp.PacketStream(packetStreamOptions)
+  if (!server) {
+    curvePackets.setDestination(destination)
+  }
   var curveMessages = new curvecp.MessageStream({
     stream: curvePackets
   })
@@ -297,7 +300,7 @@ Platform.prototype.send = function (message, options) {
     this._queueMessage(message, connection, options.callback)
   } else {
     var socket = new transport.Socket()
-    connection = this._wrapConnection(socket, false)
+    connection = this._wrapConnection(socket, message.destination)
     connection.connect(message.destination)
     this._queueMessage(message, connection, options.callback)
   }
