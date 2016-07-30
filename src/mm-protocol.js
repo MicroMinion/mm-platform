@@ -45,19 +45,19 @@ var MMProtocol = function (options) {
   this.stream.on('data', function (data) {
     debug('data received')
     assert(_.isBuffer(data))
-    if(self.remoteAddress) {
+    if (self.remoteAddress) {
       self._processData(data)
     } else {
-      setTimeout(function() {
-        if(self.remoteAddress) {
+      setTimeout(function () {
+        if (self.remoteAddress) {
           self._processData(data)
         } else {
           debug('unable to retrieve remote address')
         }
       }, DIRECTORY_TIMEOUT)
     }
-
   })
+
   this.stream.on('close', function () {
     self.emit('close')
   })
@@ -94,7 +94,7 @@ var MMProtocol = function (options) {
 
 inherits(MMProtocol, Duplex)
 
-MMProtocol.prototype._processData = function(data) {
+MMProtocol.prototype._processData = function (data) {
   var self = this
   try {
     var message = Message.decode(data)

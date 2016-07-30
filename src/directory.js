@@ -1,6 +1,5 @@
 'use strict'
 
-var debug = require('debug')('mm-platform:directory')
 var _ = require('lodash')
 var events = require('events')
 var inherits = require('inherits')
@@ -16,6 +15,7 @@ var Directory = function (options) {
   assert(_.has(options, 'storage'))
   assert(_.has(options, 'platform'))
   assert(_.has(options, 'identity'))
+  assert(_.has(options, 'logger'))
   /**
    * Node information from previously used public keys
    *
@@ -31,6 +31,7 @@ var Directory = function (options) {
   this.messaging = this.platform.messaging
   this.identity = options.identity
   this.ready = this.identity.loaded()
+  this.logger = options.logger
   var self = this
   this.identity.on('ready', function () {
     self.ready = true
@@ -39,7 +40,6 @@ var Directory = function (options) {
   this.messaging.on('self.transports.nodeInfo', this._processNodeInfo.bind(this))
   this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
   setInterval(function () {
-    debug('_cacheRefreshInterval')
     self._sendMyNodeInfo()
   }, CACHE_REFRESH_INTERVAL)
 }
@@ -47,29 +47,34 @@ var Directory = function (options) {
 inherits(Directory, events.EventEmitter)
 
 Directory.prototype._sendMyNodeInfo = function () {
-  debug('_sendMyNodeInfo')
   if (this._connectionInfo) {
     assert(_.isArray(this._connectionInfo))
     var nodeInfo = {}
     if (this.ready) {
-      debug('ready to send')
       nodeInfo.connectionInfo = this._connectionInfo
       nodeInfo.boxId = this.identity.getBoxId()
       nodeInfo.signId = this.identity.getSignId()
+      this.logger.info('_sendMyNodeInfo', {
+        nodeInfo: nodeInfo
+      })
       this.platform.messaging.send('transports.myNodeInfo', 'local', nodeInfo)
     }
   }
 }
 
 Directory.prototype.setMyConnectionInfo = function (connectionInfo) {
-  debug('setMyConnectionInfo')
+  this.logger.debug('setMyConnectionInfo', {
+    connectionInfo: connectionInfo
+  })
   assert(_.isObject(connectionInfo))
   this._connectionInfo = connectionInfo
   this._sendMyNodeInfo()
 }
 
 Directory.prototype.getNodeInfo = function (signId, callback) {
-  debug('_findKey')
+  this.logger.debug('get nodeInfo', {
+    signId: signId
+  })
   assert(_.isFunction(callback))
   assert(validation.validKeyString(signId))
   if (_.has(this.directoryCache, signId)) {
@@ -103,7 +108,6 @@ Directory.prototype._hasStaleCache = function (signId) {
  * @private
  */
 Directory.prototype._loadDirectoryCache = function () {
-  debug('loadDirectoryCache')
   var self = this
   var success = function (value) {
     assert(validation.validString(value))
@@ -126,7 +130,6 @@ Directory.prototype._loadDirectoryCache = function () {
  * @private
  */
 Directory.prototype._saveDirectoryCache = function () {
-  debug('saveDirectoryCache')
   this.storage.put('directoryCache', JSON.stringify(this.directoryCache))
 }
 
@@ -134,7 +137,9 @@ Directory.prototype._saveDirectoryCache = function () {
  * @private
  */
 Directory.prototype._lookupKey = function (signId) {
-  debug('_lookupKey')
+  this.logger.debug('lookup node Info', {
+    signId: signId
+  })
   assert(validation.validKeyString(signId))
   var self = this
   this.platform.messaging.send('transports.requestNodeInfo', 'local', signId)
@@ -152,7 +157,6 @@ Directory.prototype._lookupKey = function (signId) {
  * @private
  */
 Directory.prototype._processNodeInfo = function (topic, local, data) {
-  debug('nodeInfo event')
   assert(topic === 'self.transports.nodeInfo')
   assert(local === 'local')
   assert(_.isPlainObject(data))
@@ -171,7 +175,9 @@ Directory.prototype._processNodeInfo = function (topic, local, data) {
 }
 
 Directory.prototype.getSignId = function (boxId) {
-  debug('getSignId')
+  this.logger.debug('finding sign ID', {
+    boxId: boxId
+  })
   assert(validation.validKeyString(boxId))
   var result
   if (_.has(this.mapping, boxId)) {

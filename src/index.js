@@ -13,7 +13,6 @@ var Circle = require('./circle-empty.js')
 var Directory = require('./directory.js')
 var _ = require('lodash')
 var MemStore = require('kad-memstore-thomas')
-var path = require('path')
 var assert = require('assert')
 var validation = require('./validation.js')
 var winston = require('winston')
@@ -79,7 +78,8 @@ var Platform = function (options) {
     options.directory = new Directory({
       storage: this.storage,
       platform: this,
-      identity: this.identity
+      identity: this.identity,
+      logger: this._log
     })
   }
   this.directory = options.directory
