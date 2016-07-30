@@ -95,7 +95,9 @@ Platform.prototype.isReady = function () {
 Platform.prototype._setupTransport = function (connectionInfo) {
   this._log.debug('_setupTransport')
   var self = this
-  this._transport = new transport.Server()
+  this._transport = new transport.Server({
+    logger: this._log
+  })
   this._transport.on('close', function () {
     self._log.warn('transport closed')
     self._transport.removeAllListeners()
@@ -157,17 +159,16 @@ Platform.prototype._listen = function (connectionInfo) {
 }
 
 Platform.prototype._getConnection = function (publicKey) {
-  this._log.debug('checking connection', {
-    destination: publicKey
-  })
   assert(validation.validKeyString(publicKey))
-  try {
-    var connections = _.filter(this._connections, function (connection) {
-      return connection.remoteAddress === publicKey
+  this._log.debug('checking connection', {
+    destination: publicKey,
+    connections: _.map(this._connections, function (connection) {
+      return connection.remoteAddress
     })
-  } catch (e) {
-    return
-  }
+  })
+  var connections = _.filter(this._connections, function (connection) {
+    return connection.remoteAddress === publicKey
+  })
   _.sortBy(connections, function (connection) {
     if (connection.isConnected()) {
       return 1
@@ -299,7 +300,9 @@ Platform.prototype.send = function (message, options) {
   } else if (connection) {
     this._queueMessage(message, connection, options.callback)
   } else {
-    var socket = new transport.Socket()
+    var socket = new transport.Socket({
+      logger: this._log
+    })
     connection = this._wrapConnection(socket, message.destination)
     connection.connect(message.destination)
     this._queueMessage(message, connection, options.callback)
