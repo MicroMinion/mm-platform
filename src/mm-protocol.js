@@ -6,9 +6,10 @@ var protobuf = require('protocol-buffers')
 var fs = require('fs')
 var assert = require('assert')
 var path = require('path')
-var debug = require('debug')('mm-platform:mm-protocol')
 var validation = require('./validation.js')
 var _ = require('lodash')
+var winston = require('winston')
+var winstonWrapper = require('winston-meta-wrapper')
 
 var proto = fs.readFileSync(path.join(path.resolve(__dirname), 'mm-protocol.proto'))
 var Message = protobuf(proto).Message
@@ -19,6 +20,13 @@ var MMProtocol = function (options) {
   assert(_.has(options, 'friends'))
   assert(_.has(options, 'devices'))
   assert(_.has(options, 'directory'))
+  if (!options.logger) {
+    options.logger = winston
+  }
+  this._log = winstonWrapper(options.logger)
+  this._log.addMeta({
+    module: 'mm-platform:mm-protocol'
+  })
   Duplex.call(this, {
     allowHalfOpen: false,
     readableObjectMode: true,
@@ -30,7 +38,7 @@ var MMProtocol = function (options) {
   this.directory = options.directory
   var self = this
   this.stream.on('data', function (data) {
-    debug('data received')
+    self._log.debug('data received')
     assert(_.isBuffer(data))
     self._processData(data)
   })
@@ -65,19 +73,21 @@ MMProtocol.prototype._processData = function (data) {
   var self = this
   try {
     var message = Message.decode(data)
-    debug(message)
+    self._log.debug(message)
     message.sender = self.remoteAddress
     message.scope = self._getScope(message.sender)
     assert(validation.validReceivedMessage(message))
     self.emit('data', message)
   } catch (e) {
-    debug('invalid message received - dropped')
-    debug(e)
+    self._log.warn('invalid message received - dropped', {
+      error: e,
+      message: data
+    })
   }
 }
 
 MMProtocol.prototype.connect = function (publicKey) {
-  debug('connect')
+  this._log.debug('connect')
   assert(validation.validKeyString(publicKey))
   var self = this
   this.directory.getNodeInfo(publicKey, function (err, result) {
@@ -106,7 +116,7 @@ MMProtocol.prototype.toMetadata = function () {
 MMProtocol.prototype._read = function (size) {}
 
 MMProtocol.prototype._write = function (chunk, encoding, callback) {
-  debug('_write')
+  this._log.debug('_write')
   assert(validation.validSendMessage(chunk))
   assert(validation.validCallback(callback))
   var message = {
@@ -114,7 +124,6 @@ MMProtocol.prototype._write = function (chunk, encoding, callback) {
     protocol: chunk.protocol,
     payload: chunk.payload
   }
-  debug(message)
   this.stream.write(Message.encode(message), 'buffer', callback)
 }
 
@@ -126,8 +135,9 @@ MMProtocol.prototype._write = function (chunk, encoding, callback) {
  * @private
  */
 MMProtocol.prototype._getScope = function (publicKey) {
-  debug('_getScope')
-  debug(publicKey)
+  this._log.debug('_getScope', {
+    publicKey: publicKey
+  })
   assert(validation.validKeyString(publicKey))
   if (this.devices.inScope(publicKey)) {
     return 'self'

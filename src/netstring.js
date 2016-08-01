@@ -1,22 +1,31 @@
 'use strict'
 
-var debug = require('debug')('mm-platform:netstring')
 var inherits = require('inherits')
 var Duplex = require('stream').Duplex
 var ns = require('./ns.js')
 var assert = require('assert')
 var validation = require('./validation.js')
 var _ = require('lodash')
+var winston = require('winston')
+var winstonWrapper = require('winston-meta-wrapper')
 
 var NetstringStream = function (options) {
   assert(validation.validOptions(options))
   assert(_.has(options, 'stream'))
+  if (!options.logger) {
+    options.logger = winston
+  }
+  this._log = winstonWrapper(options.logger)
+  this._log.addMeta({
+    module: 'mm-platform:netstring'
+  })
   this.stream = options.stream
   var self = this
   this.stream.on('data', function (data) {
-    debug('data received')
     assert(_.isBuffer(data))
-    debug(data.toString())
+    self._log.debug('data received', {
+      data: data.toString()
+    })
     if (!self.buffer) {
       self.buffer = data
     } else {
@@ -26,7 +35,9 @@ var NetstringStream = function (options) {
       self._processBuffer()
     } catch (e) {
       assert(_.isError(e))
-      debug(e)
+      self._log.warn('failed to process buffer', {
+        error: e
+      })
       delete self.buffer
     }
   })
@@ -65,19 +76,19 @@ inherits(NetstringStream, Duplex)
  * @private
  */
 NetstringStream.prototype._processBuffer = function () {
-  debug('_processBuffer')
+  this._log.debug('_processBuffer')
   assert(_.isBuffer(this.buffer))
   var self = this
   if (this.buffer.length === 0) {
     return
   }
   var messageLength = ns.nsLength(this.buffer)
-  debug('message length: ' + messageLength)
-  debug('buffer length: ' + this.buffer.length)
+  this._log.debug('message length: ' + messageLength)
+  this._log.debug('buffer length: ' + this.buffer.length)
   if (this.buffer.length >= messageLength) {
     var payload = ns.nsPayload(this.buffer)
     this.buffer = this.buffer.slice(messageLength)
-    debug('buffer length after processing: ' + this.buffer.length)
+    this._log.debug('buffer length after processing: ' + this.buffer.length)
     this.emit('data', payload)
     process.nextTick(function () {
       self._processBuffer()

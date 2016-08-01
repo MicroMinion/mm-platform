@@ -2,7 +2,6 @@
 
 var EventEmitter = require('events').EventEmitter
 var inherits = require('inherits')
-var debug = require('debug')('mm-platform:offline-buffer')
 var _ = require('lodash')
 var uuid = require('node-uuid')
 var assert = require('assert')
@@ -64,7 +63,6 @@ var OfflineBuffer = function (options) {
   this._sendQueuesRetrieved = false
   this._loadSendQueues()
   setInterval(function () {
-    debug('trigger send queues periodically')
     _.forEach(_.keys(self.sendQueues), function (publicKey) {
       assert(validation.validKeyString(publicKey))
       self._trigger(publicKey)
@@ -81,7 +79,6 @@ inherits(OfflineBuffer, EventEmitter)
  * @param {string} publicKey - publicKey of destination for which messages need to be send
  */
 OfflineBuffer.prototype._trigger = function (publicKey) {
-  debug('trigger')
   assert(validation.validKeyString(publicKey))
   if (this.sendQueues[publicKey] && _.size(this.sendQueues[publicKey]) > 0) {
     this._flushQueue(publicKey)
@@ -124,14 +121,12 @@ OfflineBuffer.prototype.send = function (message, options) {
  * @private
  */
 OfflineBuffer.prototype._flushQueue = function (publicKey) {
-  debug('flushQueue')
   assert(validation.validKeyString(publicKey))
   var self = this
   _.forEach(this.sendQueues[publicKey], function (queueItem, id) {
     var options = queueItem.options
     var message = queueItem.message
     if (Math.abs(new Date() - new Date(options.timestamp)) < options.expireAfter) {
-      debug('SEND: ' + JSON.stringify(message))
       var callback = function (err) {
         if (!err) {
           if (options.callback) {
@@ -158,15 +153,12 @@ OfflineBuffer.prototype._flushQueue = function (publicKey) {
  * @private
  */
 OfflineBuffer.prototype._loadSendQueues = function () {
-  debug('loadSendQueues')
   var self = this
   var success = function (value) {
     if (value === null) {
-      debug('error in loading sendqueue')
       self._sendQueuesRetrieved = true
       return
     }
-    debug('success in loading sendqueue')
     assert(validation.validString(value))
     value = JSON.parse(value)
     assert(_.isObject(value))
@@ -185,8 +177,6 @@ OfflineBuffer.prototype._loadSendQueues = function () {
   }
   var error = function (errorMessage) {
     assert(_.isError(errorMessage))
-    debug('error in loading sendqueue')
-    debug(errorMessage)
     self._sendQueuesRetrieved = true
   }
   this.storage.get(this.name + 'Buffer', function (err, result) {
@@ -202,7 +192,6 @@ OfflineBuffer.prototype._loadSendQueues = function () {
  * @private
  */
 OfflineBuffer.prototype._saveSendQueues = function () {
-  debug('saveSendQueues')
   if (!this._sendQueuesRetrieved) {
     return
   }

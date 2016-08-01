@@ -1,6 +1,5 @@
 'use strict'
 
-var debug = require('debug')('mm-platform:identity')
 var nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
 var ed2curve = require('ed2curve')
@@ -10,6 +9,8 @@ var inherits = require('inherits')
 var assert = require('assert')
 var validation = require('./validation.js')
 var _ = require('lodash')
+var winston = require('winston')
+var winstonWrapper = require('winston-meta-wrapper')
 
 nacl.setPRNG(function (x, n) {
   var i
@@ -22,6 +23,13 @@ var Identity = function (options) {
   assert(validation.validOptions(options))
   assert(_.has(options, 'platform'))
   assert(_.has(options, 'storage'))
+  if (!options.logger) {
+    options.logger = winston
+  }
+  this._log = winstonWrapper(options.logger)
+  this._log.addMeta({
+    module: 'mm-platform'
+  })
   this.platform = options.platform
   this.storage = options.storage
   this._loadIdentity()
@@ -44,7 +52,7 @@ Identity.prototype._loadIdentity = function () {
   }
   var error = function (error) {
     assert(_.isError(error))
-    debug(error)
+    self._log.warn(error)
     self._generateIdentity()
     self.emit('ready')
   }
@@ -58,7 +66,6 @@ Identity.prototype._loadIdentity = function () {
 }
 
 Identity.prototype._generateIdentity = function () {
-  debug('_generateIdentity')
   if (!this.sign || !this.sign.secretKey) {
     this.sign = nacl.sign.keyPair()
     this._saveIdentity()
@@ -66,13 +73,14 @@ Identity.prototype._generateIdentity = function () {
 }
 
 Identity.prototype._saveIdentity = function () {
-  debug('_saveIdentity')
+  var self = this
   this.storage.put('identity', nacl.util.encodeBase64(this.sign.secretKey), function (err) {
     if (err) {
-      debug('unable to save identity')
-      debug(err)
+      self._log.warn('unable to save identity', {
+        error: err
+      })
     } else {
-      debug('saved identity')
+      self._log.debug('saved identity')
     }
   })
 }

@@ -2,7 +2,6 @@
 
 var EventEmitter = require('ak-eventemitter')
 var inherits = require('inherits')
-var debug = require('debug')('mm-platform:api')
 var validation = require('./validation.js')
 var assert = require('assert')
 var _ = require('lodash')
@@ -45,7 +44,6 @@ var API = function (options) {
 inherits(API, EventEmitter)
 
 API.prototype.send = function (topic, destination, payload, options) {
-  debug('send')
   assert(validation.validString(topic))
   assert(validation.validLocalKeyString(destination))
   assert.doesNotThrow(this.serialize.bind(payload))
