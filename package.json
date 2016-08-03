@@ -30,7 +30,7 @@
     "node": ">=4.x.x"
   },
   "dependencies": {
-    "1tp": "^0.4.2",
+    "1tp": "^0.5.0",
     "ak-eventemitter": "0.0.6",
     "curvecp": "^0.9.5",
     "ed2curve": "^0.1.4",

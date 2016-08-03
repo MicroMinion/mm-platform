@@ -97,9 +97,8 @@ Platform.prototype.isReady = function () {
 Platform.prototype._setupTransport = function (connectionInfo) {
   this._log.debug('_setupTransport')
   var self = this
-  this._transport = new transport.Server({
-    logger: this._log
-  })
+  this._transport = new transport.Server()
+  this._transport.setLogger(this._log)
   this._transport.on('close', function () {
     self._log.warn('transport closed')
     self._transport.removeAllListeners()
