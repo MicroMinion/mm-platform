@@ -1,0 +1,89 @@
+#!/usr/bin/env node
+
+'use strict'
+
+var parallel = require('run-parallel')
+var _ = require('lodash')
+var winston = require('winston')
+var winstonWrapper = require('winston-meta-wrapper')
+
+var Platform = require('./src/index.js')
+var Directory = require('./stub/directory.js')
+
+var createLogger = function () {
+  var logger = new winston.Logger({
+    transports: [
+      new winston.transports.Console({
+        level: 'warn',
+        timestamp: true,
+        logstash: false
+      })
+    ]
+  })
+  return winstonWrapper(logger)
+}
+/*
+var Logger = function () {
+  this.debug = this.log.bind(this, 'debug')
+  this.info = this.log.bind(this, 'info')
+  this.warn = this.log.bind(this, 'warn')
+  this.error = this.log.bind(this, 'error')
+}
+
+Logger.prototype.log = function (level, msg, attributes) {}
+*/
+var platformNodes = []
+
+var _makeNodes = function (number, done) {
+  var readyCounter = 0
+  for (var i = 0; i < number; i++) {
+    var platform = new Platform({
+      directory: new Directory(),
+      logger: createLogger()
+    })
+    platform.once('ready', function () {
+      readyCounter += 1
+      if (readyCounter === number) {
+        done()
+      }
+    })
+    platformNodes.push(platform)
+  }
+}
+
+var _callback = function (nodes, messageId, callback) {
+  var sample = _.sampleSize(nodes, 2)
+  var sender = sample[0]
+  var destinationKey = sample[1].identity.getBoxId()
+  // console.time(messageId)
+  sender.messaging.send('test.test', destinationKey, {
+    'testSequence': messageId
+  }, {
+    callback: function (err, result) {
+      // console.timeEnd(messageId)
+      callback(err, result)
+    }
+  })
+}
+
+var node = 15
+var nbMessages = 200
+
+var done = function () {
+  var callbacks = []
+  for (var i = 1; i <= nbMessages; i++) {
+    callbacks.push(_callback.bind(null, platformNodes, i))
+  }
+  parallel(callbacks, function (err, result) {
+    if (err) {
+      console.log('ERROR ENCOUNTERED')
+      console.log(err)
+      process.exit(1)
+    } else {
+      console.log('NO ERRORS')
+      process.exit(0)
+    }
+  })
+}
+
+_makeNodes(node, done)
