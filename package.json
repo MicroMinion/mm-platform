@@ -1,6 +1,6 @@
 {
   "name": "mm-platform",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "description": "P2P encrypted messaging platform",
   "main": "src/index.js",
   "directories": {
@@ -9,7 +9,7 @@
   "scripts": {
     "docs": "jsdoc -r -d docs src",
     "check-updates": "npm-check",
-    "test": "echo",
+    "test": "./node_modules/.bin/mocha",
     "2npm": "publish"
   },
   "repository": {
@@ -30,14 +30,14 @@
     "node": ">=4.x.x"
   },
   "dependencies": {
-    "1tp": "^0.4.2",
+    "1tp": "^0.5.0",
     "ak-eventemitter": "0.0.6",
-    "curvecp": "^0.9.5",
+    "curvecp": "^0.9.6",
     "ed2curve": "^0.1.4",
     "extend.js": "0.0.2",
     "inherits": "^2.0.1",
     "kad-memstore-thomas": "^0.1.0",
-    "lodash": "^4.14.1",
+    "lodash": "^4.14.2",
     "node-uuid": "^1.4.7",
     "protocol-buffers": "^3.1.6",
     "tweetnacl": "^0.14.3",
@@ -46,6 +46,9 @@
     "winston-meta-wrapper": "^1.0.0"
   },
   "devDependencies": {
-    "publish": "^0.6.0"
+    "chai": "^3.5.0",
+    "mocha": "^3.0.2",
+    "publish": "^0.6.0",
+    "run-parallel": "^1.1.6"
   }
 }
