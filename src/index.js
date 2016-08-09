@@ -45,7 +45,8 @@ var Platform = function (options) {
   this._log.addMeta({
     module: 'mm-platform'
   })
-  this._ready = false
+  this._identityReady = false
+  this._transportReady = false
   if (!options.storage) {
     options.storage = new MemStore()
   }
@@ -72,18 +73,16 @@ var Platform = function (options) {
     })
     self._log.info('platform initialized')
     self._setupTransport(options.connectionInfo)
-    self._ready = true
-    self.emit('ready')
+    self._identityReady = true
+    if (self._transportReady) {
+      self.emit('ready')
+    }
   })
   this._setupAPI()
   if (!options.directory) {
-    options.directory = new Directory({
-      storage: this.storage,
-      platform: this,
-      identity: this.identity,
-      logger: this._log
-    })
+    options.directory = new Directory()
   }
+  options.directory.setPlatform(this)
   this.directory = options.directory
   this._connections = []
 }
@@ -94,12 +93,15 @@ Platform.prototype.isReady = function () {
   return this._ready
 }
 
+Platform.prototype.setDevices = function (devices) {
+  this.devices = devices
+}
+
 Platform.prototype._setupTransport = function (connectionInfo) {
   this._log.debug('_setupTransport')
   var self = this
-  this._transport = new transport.Server({
-    logger: this._log
-  })
+  this._transport = new transport.Server()
+  this._transport.setLogger(this._log)
   this._transport.on('close', function () {
     self._log.warn('transport closed')
     self._transport.removeAllListeners()
@@ -122,6 +124,10 @@ Platform.prototype._setupTransport = function (connectionInfo) {
     var connectionInfo = self._transport.address()
     self.storage.put('myConnectionInfo', JSON.stringify(connectionInfo))
     self.directory.setMyConnectionInfo(connectionInfo)
+    self._transportReady = true
+    if (self._identityReady) {
+      self.emit('ready')
+    }
   })
   this._listen(connectionInfo)
 }
@@ -210,9 +216,7 @@ Platform.prototype._wrapConnection = function (socket, destination) {
   })
   var messages = new MMProtocol({
     stream: netstrings,
-    friends: this.friends,
-    devices: this.devices,
-    directory: this.directory
+    platform: this
   })
   this._connectEvents(messages)
   return messages
@@ -221,6 +225,7 @@ Platform.prototype._wrapConnection = function (socket, destination) {
 Platform.prototype._connectEvents = function (stream) {
   assert(validation.validStream(stream))
   var self = this
+  stream.setMaxListeners(0)
   this._connections.push(stream)
   stream.on('connect', function () {
     self._log.info('MicroMinion connection established', stream.toMetadata())
@@ -303,9 +308,8 @@ Platform.prototype.send = function (message, options) {
   } else if (connection) {
     this._queueMessage(message, connection, options.callback)
   } else {
-    var socket = new transport.Socket({
-      logger: this._log
-    })
+    var socket = new transport.Socket()
+    socket.setLogger(this._log)
     connection = this._wrapConnection(socket, message.destination)
     connection.connect(message.destination)
     this._queueMessage(message, connection, options.callback)

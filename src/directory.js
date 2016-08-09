@@ -10,12 +10,8 @@ var DIRECTORY_LOOKUP_TIMEOUT = 10000
 
 var CACHE_REFRESH_INTERVAL = 1000 * 60 * 5
 
-var Directory = function (options) {
-  assert(validation.validOptions(options))
-  assert(_.has(options, 'storage'))
-  assert(_.has(options, 'platform'))
-  assert(_.has(options, 'identity'))
-  assert(_.has(options, 'logger'))
+var Directory = function () {
+  var self = this
   /**
    * Node information from previously used public keys
    *
@@ -26,25 +22,27 @@ var Directory = function (options) {
   this.directoryLookup = {}
   this.mapping = {}
   events.EventEmitter.call(this)
-  this.storage = options.storage
-  this.platform = options.platform
-  this.messaging = this.platform.messaging
-  this.identity = options.identity
-  this.ready = this.identity.loaded()
-  this.logger = options.logger
-  var self = this
-  this.identity.on('ready', function () {
-    self.ready = true
-    self._sendMyNodeInfo()
-  })
-  this.messaging.on('self.transports.nodeInfo', this._processNodeInfo.bind(this))
-  this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
   setInterval(function () {
     self._sendMyNodeInfo()
   }, CACHE_REFRESH_INTERVAL)
 }
 
 inherits(Directory, events.EventEmitter)
+
+Directory.prototype.setPlatform = function (platform) {
+  this.platform = platform
+  this.storage = this.platform.storage
+  this.messaging = this.platform.messaging
+  this.ready = this.platform.identity.loaded()
+  this.logger = this.platform._log
+  var self = this
+  this.platform.identity.on('ready', function () {
+    self.ready = true
+    self._sendMyNodeInfo()
+  })
+  this.messaging.on('self.transports.nodeInfo', this._processNodeInfo.bind(this))
+  this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
+}
 
 Directory.prototype._sendMyNodeInfo = function () {
   if (this._connectionInfo) {

@@ -17,9 +17,7 @@ var Message = protobuf(proto).Message
 var MMProtocol = function (options) {
   assert(validation.validOptions(options))
   assert(_.has(options, 'stream'))
-  assert(_.has(options, 'friends'))
-  assert(_.has(options, 'devices'))
-  assert(_.has(options, 'directory'))
+  assert(_.has(options, 'platform'))
   if (!options.logger) {
     options.logger = winston
   }
@@ -33,9 +31,7 @@ var MMProtocol = function (options) {
     writableObjectMode: true
   })
   this.stream = options.stream
-  this.friends = options.friends
-  this.devices = options.devices
-  this.directory = options.directory
+  this.platform = options.platform
   var self = this
   this.stream.on('data', function (data) {
     self._log.debug('data received')
@@ -90,7 +86,7 @@ MMProtocol.prototype.connect = function (publicKey) {
   this._log.debug('connect')
   assert(validation.validKeyString(publicKey))
   var self = this
-  this.directory.getNodeInfo(publicKey, function (err, result) {
+  this.platform.directory.getNodeInfo(publicKey, function (err, result) {
     if (err) {
       assert(_.isError(err))
       assert(_.isNil(result))
@@ -139,9 +135,9 @@ MMProtocol.prototype._getScope = function (publicKey) {
     publicKey: publicKey
   })
   assert(validation.validKeyString(publicKey))
-  if (this.devices.inScope(publicKey)) {
+  if (this.platform.devices.inScope(publicKey)) {
     return 'self'
-  } else if (this.friends.inScope(publicKey)) {
+  } else if (this.platform.friends.inScope(publicKey)) {
     return 'friends'
   } else {
     return 'public'
