@@ -48,13 +48,11 @@ Identity.prototype._loadIdentity = function () {
     } else {
       self._generateIdentity()
     }
-    self.emit('ready')
   }
   var error = function (error) {
     assert(_.isError(error))
     self._log.warn(error)
     self._generateIdentity()
-    self.emit('ready')
   }
   this.storage.get('identity', function (err, result) {
     if (err) {
@@ -62,6 +60,8 @@ Identity.prototype._loadIdentity = function () {
     } else {
       success(result)
     }
+    self.box = ed2curve.convertKeyPair(self.sign)
+    self.emit('ready')
   })
 }
 
@@ -94,7 +94,7 @@ Identity.prototype.getSignId = function () {
 }
 
 Identity.prototype.getBoxId = function () {
-  return nacl.util.encodeBase64(ed2curve.convertPublicKey(this.sign.publicKey))
+  return nacl.util.encodeBase64(this.box.publicKey)
 }
 
 Identity.prototype.toMetadata = function () {
@@ -103,11 +103,5 @@ Identity.prototype.toMetadata = function () {
     boxId: this.getBoxId()
   }
 }
-
-Object.defineProperty(Identity.prototype, 'box', {
-  get: function () {
-    return ed2curve.convertKeyPair(this.sign)
-  }
-})
 
 module.exports = Identity
