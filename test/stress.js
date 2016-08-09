@@ -59,7 +59,7 @@ describe('stress test', function () {
       beforeEach(function (done) {
         _makeNodes(platformNodes, node, done)
       })
-      var messages = [1, 10, 100, 1000]
+      var messages = [1, 10, 100]
       messages.forEach(function (nbMessages) {
         it('correctly sends ' + nbMessages, function (done) {
           var callbacks = []
