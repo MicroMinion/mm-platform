@@ -6,7 +6,7 @@ var _ = require('lodash')
 
 var validKeyString = function (publicKey) {
   return _.isString(publicKey) &&
-  nacl.util.decodeBase64(publicKey).length === nacl.sign.publicKeyLength
+    nacl.util.decodeBase64(publicKey).length === nacl.sign.publicKeyLength
 }
 
 var validLocalKeyString = function (publicKey) {
@@ -15,16 +15,16 @@ var validLocalKeyString = function (publicKey) {
 
 var validSecretKeyString = function (secretKey) {
   return _.isString(secretKey) &&
-  nacl.util.decodeBase64(secretKey).length === nacl.sign.secretKeyLength
+    nacl.util.decodeBase64(secretKey).length === nacl.sign.secretKeyLength
 }
 
 var validNodeInfo = function (nodeInfo) {
   return _.isObject(nodeInfo) &&
-  _.has(nodeInfo, 'signId') &&
-  _.has(nodeInfo, 'boxId') &&
-  validKeyString(nodeInfo.signId) &&
-  validKeyString(nodeInfo.boxId) &&
-  _.has(nodeInfo, 'connectionInfo')
+    _.has(nodeInfo, 'signId') &&
+    _.has(nodeInfo, 'boxId') &&
+    validKeyString(nodeInfo.signId) &&
+    validKeyString(nodeInfo.boxId) &&
+    _.has(nodeInfo, 'connectionInfo')
 }
 
 var validString = function (string) {
@@ -45,26 +45,26 @@ var validStream = function (stream) {
 
 var validProtocolObject = function (message) {
   return _.isObject(message) &&
-  _.has(message, 'payload') &&
-  _.has(message, 'protocol') &&
-  _.has(message, 'topic') &&
-  _.isString(message.protocol) &&
-  _.isString(message.topic) &&
-  _.isString(message.payload)
+    _.has(message, 'payload') &&
+    _.has(message, 'protocol') &&
+    _.has(message, 'topic') &&
+    _.isString(message.protocol) &&
+    _.isString(message.topic) &&
+    _.isString(message.payload)
 }
 
 var validSendMessage = function (message) {
   return validProtocolObject(message) &&
-  _.has(message, 'destination') &&
-  validKeyString(message.destination)
+    _.has(message, 'destination') &&
+    validKeyString(message.destination)
 }
 
 var validReceivedMessage = function (message) {
   return validProtocolObject(message) &&
-  _.has(message, 'sender') &&
-  validKeyString(message.sender) &&
-  _.has(message, 'scope') &&
-  validString(message.scope)
+    _.has(message, 'sender') &&
+    validKeyString(message.sender) &&
+    _.has(message, 'scope') &&
+    validString(message.scope)
 }
 
 var validCallback = function (callback) {
