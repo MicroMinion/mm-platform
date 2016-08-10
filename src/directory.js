@@ -50,8 +50,8 @@ Directory.prototype._sendMyNodeInfo = function () {
     var nodeInfo = {}
     if (this.ready) {
       nodeInfo.connectionInfo = this._connectionInfo
-      nodeInfo.boxId = this.identity.getBoxId()
-      nodeInfo.signId = this.identity.getSignId()
+      nodeInfo.boxId = this.platform.identity.getBoxId()
+      nodeInfo.signId = this.platform.identity.getSignId()
       this.logger.info('_sendMyNodeInfo', {
         nodeInfo: nodeInfo
       })
