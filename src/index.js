@@ -90,7 +90,7 @@ var Platform = function (options) {
 inherits(Platform, EventEmitter)
 
 Platform.prototype.isReady = function () {
-  return this._ready
+  return this._identityReady && this._transportReady
 }
 
 Platform.prototype.setDevices = function (devices) {
