@@ -52,18 +52,14 @@ Directory.prototype._sendMyNodeInfo = function () {
       nodeInfo.connectionInfo = this._connectionInfo
       nodeInfo.boxId = this.platform.identity.getBoxId()
       nodeInfo.signId = this.platform.identity.getSignId()
-      this.logger.info('_sendMyNodeInfo', {
-        nodeInfo: nodeInfo
-      })
+      this.logger.debug('_sendMyNodeInfo', nodeInfo)
       this.platform.messaging.send('transports.myNodeInfo', 'local', nodeInfo)
     }
   }
 }
 
 Directory.prototype.setMyConnectionInfo = function (connectionInfo) {
-  this.logger.debug('setMyConnectionInfo', {
-    connectionInfo: connectionInfo
-  })
+  this.logger.debug('setMyConnectionInfo', connectionInfo)
   assert(_.isObject(connectionInfo))
   this._connectionInfo = connectionInfo
   this._sendMyNodeInfo()

@@ -16,10 +16,9 @@ var MemStore = require('kad-memstore-thomas')
 var assert = require('assert')
 var validation = require('./validation.js')
 var winston = require('winston')
-var extend = require('extend.js')
 var winstonWrapper = require('winston-meta-wrapper')
 
-var SOCKET_TIMEOUT = 5 * 1000
+var SOCKET_TIMEOUT = 30 * 1000
 
 /**
  * MicroMinion Platform
@@ -62,15 +61,13 @@ var Platform = function (options) {
   if (!options.identity) {
     options.identity = new Identity({
       platform: this,
-      storage: this.storage
+      storage: this.storage,
+      logger: this._log
     })
   }
   this.identity = options.identity
   var self = this
   this.identity.on('ready', function () {
-    self._log.addMeta({
-      node: self.identity.getBoxId()
-    })
     self._log.info('platform initialized')
     self._setupTransport(options.connectionInfo)
     self._identityReady = true
@@ -109,7 +106,6 @@ Platform.prototype._setupTransport = function (connectionInfo) {
   })
   this._transport.on('connection', function (socket) {
     assert(validation.validStream(socket))
-    // TODO: add socket.toMetadata() once it exists
     self._log.info('new incoming 1tp connection')
     self._wrapConnection(socket)
   })
@@ -168,12 +164,6 @@ Platform.prototype._listen = function (connectionInfo) {
 
 Platform.prototype._getConnection = function (publicKey) {
   assert(validation.validKeyString(publicKey))
-  this._log.debug('checking connection', {
-    destination: publicKey,
-    connections: _.map(this._connections, function (connection) {
-      return connection.remoteAddress
-    })
-  })
   var connections = _.filter(this._connections, function (connection) {
     return connection.remoteAddress === publicKey
   })
@@ -195,7 +185,8 @@ Platform.prototype._wrapConnection = function (socket, destination) {
   socket.setTimeout(SOCKET_TIMEOUT)
   var packetStreamOptions = {
     isServer: server,
-    stream: socket
+    stream: socket,
+    logger: this._log
   }
   if (server) {
     packetStreamOptions.serverPublicKey = this.identity.box.publicKey
@@ -209,14 +200,17 @@ Platform.prototype._wrapConnection = function (socket, destination) {
     curvePackets.setDestination(destination)
   }
   var curveMessages = new curvecp.MessageStream({
-    stream: curvePackets
+    stream: curvePackets,
+    logger: this._log
   })
   var netstrings = new NetstringStream({
-    stream: curveMessages
+    stream: curveMessages,
+    logger: this._log
   })
   var messages = new MMProtocol({
     stream: netstrings,
-    platform: this
+    platform: this,
+    logger: this._log
   })
   this._connectEvents(messages)
   return messages
@@ -228,43 +222,55 @@ Platform.prototype._connectEvents = function (stream) {
   stream.setMaxListeners(0)
   this._connections.push(stream)
   stream.on('connect', function () {
-    self._log.info('MicroMinion connection established', stream.toMetadata())
+    self._log.info('MicroMinion connection established', {
+      remote: stream.remoteAddress
+    })
     self.emit('connection', stream.remoteAddress)
   })
   stream.on('data', function (message) {
-    self._log.info('MicroMinion message received', extend(stream.toMetadata(), {
-      topic: message.topic,
+    self._log.info('MicroMinion message received', {
+      sender: message.sender,
       protocol: message.protocol,
-      payload: message.payload
-    }))
+      topic: message.topic
+    })
     assert(validation.validProtocolObject(message))
     assert(_.has(message, 'sender'))
     assert(validation.validKeyString(message.sender))
     self.emit('message', message)
   })
   stream.on('close', function () {
-    self._log.info('MicroMinion connection destroyed', stream.toMetadata())
+    self._log.info('MicroMinion connection destroyed', {
+      remote: stream.remoteAddress
+    })
     self._connections.splice(self._connections.indexOf(stream), 1)
+    stream.removeAllListeners()
     self.emit('disconnected', stream.remoteAddress)
   })
   stream.on('end', function () {
-    self._log.debug('MicroMinion connection ended', stream.toMetadata())
+    self._log.debug('MicroMinion connection ended', {
+      remote: stream.remoteAddress
+    })
     stream.destroy()
   })
   stream.on('finish', function () {
-    self._log.debug('MicroMinion connection end of stream reached', stream.toMetadata())
+    self._log.debug('MicroMinion connection end of stream reached', {
+      remote: stream.remoteAddress
+    })
     stream.destroy()
   })
   stream.on('error', function (err) {
     assert(_.isError(err))
-    self._log.warn('MicroMinion connection error', extend(stream.toMetadata(), {
+    self._log.warn('MicroMinion connection error', {
+      remote: stream.remoteAddress,
       errorName: err.name,
-      errorMessage: err.message,
-      error: err.toString()
-    }))
+      errorMessage: err.message
+    })
     stream.destroy()
   })
   stream.on('timeout', function () {
+    self._log.info('MicroMinion stream timeout', {
+      remote: stream.remoteAddress
+    })
     stream.destroy()
   })
 }
@@ -296,7 +302,6 @@ Platform.prototype.send = function (message, options) {
           destination: message.destination,
           protocol: message.protocol,
           topic: message.topic,
-          payload: message.payload,
           error: err
         })
       }
@@ -321,12 +326,11 @@ Platform.prototype._queueMessage = function (message, connection, callback) {
   assert(validation.validStream(connection))
   assert(_.isNil(callback) || _.isFunction(callback))
   var self = this
-  self._log.debug('MicroMinion queuing message', extend(connection.toMetadata(), {
+  self._log.debug('MicroMinion queuing message', {
     destination: message.destination,
     protocol: message.protocol,
-    topic: message.topic,
-    payload: message.payload
-  }))
+    topic: message.topic
+  })
   connection.once('connect', function () {
     self._send(message, connection, callback)
   })
@@ -346,11 +350,11 @@ Platform.prototype._send = function (message, connection, callback) {
   assert(validation.validStream(connection))
   assert(_.isNil(callback) || _.isFunction(callback))
   connection.write(message, callback)
-  this._log.info('MicroMinion message send', extend(connection.toMetadata(), {
-    topic: message.topic,
+  this._log.info('MicroMinion message send', {
+    destination: message.destination,
     protocol: message.protocol,
-    payload: message.payload
-  }))
+    topic: message.topic
+  })
 }
 
 Platform.prototype._setupAPI = function () {

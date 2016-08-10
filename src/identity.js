@@ -9,8 +9,6 @@ var inherits = require('inherits')
 var assert = require('assert')
 var validation = require('./validation.js')
 var _ = require('lodash')
-var winston = require('winston')
-var winstonWrapper = require('winston-meta-wrapper')
 
 nacl.setPRNG(function (x, n) {
   var i
@@ -23,13 +21,8 @@ var Identity = function (options) {
   assert(validation.validOptions(options))
   assert(_.has(options, 'platform'))
   assert(_.has(options, 'storage'))
-  if (!options.logger) {
-    options.logger = winston
-  }
-  this._log = winstonWrapper(options.logger)
-  this._log.addMeta({
-    module: 'mm-platform'
-  })
+  assert(_.has(options, 'logger'))
+  this._log = options.logger
   this.platform = options.platform
   this.storage = options.storage
   this._loadIdentity()

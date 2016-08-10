@@ -8,8 +8,6 @@ var assert = require('assert')
 var path = require('path')
 var validation = require('./validation.js')
 var _ = require('lodash')
-var winston = require('winston')
-var winstonWrapper = require('winston-meta-wrapper')
 
 var proto = fs.readFileSync(path.join(path.resolve(__dirname), 'mm-protocol.proto'))
 var Message = protobuf(proto).Message
@@ -18,13 +16,8 @@ var MMProtocol = function (options) {
   assert(validation.validOptions(options))
   assert(_.has(options, 'stream'))
   assert(_.has(options, 'platform'))
-  if (!options.logger) {
-    options.logger = winston
-  }
-  this._log = winstonWrapper(options.logger)
-  this._log.addMeta({
-    module: 'mm-platform:mm-protocol'
-  })
+  assert(_.has(options, 'logger'))
+  this._log = options.logger
   Duplex.call(this, {
     allowHalfOpen: false,
     readableObjectMode: true,
@@ -34,13 +27,14 @@ var MMProtocol = function (options) {
   this.platform = options.platform
   var self = this
   this.stream.on('data', function (data) {
-    self._log.debug('data received')
+    self._log.debug('mm-protocol data received')
     assert(_.isBuffer(data))
     self._processData(data)
   })
 
   this.stream.on('close', function () {
     self.emit('close')
+    self.stream.removeAllListeners()
   })
   this.stream.on('connect', function () {
     self.emit('connect')
@@ -69,7 +63,6 @@ MMProtocol.prototype._processData = function (data) {
   var self = this
   try {
     var message = Message.decode(data)
-    self._log.debug(message)
     message.sender = self.remoteAddress
     message.scope = self._getScope(message.sender)
     assert(validation.validReceivedMessage(message))
@@ -83,7 +76,6 @@ MMProtocol.prototype._processData = function (data) {
 }
 
 MMProtocol.prototype.connect = function (publicKey) {
-  this._log.debug('connect')
   assert(validation.validKeyString(publicKey))
   var self = this
   this.platform.directory.getNodeInfo(publicKey, function (err, result) {
@@ -112,7 +104,6 @@ MMProtocol.prototype.toMetadata = function () {
 MMProtocol.prototype._read = function (size) {}
 
 MMProtocol.prototype._write = function (chunk, encoding, callback) {
-  this._log.debug('_write')
   assert(validation.validSendMessage(chunk))
   assert(validation.validCallback(callback))
   var message = {

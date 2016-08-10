@@ -6,24 +6,17 @@ var ns = require('./ns.js')
 var assert = require('assert')
 var validation = require('./validation.js')
 var _ = require('lodash')
-var winston = require('winston')
-var winstonWrapper = require('winston-meta-wrapper')
 
 var NetstringStream = function (options) {
   assert(validation.validOptions(options))
   assert(_.has(options, 'stream'))
-  if (!options.logger) {
-    options.logger = winston
-  }
-  this._log = winstonWrapper(options.logger)
-  this._log.addMeta({
-    module: 'mm-platform:netstring'
-  })
+  assert(_.has(options, 'logger'))
+  this._log = options.logger
   this.stream = options.stream
   var self = this
   this.stream.on('data', function (data) {
     assert(_.isBuffer(data))
-    self._log.debug('data received', {
+    self._log.debug('netstring data received', {
       data: data.toString()
     })
     if (!self.buffer) {
@@ -35,7 +28,7 @@ var NetstringStream = function (options) {
       self._processBuffer()
     } catch (e) {
       assert(_.isError(e))
-      self._log.warn('failed to process buffer', {
+      self._log.warn('failed to process netstring buffer', {
         error: e
       })
       delete self.buffer
@@ -46,6 +39,7 @@ var NetstringStream = function (options) {
   })
   this.stream.on('close', function () {
     self.emit('close')
+    self.stream.removeAllListeners()
   })
   this.stream.on('connect', function () {
     self.emit('connect')
@@ -76,19 +70,15 @@ inherits(NetstringStream, Duplex)
  * @private
  */
 NetstringStream.prototype._processBuffer = function () {
-  this._log.debug('_processBuffer')
   assert(_.isBuffer(this.buffer))
   var self = this
   if (this.buffer.length === 0) {
     return
   }
   var messageLength = ns.nsLength(this.buffer)
-  this._log.debug('message length: ' + messageLength)
-  this._log.debug('buffer length: ' + this.buffer.length)
   if (this.buffer.length >= messageLength) {
     var payload = ns.nsPayload(this.buffer)
     this.buffer = this.buffer.slice(messageLength)
-    this._log.debug('buffer length after processing: ' + this.buffer.length)
     this.emit('data', payload)
     process.nextTick(function () {
       self._processBuffer()
