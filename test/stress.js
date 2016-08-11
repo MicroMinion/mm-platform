@@ -1,8 +1,6 @@
 /* eslint-env mocha */
 'use strict'
 
-var chai = require('chai')
-var expect = chai.expect
 var parallel = require('run-parallel')
 var _ = require('lodash')
 
