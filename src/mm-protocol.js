@@ -70,7 +70,7 @@ MMProtocol.prototype._processData = function (data) {
   } catch (e) {
     self._log.warn('invalid message received - dropped', {
       error: e,
-      message: data
+      remote: self.remoteAddress
     })
   }
 }
