@@ -231,7 +231,8 @@ Platform.prototype._connectEvents = function (stream) {
     self._log.info('MicroMinion message received', {
       sender: message.sender,
       protocol: message.protocol,
-      topic: message.topic
+      topic: message.topic,
+      scope: message.scope
     })
     assert(validation.validProtocolObject(message))
     assert(_.has(message, 'sender'))
