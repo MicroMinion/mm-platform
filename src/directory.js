@@ -41,6 +41,7 @@ Directory.prototype.setPlatform = function (platform) {
     self._sendMyNodeInfo()
   })
   this.messaging.on('self.transports.nodeInfo', this._processNodeInfo.bind(this))
+  this.messaging.on('self.transports.requestMyNodeInfo', this._sendMyNodeInfo.bind(this))
   this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
 }
 
