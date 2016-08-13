@@ -2,41 +2,34 @@
 
 var inherits = require('inherits')
 var Duplex = require('stream').Duplex
-// var protobuf = require('protocol-buffers')
-var fs = require('fs')
 var assert = require('assert')
-var path = require('path')
 var validation = require('./validation.js')
 var _ = require('lodash')
-var protobufjs = require('protobufjs')
+var ProtoBuf = require('protobufjs')
 
-// var proto = 'message Message {\n required string topic = 1;\n required string protocol = 2;\n required string payload = 3;\n}'
-// var pr = 'NVSXG43BM5SSATLFONZWCZ3FEB5QUIBAOJSXC5LJOJSWIIDTORZGS3THEB2G64DJMMQD2IBRHMFCAIDSMVYXK2LSMVSCA43UOJUW4ZZAOBZG65DPMNXWYIB5EAZDWCRAEBZGK4LVNFZGKZBAON2HE2LOM4QHAYLZNRXWCZBAHUQDGOYKPUFA===='
-
-// var proto = fs.readFileSync(path.join(path.resolve(__dirname), 'mm-protocol.proto'))
-// var Message = protobuf(proto).Message
-var Message = protobufjs.newBuilder({})['import']({
-  'package': null,
-  'messages': [{
-    'name': 'Message',
-    'fields': [{
-      'rule': 'required',
-      'type': 'string',
-      'name': 'topic',
-      'id': 1
-    }, {
-      'rule': 'required',
-      'type': 'string',
-      'name': 'protocol',
-      'id': 2
-    }, {
-      'rule': 'required',
-      'type': 'string',
-      'name': 'payload',
-      'id': 3
-    }]
+var definition = {
+  'name': 'Message',
+  'fields': [{
+    'rule': 'required',
+    'type': 'string',
+    'name': 'topic',
+    'id': 1
+  }, {
+    'rule': 'required',
+    'type': 'string',
+    'name': 'protocol',
+    'id': 2
+  }, {
+    'rule': 'required',
+    'type': 'string',
+    'name': 'payload',
+    'id': 3
   }]
-}).build()
+}
+
+var builder = ProtoBuf.newBuilder()
+builder.create(definition)
+var Message = builder.build('Message')
 
 var MMProtocol = function (options) {
   assert(validation.validOptions(options))
@@ -86,7 +79,12 @@ inherits(MMProtocol, Duplex)
 MMProtocol.prototype._processData = function (data) {
   var self = this
   try {
-    var message = Message.decode(data)
+    var _message = Message.decode(data)
+    var message = {
+      topic: _message.topic,
+      protocol: _message.protocol,
+      payload: _message.payload
+    }
     message.sender = self.remoteAddress
     message.scope = self._getScope(message.sender)
     assert(validation.validReceivedMessage(message))
@@ -130,12 +128,12 @@ MMProtocol.prototype._read = function (size) {}
 MMProtocol.prototype._write = function (chunk, encoding, callback) {
   assert(validation.validSendMessage(chunk))
   assert(validation.validCallback(callback))
-  var message = {
+  var message = new Message({
     topic: chunk.topic,
     protocol: chunk.protocol,
     payload: chunk.payload
-  }
-  this.stream.write(Message.encode(message), 'buffer', callback)
+  })
+  this.stream.write(message.toBuffer(), 'buffer', callback)
 }
 
 /**
