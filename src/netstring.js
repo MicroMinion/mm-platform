@@ -39,7 +39,6 @@ var NetstringStream = function (options) {
   })
   this.stream.on('close', function () {
     self.emit('close')
-    self.stream.removeAllListeners()
   })
   this.stream.on('connect', function () {
     self.emit('connect')

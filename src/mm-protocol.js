@@ -31,10 +31,8 @@ var MMProtocol = function (options) {
     assert(_.isBuffer(data))
     self._processData(data)
   })
-
   this.stream.on('close', function () {
     self.emit('close')
-    self.stream.removeAllListeners()
   })
   this.stream.on('connect', function () {
     self.emit('connect')
