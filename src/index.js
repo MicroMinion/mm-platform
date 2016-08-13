@@ -245,6 +245,9 @@ Platform.prototype._connectEvents = function (stream) {
     })
     self._connections.splice(self._connections.indexOf(stream), 1)
     stream.removeAllListeners()
+    stream.on('error', function (error) {
+      self._log.warn(error.message)
+    })
     self.emit('disconnected', stream.remoteAddress)
   })
   stream.on('end', function () {
