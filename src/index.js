@@ -228,7 +228,7 @@ Platform.prototype._connectEvents = function (stream) {
     self._log.info('MicroMinion connection established', {
       remote: stream.remoteAddress
     })
-    self.emit('connection', stream.remoteAddress)
+    self.messaging.send('transports.online', 'local', stream.remoteAddress)
   })
   stream.on('data', function (message) {
     self._log.info('MicroMinion message received', {
@@ -251,7 +251,7 @@ Platform.prototype._connectEvents = function (stream) {
     stream.on('error', function (error) {
       self._log.warn(error.message)
     })
-    self.emit('disconnected', stream.remoteAddress)
+    self.messaging.send('transports.offline', 'local', stream.remoteAddress)
   })
   stream.on('end', function () {
     self._log.debug('MicroMinion connection ended', {
@@ -311,6 +311,7 @@ Platform.prototype.send = function (message, options) {
           topic: message.topic,
           error: err
         })
+        self.messaging.send('transports.failed', 'local', message.destination)
       }
     }
   }
