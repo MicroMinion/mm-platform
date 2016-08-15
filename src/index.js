@@ -9,7 +9,7 @@ var EventEmitter = require('events').EventEmitter
 var curvecp = require('curvecp')
 var NetstringStream = require('./netstring.js')
 var MMProtocol = require('./mm-protocol.js')
-var Circle = require('./circle-empty.js')
+var Circle = require('./circle.js')
 var Directory = require('./directory.js')
 var _ = require('lodash')
 var MemStore = require('kad-memstore-thomas')
@@ -37,6 +37,7 @@ var Platform = function (options) {
   if (!options) {
     options = {}
   }
+  // LOGGING
   if (!options.logger) {
     options.logger = winston
   }
@@ -44,20 +45,13 @@ var Platform = function (options) {
   this._log.addMeta({
     module: 'mm-platform'
   })
-  this._identityReady = false
-  this._transportReady = false
+  // STORAGE
   if (!options.storage) {
     options.storage = new MemStore()
   }
   this.storage = options.storage
-  if (!options.friends) {
-    options.friends = new Circle()
-  }
-  this.friends = options.friends
-  if (!options.devices) {
-    options.devices = new Circle()
-  }
-  this.devices = options.devices
+  // IDENTITY
+  this._identityReady = false
   if (!options.identity) {
     options.identity = new Identity({
       platform: this,
@@ -75,23 +69,32 @@ var Platform = function (options) {
       self.emit('ready')
     }
   })
+  // TRANSPORT
+  this._transportReady = false
+  this._connections = []
+  // API
   this._setupAPI()
+  // CIRCLES
+  if (!options.friends) {
+    options.friends = new Circle('friends.update', this)
+  }
+  this.friends = options.friends
+  if (!options.devices) {
+    options.devices = new Circle('devices.update', this)
+  }
+  this.devices = options.devices
+  // DIRECTORY
   if (!options.directory) {
     options.directory = new Directory()
   }
   options.directory.setPlatform(this)
   this.directory = options.directory
-  this._connections = []
 }
 
 inherits(Platform, EventEmitter)
 
 Platform.prototype.isReady = function () {
   return this._identityReady && this._transportReady
-}
-
-Platform.prototype.setDevices = function (devices) {
-  this.devices = devices
 }
 
 Platform.prototype._setupTransport = function (connectionInfo) {
