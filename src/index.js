@@ -251,7 +251,9 @@ Platform.prototype._connectEvents = function (stream) {
     stream.on('error', function (error) {
       self._log.warn(error.message)
     })
-    self.messaging.send('transports.offline', 'local', stream.remoteAddress)
+    if(stream.remoteAddress) {
+      self.messaging.send('transports.offline', 'local', stream.remoteAddress)
+    }
   })
   stream.on('end', function () {
     self._log.debug('MicroMinion connection ended', {
