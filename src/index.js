@@ -140,8 +140,8 @@ Platform.prototype._listen = function (connectionInfo) {
     return
   }
   var success = function (value) {
-    assert(_.isString(value) || value === null)
-    if (value === null || value.length === 0) {
+    assert(_.isString(value) || value === null || value === undefined)
+    if (value === null || value === undefined || value.length === 0) {
       self._transport.listen()
     } else {
       value = JSON.parse(value)
@@ -251,7 +251,7 @@ Platform.prototype._connectEvents = function (stream) {
     stream.on('error', function (error) {
       self._log.warn(error.message)
     })
-    if(stream.remoteAddress) {
+    if (stream.remoteAddress) {
       self.messaging.send('transports.offline', 'local', stream.remoteAddress)
     }
   })
@@ -341,13 +341,15 @@ Platform.prototype._queueMessage = function (message, connection, callback) {
     protocol: message.protocol,
     topic: message.topic
   })
-  connection.once('connect', function () {
-    self._send(message, connection, callback)
-  })
-  connection.once('error', function (err) {
+  var errorCallback = function (err) {
     assert(_.isError(err))
     callback(err)
+  }
+  connection.once('connect', function () {
+    self._send(message, connection, callback)
+    connection.removeListener('error', errorCallback)
   })
+  connection.once('error', errorCallback)
 }
 
 /**
