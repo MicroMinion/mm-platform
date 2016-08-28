@@ -155,7 +155,7 @@ OfflineBuffer.prototype._flushQueue = function (publicKey) {
 OfflineBuffer.prototype._loadSendQueues = function () {
   var self = this
   var success = function (value) {
-    if (value === null) {
+    if (value === null || value === undefined) {
       self._sendQueuesRetrieved = true
       return
     }
