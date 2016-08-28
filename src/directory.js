@@ -18,9 +18,7 @@ var Directory = function () {
    * @access private
    * @type {Object.<string, Object>}
    */
-  this.directoryCache = {}
   this.directoryLookup = {}
-  this.mapping = {}
   events.EventEmitter.call(this)
   setInterval(function () {
     self._sendMyNodeInfo()
@@ -42,7 +40,6 @@ Directory.prototype.setPlatform = function (platform) {
   })
   this.messaging.on('self.transports.nodeInfo', this._processNodeInfo.bind(this))
   this.messaging.on('self.transports.requestMyNodeInfo', this._sendMyNodeInfo.bind(this))
-  this.messaging.on('self.directory.getReply', this._processGetReply.bind(this))
 }
 
 Directory.prototype._sendMyNodeInfo = function () {
@@ -72,60 +69,12 @@ Directory.prototype.getNodeInfo = function (boxId, callback) {
   })
   assert(_.isFunction(callback))
   assert(validation.validKeyString(boxId))
-  if (_.has(this.directoryCache, boxId)) {
-    var cacheResult = this.directoryCache[boxId]
-    process.nextTick(function () {
-      callback(null, cacheResult)
-    })
-    if (this._hasStaleCache(boxId)) {
-      if (!_.has(this.directoryLookup, boxId)) {
-        this._lookupKey(boxId)
-      }
-    }
-  } else if (_.has(this.directoryLookup, boxId)) {
+  if (_.has(this.directoryLookup, boxId)) {
     this.directoryLookup[boxId].push(callback)
   } else {
-    this._lookupKey(boxId)
     this.directoryLookup[boxId] = [callback]
+    this._lookupKey(boxId)
   }
-}
-
-Directory.prototype._hasStaleCache = function (boxId) {
-  assert(validation.validKeyString(boxId))
-  if (!this.directoryCache[boxId].lastUpdate) {
-    return true
-  }
-  var diff = Math.abs(new Date() - new Date(this.directoryCache[boxId].lastUpdate))
-  return diff > CACHE_REFRESH_INTERVAL
-}
-
-/**
- * @private
- */
-Directory.prototype._loadDirectoryCache = function () {
-  var self = this
-  var success = function (value) {
-    assert(validation.validString(value))
-    value = JSON.parse(value)
-    assert(_.isObject(value))
-    _.forEach(value, function (n, key) {
-      if (!_.has(self.directoryCache, key)) {
-        self.directoryCache[key] = n
-      }
-    })
-  }
-  this.storage.get('directoryCache', function (err, result) {
-    if (!err) {
-      success(result)
-    }
-  })
-}
-
-/**
- * @private
- */
-Directory.prototype._saveDirectoryCache = function () {
-  this.storage.put('directoryCache', JSON.stringify(this.directoryCache))
 }
 
 /**
@@ -155,31 +104,11 @@ Directory.prototype._processNodeInfo = function (topic, local, data) {
   assert(topic === 'self.transports.nodeInfo')
   assert(local === 'local')
   assert(_.isPlainObject(data))
-  if (!_.has(this.directoryCache, data.boxId)) {
-    this.directoryCache[data.boxId] = {}
-  }
-  this.directoryCache[data.boxId] = data
-  this.directoryCache[data.boxId].lastUpdate = new Date().toJSON()
-  this._saveDirectoryCache()
   if (_.has(this.directoryLookup, data.boxId)) {
     _.forEach(this.directoryLookup[data.boxId], function (callback) {
       callback(null, data)
     })
     delete this.directoryLookup[data.boxId]
-  }
-}
-
-Directory.prototype._processGetReply = function (topic, sender, data) {
-  assert(_.isObject(data))
-  assert(_.has(data, 'key'))
-  assert(validation.validString(data.key))
-  assert(_.has(data, 'value'))
-  assert(validation.validString(data.value))
-  assert(topic === 'self.directory.getReply')
-  assert(sender === 'local')
-  if (_.has(this.mapping, data.key)) {
-    this.mapping[data.key] = data.value
-    this.emit('lookup', data.key, data.value)
   }
 }
 
