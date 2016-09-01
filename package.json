@@ -1,6 +1,6 @@
 {
   "name": "mm-platform",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "P2P encrypted messaging platform",
   "main": "src/index.js",
   "directories": {
@@ -35,7 +35,7 @@
     "curvecp": "1.1.0",
     "ed2curve": "0.1.4",
     "inherits": "2.0.1",
-    "kad-memstore-thomas": "0.1.0",
+    "kad-memstore-thomas": "0.2.0",
     "lodash": "4.15.0",
     "node-uuid": "1.4.7",
     "protobufjs": "5.0.1",
