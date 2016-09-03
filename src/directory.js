@@ -50,6 +50,7 @@ Directory.prototype._sendMyNodeInfo = function () {
       nodeInfo.connectionInfo = this._connectionInfo
       nodeInfo.boxId = this.platform.identity.getBoxId()
       nodeInfo.signId = this.platform.identity.getSignId()
+      nodeInfo.expireTime = Date.now() + (CACHE_REFRESH_INTERVAL * 2)
       this.logger.debug('_sendMyNodeInfo', nodeInfo)
       this.platform.messaging.send('transports.myNodeInfo', 'local', nodeInfo)
     }
