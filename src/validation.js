@@ -10,7 +10,7 @@ var validKeyString = function (publicKey) {
 }
 
 var validLocalKeyString = function (publicKey) {
-  return validKeyString(publicKey) || publicKey === 'local'
+  return publicKey === 'local' || validKeyString(publicKey)
 }
 
 var validSecretKeyString = function (secretKey) {
