@@ -17,6 +17,7 @@ var assert = require('assert')
 var validation = require('./validation.js')
 var winston = require('winston')
 var winstonWrapper = require('winston-meta-wrapper')
+var setImmediate = require('async.util.setimmediate')
 
 var SOCKET_TIMEOUT = 30 * 1000
 
