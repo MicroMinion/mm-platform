@@ -26,7 +26,6 @@ var CurveCPClient = function (options) {
     options = {}
   }
   if (!options.logger) {
-    console.log('NEED WINSTON')
     options.logger = winston
   }
   this._log = winstonWrapper(options.logger)
@@ -76,7 +75,6 @@ CurveCPClient.prototype.connect = function (destination, connectionInfo) {
     socket.once('data', function (data) {
       self._onCookie(socket, data)
     })
-    console.log(connectionInfoItem)
     socket.connect([connectionInfoItem])
   })
 }
