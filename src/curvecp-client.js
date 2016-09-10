@@ -21,6 +21,8 @@ var CurveCPClient = function (options) {
   this.clientConnectionPublicKey = keyPair.publicKey
   this.clientConnectionPrivateKey = keyPair.secretKey
   this.connected = false
+  this._errors = 0
+  this._maxErrors = 0
   EventEmitter.call(this)
   if (!options) {
     options = {}
@@ -52,31 +54,39 @@ inherits(CurveCPClient, EventEmitter)
 
 CurveCPClient.prototype.connect = function (destination, connectionInfo) {
   this._log.info('connect ' + destination)
-  var errors = 0
   var self = this
   this.serverPublicKey = nacl.util.decodeBase64(destination)
   if (connectionInfo.length === 0) {
     this.emit('error', new Error('No connectionInfo specified'))
     return
   }
+  this._maxErrors = connectionInfo.length
   _.forEach(connectionInfo, function (connectionInfoItem) {
-    var socket = new transport.Socket()
-    socket.once('error', function (err) {
-      errors += 1
-      self._log.debug(err)
-      if (errors === connectionInfo.length) {
-        self.emit('error', new Error('All connections failed'))
-      }
+    setImmediate(function () {
+      self._connectSocket(connectionInfoItem)
     })
-    socket.setLogger(self._log)
-    socket.once('connect', function () {
-      self._sendHello(socket, 0)
-    })
-    socket.once('data', function (data) {
-      self._onCookie(socket, data)
-    })
-    socket.connect([connectionInfoItem])
   })
+}
+
+CurveCPClient.prototype._connectSocket = function (connectionInfoItem) {
+  var socket = new transport.Socket()
+  var self = this
+  socket.once('error', function (err) {
+    self._errors += 1
+    self._log.warn(err)
+    if (self._errors === self._maxErrors) {
+      self.emit('error', new Error('All connections failed'))
+    }
+  })
+  socket.setLogger(self._log)
+  socket.once('connect', function () {
+    self._log.info('connected', connectionInfoItem)
+    self._sendHello(socket, 0)
+  })
+  socket.once('data', function (data) {
+    self._onCookie(socket, data)
+  })
+  socket.connect([connectionInfoItem])
 }
 
 CurveCPClient.prototype._increaseCounter = function () {
@@ -166,6 +176,7 @@ CurveCPClient.prototype._onCookie = function (socket, cookieMessage) {
     serverName: this.serverName,
     logger: this._log
   })
+  this._errors = 0
   this.emit('connection', stream)
 }
 
