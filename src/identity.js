@@ -44,7 +44,7 @@ Identity.prototype._loadIdentity = function () {
   }
   var error = function (error) {
     assert(_.isError(error))
-    self._log.warn(error)
+    self._log.debug(error.message)
     self._generateIdentity()
   }
   this.storage.get('identity', function (err, result) {
