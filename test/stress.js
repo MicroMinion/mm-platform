@@ -37,12 +37,12 @@ var _callback = function (nodes, messageId, callback) {
   var sample = _.sampleSize(nodes, 2)
   var sender = sample[0]
   var destinationKey = sample[1].identity.getBoxId()
-  console.time(messageId)
+  // console.time(messageId)
   sender.messaging.send('test.test', destinationKey, {
     'testSequence': messageId
   }, {
     callback: function (err, result) {
-      console.timeEnd(messageId)
+      // console.timeEnd(messageId)
       callback(err, result)
     }
   })
