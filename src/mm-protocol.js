@@ -99,20 +99,7 @@ MMProtocol.prototype._processData = function (data) {
 
 MMProtocol.prototype.connect = function (publicKey) {
   assert(validation.validKeyString(publicKey))
-  var self = this
-  this.platform.directory.getNodeInfo(publicKey, function (err, result) {
-    if (err) {
-      assert(_.isError(err))
-      assert(_.isNil(result))
-      self.emit('error', err)
-      self.emit('lookup', err, null, null)
-    } else {
-      assert(_.isNil(err))
-      assert(validation.validNodeInfo(result))
-      self.emit('lookup', null, result, 'mm')
-      self.stream.connect(result.boxId, result.connectionInfo)
-    }
-  })
+  this.stream.connect(publicKey)
 }
 
 MMProtocol.prototype.isConnected = function () {
