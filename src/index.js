@@ -18,6 +18,8 @@ var winstonWrapper = require('winston-meta-wrapper')
 var setImmediate = require('async.util.setimmediate')
 var TransportManager = require('./transport.js')
 
+var CONNECT_RANDOMIZATION = 100
+
 var getRandomInt = function (min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
@@ -297,7 +299,7 @@ Platform.prototype.send = function (message, options) {
     this._send(message, connection, options.callback)
   } else {
     this._queueMessage(message, options.callback)
-    var randomization = getRandomInt(0, 200)
+    var randomization = getRandomInt(0, CONNECT_RANDOMIZATION)
     setTimeout(this._connect.bind(this, message.destination), randomization)
   }
 }
