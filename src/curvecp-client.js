@@ -83,7 +83,7 @@ CurveCPClient.prototype._connectSocket = function (connectionInfoItem) {
   socket.setLogger(self._log)
   socket.once('error', function (err) {
     self._errors += 1
-    self._log.warn(err)
+    self._log.debug(err)
     if (self._errors === self._maxErrors && !self._connected) {
       self.emit('error', new Error('All connections failed'))
     }
