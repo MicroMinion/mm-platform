@@ -374,7 +374,7 @@ Platform.prototype._flushQueue = function (destination) {
   if (_.has(this._sendQueue, destination)) {
     while (canSend && this._sendQueue[destination].length > 0) {
       var queueItem = this._sendQueue[destination].shift()
-      this._send(queueItem.message, queueItem.callback)
+      canSend = this._send(queueItem.message, queueItem.callback)
     }
   }
 }
