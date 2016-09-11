@@ -10,10 +10,13 @@ var util = require('./curvecp-util.js')
 var extend = require('extend.js')
 var winstonWrapper = require('winston-meta-wrapper')
 var CurveCPServerStream = require('./curvecp-server-stream.js')
+var validation = require('./validation.js')
+var assert = require('assert')
 
 var MINUTE_KEY_TIMEOUT = 1000 * 60 * 2
 
 var CurveCPServer = function (options) {
+  assert(validation.validOptions(options))
   EventEmitter.call(this)
   if (!options) {
     options = {}
@@ -21,24 +24,18 @@ var CurveCPServer = function (options) {
   if (!options.logger) {
     options.logger = winston
   }
+  this._log = winstonWrapper(options.logger)
+  this._log.addMeta({
+    module: 'curvecp-server'
+  })
   extend(this, {
     serverName: new Uint8Array(256),
     serverExtension: new Uint8Array(16),
     serverPublicKey: null,
     serverPrivateKey: null
   }, options)
+  this.serverName = util.codifyServerName(this.serverName)
   this._connections = {}
-  if (this.serverName.length !== 256) {
-    var buffer = new Buffer(256)
-    buffer.fill(0)
-    buffer.write('0A', 'hex')
-    buffer.write(this.serverName, 1)
-    this.serverName = new Uint8Array(buffer)
-  }
-  this._log = winstonWrapper(options.logger)
-  this._log.addMeta({
-    module: 'curvecp-server'
-  })
   this._setCookieKey()
   this._startCookieKeyTimeout()
 }
@@ -134,6 +131,7 @@ CurveCPServer.prototype._sendCookie = function (clientConnectionPublicKey, clien
 }
 
 CurveCPServer.prototype._onInitiate = function (initiateMessage, socket) {
+  var self = this
   this._log.debug('onInitiate')
   if (initiateMessage.length < 544) {
     this._log.warn('Initiate command has incorrect length')
@@ -179,11 +177,13 @@ CurveCPServer.prototype._onInitiate = function (initiateMessage, socket) {
     stream: socket
   }
   var stream = new CurveCPServerStream(options)
+  stream.on('close', function () {
+    delete self._connections[nacl.util.encodeBase64(clientConnectionPublicKey)]
+  })
   this._connections[nacl.util.encodeBase64(clientConnectionPublicKey)] = stream
   this.emit('connection', stream)
   setImmediate(function () {
-    stream.emit('connect')
-    stream.push(new Buffer(initiateBoxData.subarray(32 + 16 + 48 + 256)))
+    stream.emit('data', new Buffer(initiateBoxData.subarray(32 + 16 + 48 + 256)))
   })
 }
 

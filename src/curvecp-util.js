@@ -140,6 +140,18 @@ var createRandomNonce = function (prefix) {
   return nonce
 }
 
+var codifyServerName = function (serverName) {
+  if (serverName.length !== 256) {
+    var buffer = new Buffer(256)
+    buffer.fill(0)
+    buffer.write('0A', 'hex')
+    buffer.write(serverName, 1)
+    return new Uint8Array(buffer)
+  } else {
+    return serverName
+  }
+}
+
 module.exports = {
   isEqual: isEqual,
   encrypt: encrypt,
@@ -156,5 +168,6 @@ module.exports = {
   randommod: randommod,
   safeIntegerAddition: safeIntegerAddition,
   safeIntegerMultiplication: safeIntegerMultiplication,
-  createRandomNonce: createRandomNonce
+  createRandomNonce: createRandomNonce,
+  codifyServerName: codifyServerName
 }

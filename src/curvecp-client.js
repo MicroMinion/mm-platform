@@ -8,19 +8,22 @@ nacl.util = require('tweetnacl-util')
 var extend = require('extend.js')
 var EventEmitter = require('events').EventEmitter
 var Uint64BE = require('int64-buffer').Uint64BE
-var CurveCPClientStream = require('./curvecp-client-stream.js')
 var inherits = require('inherits')
 var winston = require('winston')
 var winstonWrapper = require('winston-meta-wrapper')
+var Message = require('curvecp').Message
+var assert = require('assert')
 
 var HELLO_WAIT = [1000000000, 1500000000, 2250000000, 3375000000, 5062500000, 7593750000, 11390625000, 17085937500]
+var INITIATE_WAIT = 1000 * 10
 
 var CurveCPClient = function (options) {
   this.__ourNonceCounter = 0
+  this.__remoteNonceCounter = 0
   var keyPair = nacl.box.keyPair()
   this.clientConnectionPublicKey = keyPair.publicKey
   this.clientConnectionPrivateKey = keyPair.secretKey
-  this.connected = false
+  this._connected = false
   this._errors = 0
   this._maxErrors = 0
   EventEmitter.call(this)
@@ -41,18 +44,14 @@ var CurveCPClient = function (options) {
     clientPrivateKey: null,
     serverName: new Uint8Array(256)
   }, options)
-  if (this.serverName.length !== 256) {
-    var buffer = new Buffer(256)
-    buffer.fill(0)
-    buffer.write('0A', 'hex')
-    buffer.write(this.serverName, 1)
-    this.serverName = new Uint8Array(buffer)
-  }
+  EventEmitter.call(this)
+  this.serverName = util.codifyServerName(this.serverName)
 }
 
 inherits(CurveCPClient, EventEmitter)
 
 CurveCPClient.prototype.connect = function (destination, connectionInfo) {
+  assert(this._maxErrors === 0, 'connect can only be executed once on CurveCPClient')
   this._log.info('connect ' + destination)
   var self = this
   this.serverPublicKey = nacl.util.decodeBase64(destination)
@@ -68,29 +67,77 @@ CurveCPClient.prototype.connect = function (destination, connectionInfo) {
   })
 }
 
-CurveCPClient.prototype._connectSocket = function (connectionInfoItem) {
-  var socket = new transport.Socket()
+CurveCPClient.prototype.destroy = function () {
   var self = this
+  if (this.socket) {
+    this.socket.destroy()
+    setImmediate(function () {
+      self.emit('close')
+    })
+  }
+}
+
+CurveCPClient.prototype._connectSocket = function (connectionInfoItem) {
+  var self = this
+  var socket = new transport.Socket()
+  socket.setLogger(self._log)
   socket.once('error', function (err) {
     self._errors += 1
     self._log.warn(err)
-    if (self._errors === self._maxErrors) {
+    if (self._errors === self._maxErrors && !self._connected) {
       self.emit('error', new Error('All connections failed'))
     }
   })
-  socket.setLogger(self._log)
   socket.once('connect', function () {
     self._log.info('connected', connectionInfoItem)
     self._sendHello(socket, 0)
   })
   socket.once('data', function (data) {
-    self._onCookie(socket, data)
+    if (!self._connected) {
+      self._connected = true
+      self._errors = 0
+      self._onMessage(data, socket)
+    }
   })
   socket.connect([connectionInfoItem])
 }
 
+CurveCPClient.prototype._onMessage = function (message, socket) {
+  this._log.debug('_onMessage@Client')
+  if (message.length < 64 || message.length > 1152) {
+    return
+  }
+  var messageType = message.subarray(0, 8)
+  if (util.isEqual(messageType, util.SERVER_MSG) && this.serverCookie) {
+    if (this._initiateTimeout) {
+      clearTimeout(this._initiateTimeout)
+      this.emit('connect')
+    }
+    this._onServerMessage(message, socket)
+  } else if (util.isEqual(messageType, util.COOKIE_MSG) && !this.serverCookie) {
+    this._onCookie(message, socket)
+  } else {
+    this._log.warn('invalid packet received')
+  }
+}
+
 CurveCPClient.prototype._increaseCounter = function () {
   this.__ourNonceCounter += 1
+}
+
+CurveCPClient.prototype.__validNonce = function (message, offset) {
+  var remoteNonce = new Uint64BE(new Buffer(message.subarray(offset, 8).reverse())).toNumber()
+  if (remoteNonce > this.__remoteNonceCounter || (this.__remoteNonceCounter === 0 && remoteNonce === 0)) {
+    this.__remoteNonceCounter = remoteNonce
+    return true
+  } else {
+    return false
+  }
+}
+
+CurveCPClient.prototype._createVouch = function () {
+  var nonce = util.createRandomNonce('CurveCPV')
+  return util.encrypt(this.clientConnectionPublicKey, nonce, 8, this.clientPrivateKey, this.serverPublicKey)
 }
 
 CurveCPClient.prototype._setExtensions = function (array) {
@@ -130,17 +177,15 @@ CurveCPClient.prototype._sendHello = function (socket, attempt) {
   }
   var wait = HELLO_WAIT[attempt]
   setTimeout(function () {
-    if (!self.connected) {
+    if (!self._connected) {
       self._sendHello(socket, attempt + 1)
     }
   }, (wait + util.randommod(wait)) / 1000000)
 }
 
-CurveCPClient.prototype._onCookie = function (socket, cookieMessage) {
+CurveCPClient.prototype._onCookie = function (cookieMessage, socket) {
+  var self = this
   this._log.debug('onCookie')
-  if (this.connected) {
-    return
-  }
   if (cookieMessage.length !== 200) {
     this._log.warn('Cookie message has incorrect length')
     return
@@ -155,29 +200,91 @@ CurveCPClient.prototype._onCookie = function (socket, cookieMessage) {
     return
   }
   this.serverConnectionPublicKey = boxData.subarray(0, 32)
-  var sharedKey = nacl.box.before(this.serverConnectionPublicKey, this.clientConnectionPrivateKey)
-  var serverCookie = boxData.subarray(32)
-  if (serverCookie.length !== 96) {
+  this.sharedKey = nacl.box.before(this.serverConnectionPublicKey, this.clientConnectionPrivateKey)
+  this.serverCookie = boxData.subarray(32)
+  if (this.serverCookie.length !== 96) {
     this._log.warn('Server cookie invalid')
     return
   }
-  this.connected = true
-  var stream = new CurveCPClientStream({
-    clientPublicKey: this.clientPublicKey,
-    clientPrivateKey: this.clientPrivateKey,
-    serverPublicKey: this.serverPublicKey,
-    clientConnectionPublicKey: this.clientConnectionPublicKey,
-    clientConnectionPrivateKey: this.clientConnectionPrivateKey,
-    sharedKey: sharedKey,
-    serverExtension: this.serverExtension,
-    clientExtension: this.clientExtension,
-    socket: socket,
-    serverCookie: serverCookie,
-    serverName: this.serverName,
-    logger: this._log
+  this.socket = socket
+  this.socket.on('data', function (data) {
+    self._onMessage(data)
   })
-  this._errors = 0
-  this.emit('connection', stream)
+  this.socket.on('error', function (err) {
+    self.emit('error', err)
+  })
+  this._sendInitiate(new Message().toBuffer())
 }
+
+CurveCPClient.prototype._sendInitiate = function (message) {
+  var self = this
+  this._log.debug('sendInitiate ' + nacl.util.encodeBase64(this.clientPublicKey) + ' > ' + nacl.util.encodeBase64(this.serverPublicKey))
+  if (message.length & 15) {
+    this._log.warn('message is of incorrect length, needs to be multiple of 16')
+    return
+  }
+  var result = new Uint8Array(544 + message.length)
+  result.set(util.INITIATE_MSG)
+  result.set(this.clientConnectionPublicKey, 40)
+  result.set(this.serverCookie, 72)
+  var initiateBoxData = new Uint8Array(352 + message.length)
+  initiateBoxData.set(this.clientPublicKey)
+  initiateBoxData.set(this._createVouch(), 32)
+  initiateBoxData.set(this.serverName, 96)
+  initiateBoxData.set(message, 352)
+  var nonce = this._createNonceFromCounter('CurveCP-client-I')
+  result.set(util.encryptShared(initiateBoxData, nonce, 16, this.sharedKey), 168)
+  result = this._setExtensions(result)
+  this.socket.write(new Buffer(result), function (err) {
+    if (err) {
+      self.emit('error', new Error('CurveCP handshake failed - can not send INITIATE'))
+    } else {
+      self._initiateTimeout = setTimeout(function () {
+        self.emit('error', new Error('CurveCP handshake failed - no reply to INITIATE'))
+      }, INITIATE_WAIT)
+    }
+  })
+}
+
+CurveCPClient.prototype._sendClientMessage = function (message, done) {
+  this._log.debug('sendClientMessage ' + nacl.util.encodeBase64(this.clientPublicKey) + ' > ' + nacl.util.encodeBase64(this.serverPublicKey))
+  var result = new Uint8Array(96 + message.length)
+  result.set(util.CLIENT_MSG)
+  result.set(this.clientConnectionPublicKey, 40)
+  var nonce = this._createNonceFromCounter('CurveCP-client-M')
+  var messageBox = util.encryptShared(message, nonce, 16, this.sharedKey)
+  result.set(messageBox, 8 + 16 + 16 + 32)
+  result = this._setExtensions(result)
+  this.socket.write(new Buffer(result), done)
+}
+
+CurveCPClient.prototype._onServerMessage = function (message) {
+  this._log.debug('onServerMessage@Client')
+  if (!this._validExtensions(message)) {
+    this._log.warn('Invalid extensions')
+    return
+  }
+  if (!this.__validNonce(message, 40)) {
+    this._log.warn('Invalid nonce received')
+    return
+  }
+  var boxData = util.decryptShared(message.subarray(40), 'CurveCP-server-M', this.sharedKey)
+  if (boxData === undefined || !boxData) {
+    this._log.warn('not able to decrypt box data')
+    return
+  }
+  var buffer = new Buffer(boxData)
+  this.emit('data', buffer)
+}
+
+CurveCPClient.prototype.write = function (chunk, done) {
+  this._sendClientMessage(chunk, done)
+}
+
+Object.defineProperty(CurveCPClient.prototype, 'remoteAddress', {
+  get: function () {
+    return nacl.util.encodeBase64(this.serverPublicKey)
+  }
+})
 
 module.exports = CurveCPClient

@@ -1,7 +1,7 @@
 'use strict'
 var util = require('./curvecp-util.js')
 var Uint64BE = require('int64-buffer').Uint64BE
-var Duplex = require('stream').Duplex
+var EventEmitter = require('events').EventEmitter
 var inherits = require('inherits')
 var extend = require('extend.js')
 var winston = require('winston')
@@ -21,15 +21,12 @@ var CurveCPServerStream = function (options) {
     module: 'curvecp-server-stream'
   })
   extend(this, options)
-  options.objectMode = false
-  options.decodeStrings = false
-  options.allowHalfOpen = false
-  Duplex.call(this, options)
+  EventEmitter.call(this)
   this.__remoteNonceCounter = 0
   this.__ourNonceCounter = 0
 }
 
-inherits(CurveCPServerStream, Duplex)
+inherits(CurveCPServerStream, EventEmitter)
 
 CurveCPServerStream.prototype._validExtensions = function (message) {
   return util.isEqual(message.subarray(8, 8 + 16), this.serverExtension) &&
@@ -44,6 +41,13 @@ CurveCPServerStream.prototype.__validNonce = function (message, offset) {
   } else {
     return false
   }
+}
+
+CurveCPServerStream.prototype.destroy = function () {
+  var self = this
+  setImmediate(function () {
+    self.emit('close')
+  })
 }
 
 CurveCPServerStream.prototype.process = function (message, socket) {
@@ -71,7 +75,7 @@ CurveCPServerStream.prototype._onClientMessage = function (message) {
     return
   }
   var buffer = new Buffer(boxData)
-  this.push(buffer)
+  this.emit('data', buffer)
 }
 
 CurveCPServerStream.prototype._increaseCounter = function () {
@@ -98,18 +102,14 @@ CurveCPServerStream.prototype._sendServerMessage = function (message, done) {
   this.stream.write(new Buffer(result), done)
 }
 
-CurveCPServerStream.prototype._read = function (size) {
-  this._log.debug('_read')
-}
-
 CurveCPServerStream.prototype._setExtensions = function (array) {
   array.set(this.clientExtension, 8)
   array.set(this.serverExtension, 24)
   return array
 }
 
-CurveCPServerStream.prototype._write = function (chunk, encoding, done) {
-  this._log.debug('_write')
+CurveCPServerStream.prototype.write = function (chunk, done) {
+  this._log.debug('write')
   this._sendServerMessage(chunk, done)
 }
 

@@ -5,8 +5,6 @@ var inherits = require('inherits')
 var OfflineBuffer = require('./offline-buffer.js')
 var API = require('./api.js')
 var EventEmitter = require('events').EventEmitter
-var NetstringStream = require('./netstring.js')
-var MMProtocol = require('./mm-protocol.js')
 var Circle = require('./circle.js')
 var Directory = require('./directory.js')
 var _ = require('lodash')
@@ -17,8 +15,35 @@ var winston = require('winston')
 var winstonWrapper = require('winston-meta-wrapper')
 var setImmediate = require('async.util.setimmediate')
 var TransportManager = require('./transport.js')
+var ns = require('./ns.js')
+var ProtoBuf = require('protobufjs')
+
+var definition = {
+  'name': 'Message',
+  'fields': [{
+    'rule': 'required',
+    'type': 'string',
+    'name': 'topic',
+    'id': 1
+  }, {
+    'rule': 'required',
+    'type': 'string',
+    'name': 'protocol',
+    'id': 2
+  }, {
+    'rule': 'required',
+    'type': 'string',
+    'name': 'payload',
+    'id': 3
+  }]
+}
+
+var builder = ProtoBuf.newBuilder()
+builder.create(definition)
+var Message = builder.build('Message')
 
 var CONNECT_RANDOMIZATION = 100
+var MAX_CONNECTION_ATTEMPTS = 5
 
 var getRandomInt = function (min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min
@@ -75,8 +100,9 @@ var Platform = function (options) {
   })
   // TRANSPORT
   this._transportReady = false
-  this._connections = []
   this._sendQueue = {}
+  this._receiveBuffer = {}
+  this._connectionAttempts = {}
   // API
   this._setupAPI()
   // CIRCLES
@@ -102,6 +128,8 @@ Platform.prototype.isReady = function () {
   return this._identityReady && this._transportReady
 }
 
+// TRANSPORT SETUP LOGIC
+
 Platform.prototype._setupTransport = function (connectionInfo) {
   this._log.debug('_setupTransport')
   var self = this
@@ -114,21 +142,34 @@ Platform.prototype._setupTransport = function (connectionInfo) {
     self._transport.removeAllListeners()
     self._setupTransport()
   })
-  this._transport.on('connection', function (socket) {
-    assert(validation.validStream(socket))
-    self._log.info('new connection ' + socket.remoteAddress)
-    socket = self._wrapConnection(socket)
-    self.messaging.send('transports.online', 'local', socket.remoteAddress)
-    self._flushQueue(socket.remoteAddress)
+  this._transport.on('connected', function (destination) {
+    assert(validation.validKeyString(destination))
+    self._log.info('CONNECTION RECEIVED IN PLATFORM ' + destination)
+    self.messaging.send('transports.online', 'local', destination)
+    self._connectionAttempts[destination] = 0
+    self._flushQueue(destination)
   })
-  this._transport.on('connectionFailed', function (destination) {
-    self._clearQueue(destination)
+  this._transport.on('disconnected', function (destination) {
+    assert(validation.validKeyString(destination))
+    self._log.info('disconnected ' + destination)
+    self._connectionAttempts[destination] += 1
+    if (self._connectionAttempts[destination] > MAX_CONNECTION_ATTEMPTS) {
+      self._clearQueue(destination)
+    } else {
+      self._connect(destination)
+    }
+    self.messaging.send('transports.offline', 'local', destination)
   })
   this._transport.on('error', function (err) {
     assert(_.isError(err))
     self._log.error('error in transport', {
       error: err
     })
+  })
+  this._transport.on('data', function (origin, message) {
+    assert(validation.validKeyString(origin))
+    assert(_.isBuffer(message))
+    self._processData(origin, message)
   })
   this._transport.on('listening', function () {
     self._log.info('transport opened')
@@ -177,89 +218,88 @@ Platform.prototype._listen = function (connectionInfo) {
   })
 }
 
-Platform.prototype._getConnection = function (publicKey) {
-  assert(validation.validKeyString(publicKey))
-  var connections = _.filter(this._connections, function (connection) {
-    return connection.remoteAddress === publicKey
-  })
-  if (_.size(connections) > 0) {
-    return connections[connections.length - 1]
+// MESSAGE RECEIVE LOGIC
+
+Platform.prototype._processData = function (origin, message) {
+  assert(validation.validKeyString(origin))
+  assert(_.isBuffer(message))
+  if (!_.has(this._receiveBuffer, origin)) {
+    this._receiveBuffer[origin] = message
+  } else {
+    this._receiveBuffer[origin] = Buffer.concat([this._receiveBuffer[origin], message])
+  }
+  try {
+    this._processBuffer(origin)
+  } catch (e) {
+    assert(_.isError(e))
+    this._log.warn('failed to process netstring buffer')
+    delete this._receiveBuffer[origin]
   }
 }
 
-Platform.prototype._wrapConnection = function (socket) {
-  assert(validation.validStream(socket))
-  var netstrings = new NetstringStream({
-    stream: socket,
-    logger: this._log
-  })
-  var messages = new MMProtocol({
-    stream: netstrings,
-    platform: this,
-    logger: this._log
-  })
-  this._connectEvents(messages)
-  return messages
+Platform.prototype._processBuffer = function (origin) {
+  assert(_.has(this._receiveBuffer, origin))
+  assert(_.isBuffer(this._receiveBuffer[origin]))
+  assert(validation.validKeyString(origin))
+  var self = this
+  if (this._receiveBuffer[origin].length === 0) {
+    return
+  }
+  var messageLength = ns.nsLength(this._receiveBuffer[origin])
+  if (messageLength > 0 && this._receiveBuffer[origin].length >= messageLength) {
+    var payload = ns.nsPayload(this._receiveBuffer[origin])
+    this._receiveBuffer[origin] = this._receiveBuffer[origin].slice(messageLength)
+    this._processMessage(origin, payload)
+    process.nextTick(function () {
+      self._processBuffer(origin)
+    })
+  }
 }
 
-Platform.prototype._connectEvents = function (stream) {
-  assert(validation.validStream(stream))
+Platform.prototype._processMessage = function (origin, data) {
+  assert(_.isBuffer(data))
+  assert(validation.validKeyString(origin))
   var self = this
-  stream.setMaxListeners(0)
-  this._connections.push(stream)
-  stream.on('data', function (message) {
+  try {
+    var _message = Message.decode(data)
+    var message = {
+      topic: _message.topic,
+      protocol: _message.protocol,
+      payload: _message.payload
+    }
+    message.sender = origin
+    message.scope = self._getScope(origin)
+    assert(validation.validReceivedMessage(message))
     self._log.info('MicroMinion message received', {
       sender: message.sender,
       protocol: message.protocol,
       topic: message.topic,
       scope: message.scope
     })
-    assert(validation.validProtocolObject(message))
-    assert(_.has(message, 'sender'))
-    assert(validation.validKeyString(message.sender))
     self.emit('message', message)
-  })
-  stream.on('close', function () {
-    self._log.info('MicroMinion connection destroyed', {
-      remote: stream.remoteAddress
+  } catch (e) {
+    self._log.warn('invalid message received - dropped', {
+      error: e,
+      remote: origin
     })
-    self._connections.splice(self._connections.indexOf(stream), 1)
-    stream.removeAllListeners()
-    stream.on('error', function (error) {
-      self._log.warn(error.message)
-    })
-    if (stream.remoteAddress) {
-      self.messaging.send('transports.offline', 'local', stream.remoteAddress)
-    }
-  })
-  stream.on('end', function () {
-    self._log.debug('MicroMinion connection ended', {
-      remote: stream.remoteAddress
-    })
-    stream.destroy()
-  })
-  stream.on('finish', function () {
-    self._log.debug('MicroMinion connection end of stream reached', {
-      remote: stream.remoteAddress
-    })
-    stream.destroy()
-  })
-  stream.on('error', function (err) {
-    assert(_.isError(err))
-    self._log.warn('MicroMinion connection error', {
-      remote: stream.remoteAddress,
-      errorName: err.name,
-      errorMessage: err.message
-    })
-    stream.destroy()
-  })
-  stream.on('timeout', function () {
-    self._log.info('MicroMinion stream timeout', {
-      remote: stream.remoteAddress
-    })
-    stream.destroy()
-  })
+  }
 }
+
+Platform.prototype._getScope = function (publicKey) {
+  assert(validation.validKeyString(publicKey))
+  this._log.debug('_getScope', {
+    publicKey: publicKey
+  })
+  if (this.devices.inScope(publicKey)) {
+    return 'self'
+  } else if (this.friends.inScope(publicKey)) {
+    return 'friends'
+  } else {
+    return 'public'
+  }
+}
+
+// MESSAGE SEND LOGIC
 
 /**
  * send message: message is an object with the following properties
@@ -294,17 +334,13 @@ Platform.prototype.send = function (message, options) {
       }
     }
   }
-  var connection = this._getConnection(message.destination)
-  if (connection) {
-    this._send(message, connection, options.callback)
-  } else {
-    this._queueMessage(message, options.callback)
-    var randomization = getRandomInt(0, CONNECT_RANDOMIZATION)
-    setTimeout(this._connect.bind(this, message.destination), randomization)
-  }
+  this._queueMessage(message, options.callback)
+  var randomization = getRandomInt(0, CONNECT_RANDOMIZATION)
+  setTimeout(this._connect.bind(this, message.destination), randomization)
 }
 
 Platform.prototype._connect = function (destination) {
+  assert(validation.validKeyString(destination))
   var self = this
   this.directory.getNodeInfo(destination, function (err, result) {
     if (err) {
@@ -314,6 +350,7 @@ Platform.prototype._connect = function (destination) {
     } else {
       assert(_.isNil(err))
       assert(validation.validNodeInfo(result))
+      assert(destination === result.boxId)
       self._transport.connect(result.boxId, result.connectionInfo)
     }
   })
@@ -322,46 +359,33 @@ Platform.prototype._connect = function (destination) {
 Platform.prototype._queueMessage = function (message, callback) {
   assert(validation.validSendMessage(message))
   assert(_.isNil(callback) || _.isFunction(callback))
-  var self = this
-  self._log.debug('MicroMinion queuing message', {
-    destination: message.destination,
-    protocol: message.protocol,
-    topic: message.topic
-  })
-  var errorCallback = function (err) {
-    assert(_.isError(err))
-    callback(err)
-  }
   if (!_.has(this._sendQueue, message.destination)) {
     this._sendQueue[message.destination] = []
   }
   this._sendQueue[message.destination].push({
     message: message,
-    callback: callback,
-    errorCallback: errorCallback
+    callback: callback
   })
 }
 
 Platform.prototype._flushQueue = function (destination) {
-  var self = this
+  assert(validation.validKeyString(destination))
+  var canSend = true
   if (_.has(this._sendQueue, destination)) {
-    var queue = this._sendQueue[destination]
-    this._sendQueue[destination] = []
-    _.forEach(queue, function (queueItem) {
-      self.send(queueItem.message, {
-        callback: queueItem.callback
-      })
-    })
+    while (canSend && this._sendQueue[destination].length > 0) {
+      var queueItem = this._sendQueue[destination].shift()
+      this._send(queueItem.message, queueItem.callback)
+    }
   }
 }
 
 Platform.prototype._clearQueue = function (destination) {
+  assert(validation.validKeyString(destination))
   if (_.has(this._sendQueue, destination)) {
-    var queue = this._sendQueue[destination]
-    this._sendQueue[destination] = []
-    _.forEach(queue, function (queueItem) {
-      queueItem.errorCallback(new Error('Connection could not be established. Message sending failed.'))
-    })
+    while (this._sendQueue[destination].length > 0) {
+      var queueItem = this._sendQueue[destination].shift()
+      queueItem.callback(new Error('Connection could not be established. Message sending failed.'))
+    }
   }
 }
 
@@ -370,17 +394,24 @@ Platform.prototype._clearQueue = function (destination) {
  *
  * @private
  */
-Platform.prototype._send = function (message, connection, callback) {
-  assert(validation.validSendMessage(message))
-  assert(validation.validStream(connection))
+Platform.prototype._send = function (chunk, callback) {
+  assert(validation.validSendMessage(chunk))
   assert(_.isNil(callback) || _.isFunction(callback))
-  connection.write(message, callback)
+  var destination = chunk.destination
+  var message = new Message({
+    topic: chunk.topic,
+    protocol: chunk.protocol,
+    payload: chunk.payload
+  })
   this._log.info('MicroMinion message send', {
     destination: message.destination,
     protocol: message.protocol,
     topic: message.topic
   })
+  return this._transport.send(ns.nsWrite(message.toBuffer()), destination, callback)
 }
+
+// API SYNTACTIC SUGAR
 
 Platform.prototype._setupAPI = function () {
   assert(_.has(this, 'storage'))
