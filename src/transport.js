@@ -13,7 +13,7 @@ var _ = require('lodash')
 var assert = require('assert')
 var validation = require('./validation.js')
 
-var MAX_ONGOING_CONNECTIONS = 1
+var MAX_ONGOING_CONNECTIONS = 2
 
 var TransportManager = function (options) {
   assert(validation.validOptions(options))
@@ -31,7 +31,7 @@ var TransportManager = function (options) {
   // CONNECTIONS
   this._connections = []
   this._clientConnectionsInProgress = {}
-  this._clientConnectQueue = []
+  this._clientConnectQueue = {}
   // TRANSPORT-SERVER
   this._transportServer = new transport.Server()
   this._transportServer.setLogger(this._log)
@@ -71,7 +71,7 @@ inherits(TransportManager, EventEmitter)
 TransportManager.prototype._addConnection = function (connection, server) {
   assert(validation.validKeyString(connection.remoteAddress))
   var self = this
-  var messageStream = new curvecp.MessageStream({
+  var messageStream = new curvecp.SimpleMessageStream({
     logger: this._log,
     stream: connection
   })
@@ -160,18 +160,17 @@ TransportManager.prototype.connect = function (destination, connectionInfo) {
   if (this._hasConnection(destination)) {
     setImmediate(function () {
       self.emit('connected', destination)
+      self._shiftConnectQueue()
     })
     return
   }
   if (_.has(this._clientConnectionsInProgress, destination)) {
     return
   }
-  /*
   if (_.size(this._clientConnectionsInProgress) > MAX_ONGOING_CONNECTIONS) {
     this._addToConnectQueue(destination, connectionInfo)
     return
   }
-  */
   var client = new CurveCPClient({
     clientPublicKey: nacl.util.decodeBase64(this._identity.box.publicKey),
     clientPrivateKey: nacl.util.decodeBase64(this._identity.box.secretKey),
@@ -197,18 +196,20 @@ TransportManager.prototype.connect = function (destination, connectionInfo) {
 TransportManager.prototype._removeInProgress = function (destination) {
   if (_.has(this._clientConnectionsInProgress, destination)) {
     delete this._clientConnectionsInProgress[destination]
-    this._shiftConnectQueue()
   }
+  this._shiftConnectQueue()
 }
 
 TransportManager.prototype._addToConnectQueue = function (destination, connectionInfo) {
-  this._clientConnectQueue.push([destination, connectionInfo])
+  this._clientConnectQueue[destination] = connectionInfo
 }
 
 TransportManager.prototype._shiftConnectQueue = function () {
-  if (this._clientConnectQueue.length > 0) {
-    var queueItem = this._clientConnectQueue.shift()
-    this.connect(queueItem[0], queueItem[1])
+  if (_.size(this._clientConnectQueue) > 0) {
+    var destination = _.sample(_.keys(this._clientConnectQueue))
+    var connectionInfo = this._clientConnectQueue[destination]
+    delete this._clientConnectQueue[destination]
+    this.connect(destination, connectionInfo)
   }
 }
 

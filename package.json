@@ -33,7 +33,7 @@
     "1tp": "0.7.5",
     "ak-eventemitter": "0.0.6",
     "async.util.setimmediate": "0.5.2",
-    "curvecp": "1.1.2",
+    "curvecp": "1.2.0",
     "ed2curve": "0.1.4",
     "extend.js": "0.0.2",
     "inherits": "2.0.3",
