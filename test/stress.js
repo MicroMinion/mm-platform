@@ -50,14 +50,14 @@ var _callback = function (nodes, messageId, callback) {
 
 describe('stress test', function () {
   this.timeout(0)
-  var nodes = [2, 5, 10, 20, 30, 50, 100]
+  var nodes = [2, 5, 10, 20, 30, 50]
   nodes.forEach(function (node) {
     describe('between ' + node + ' nodes', function () {
       var platformNodes = []
       beforeEach(function (done) {
         _makeNodes(platformNodes, node, done)
       })
-      var messages = [1, 10, 100, 1000]
+      var messages = [1, 10, 100]
       messages.forEach(function (nbMessages) {
         it('correctly sends ' + nbMessages, function (done) {
           var callbacks = []
