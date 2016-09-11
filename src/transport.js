@@ -54,8 +54,8 @@ var TransportManager = function (options) {
   })
   // CURVECP-SERVER
   this._curveCPServer = new CurveCPServer({
-    serverPublicKey: nacl.util.decodeBase64(this._identity.box.publicKey),
-    serverPrivateKey: nacl.util.decodeBase64(this._identity.box.secretKey),
+    serverPublicKey: this._identity.box.publicKey,
+    serverPrivateKey: this._identity.box.secretKey,
     logger: this._log
   })
   this._curveCPServer.on('connection', function (socket) {
@@ -172,8 +172,8 @@ TransportManager.prototype.connect = function (destination, connectionInfo) {
     return
   }
   var client = new CurveCPClient({
-    clientPublicKey: nacl.util.decodeBase64(this._identity.box.publicKey),
-    clientPrivateKey: nacl.util.decodeBase64(this._identity.box.secretKey),
+    clientPublicKey: this._identity.box.publicKey,
+    clientPrivateKey: this._identity.box.secretKey,
     logger: this._log
   })
   this._clientConnectionsInProgress[destination] = client
