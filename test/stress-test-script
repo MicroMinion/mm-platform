@@ -10,18 +10,18 @@ var winstonWrapper = require('winston-meta-wrapper')
 var Platform = require('../src/index.js')
 var Directory = require('../stub/directory.js')
 
-var createLogger = function () {
-  var logger = new winston.Logger({
-    transports: [
-      new winston.transports.Console({
-        level: 'warn',
-        timestamp: true,
-        logstash: false
-      })
-    ]
-  })
-  return winstonWrapper(logger)
-}
+var createLogger = function() {
+        var logger = new winston.Logger({
+            transports: [
+                new winston.transports.Console({
+                    level: 'warn',
+                    timestamp: true,
+                    logstash: false
+                })
+            ]
+        })
+        return winstonWrapper(logger)
+    }
     /*
     var Logger = function () {
       this.debug = this.log.bind(this, 'debug')
@@ -34,56 +34,80 @@ var createLogger = function () {
     */
 var platformNodes = []
 
-var _makeNodes = function (number, done) {
-  var readyCounter = 0
-  for (var i = 0; i < number; i++) {
-    var platform = new Platform({
-      directory: new Directory(),
-      logger: createLogger()
-    })
-    platform.once('ready', function () {
-      readyCounter += 1
-      if (readyCounter === number) {
-        done()
-      }
-    })
-    platformNodes.push(platform)
-  }
-}
-
-var _callback = function (nodes, messageId, callback) {
-  var sample = _.sampleSize(nodes, 2)
-  var sender = sample[0]
-  var destinationKey = sample[1].identity.getBoxId()
-        // console.time(messageId)
-  sender.messaging.send('test.test', destinationKey, {
-    'testSequence': messageId
-  }, {
-    callback: function (err, result) {
-            // console.timeEnd(messageId)
-      callback(err, result)
+var _makeNodes = function(number, done) {
+    var readyCounter = 0
+    for (var i = 0; i < number; i++) {
+        var platform = new Platform({
+            directory: new Directory(),
+            logger: createLogger()
+        })
+        platform._log.addMeta({
+            node: i
+        })
+        platform.once('ready', function() {
+            readyCounter += 1
+            if (readyCounter === number) {
+                done()
+            }
+        })
+        platformNodes.push(platform)
     }
-  })
 }
 
-var node = 15
+var counter = 0
+
+var inQueue = function() {
+    var result = 0
+    _.forEach(platformNodes, function(platform) {
+        _.forEach(platform._sendQueue, function(value, key) {
+            result += value.length
+            if (value.length > 1) {
+
+            }
+        })
+    })
+    return result
+}
+
+var _callback = function(nodes, messageId, callback) {
+    var sample = _.sampleSize(nodes, 2)
+    var sender = sample[0]
+    var destinationKey = sample[1].identity.getBoxId()
+        // console.time(messageId)
+    sender.messaging.send('test.test', destinationKey, {
+        'testSequence': messageId
+    }, {
+        callback: function(err, result) {
+            if (!err) {
+                counter += 1
+                    //console.log('COUNTER: ' + counter + ' ' + inQueue())
+            } else {
+                console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ERROR")
+            }
+            // console.timeEnd(messageId)
+            callback(err, result)
+        }
+    })
+}
+
+var node = 20
 var nbMessages = 1000
 
-var done = function () {
-  var callbacks = []
-  for (var i = 1; i <= nbMessages; i++) {
-    callbacks.push(_callback.bind(null, platformNodes, i))
-  }
-  parallel(callbacks, function (err, result) {
-    if (err) {
-      console.log('ERROR ENCOUNTERED')
-      console.log(err)
-      process.exit(1)
-    } else {
-      console.log('NO ERRORS')
-      process.exit(0)
+var done = function() {
+    var callbacks = []
+    for (var i = 1; i <= nbMessages; i++) {
+        callbacks.push(_callback.bind(null, platformNodes, i))
     }
-  })
+    parallel(callbacks, function(err, result) {
+        if (err) {
+            console.log('ERROR ENCOUNTERED')
+            console.log(err)
+            process.exit(1)
+        } else {
+            console.log('NO ERRORS')
+            process.exit(0)
+        }
+    })
 }
 
 _makeNodes(node, done)
