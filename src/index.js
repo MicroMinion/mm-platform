@@ -408,7 +408,7 @@ Platform.prototype._send = function (chunk, callback) {
     protocol: message.protocol,
     topic: message.topic
   })
-  return this._transport.send(ns.nsWrite(message.toBuffer()), destination, callback)
+  return this._transport.send(ns.nsWrite(new Buffer(message.toBuffer())), destination, callback)
 }
 
 // API SYNTACTIC SUGAR
