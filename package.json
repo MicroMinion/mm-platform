@@ -1,6 +1,6 @@
 {
   "name": "mm-platform",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "description": "P2P encrypted messaging platform",
   "main": "src/index.js",
   "directories": {
