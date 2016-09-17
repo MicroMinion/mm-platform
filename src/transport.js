@@ -12,6 +12,7 @@ nacl.util = require('tweetnacl-util')
 var _ = require('lodash')
 var assert = require('assert')
 var validation = require('./validation.js')
+var isBuffer = require('is-buffer')
 
 var MAX_ONGOING_CONNECTIONS = 2
 
@@ -41,7 +42,7 @@ var TransportManager = function (options) {
   this._transportServer.on('connection', function (socket) {
     socket.setLogger(self._log)
     socket.on('data', function (data) {
-      assert(_.isBuffer(data))
+      assert(isBuffer(data))
       self._curveCPServer.process(data, socket)
     })
   })

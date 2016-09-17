@@ -17,6 +17,7 @@ var setImmediate = require('async.util.setimmediate')
 var TransportManager = require('./transport.js')
 var ns = require('./ns.js')
 var ProtoBuf = require('protobufjs')
+var isBuffer = require('is-buffer')
 
 var definition = {
   'name': 'Message',
@@ -168,8 +169,8 @@ Platform.prototype._setupTransport = function (connectionInfo) {
   })
   this._transport.on('data', function (origin, message) {
     assert(validation.validKeyString(origin))
-    assert(_.isBuffer(message))
-    self._processData(origin, message)
+    assert(isBuffer(message), 'message is not buffer')
+    self._processData(origin, new Buffer(message))
   })
   this._transport.on('listening', function () {
     self._log.info('transport opened')
@@ -222,7 +223,7 @@ Platform.prototype._listen = function (connectionInfo) {
 
 Platform.prototype._processData = function (origin, message) {
   assert(validation.validKeyString(origin))
-  assert(_.isBuffer(message))
+  assert(isBuffer(message))
   if (!_.has(this._receiveBuffer, origin)) {
     this._receiveBuffer[origin] = message
   } else {
@@ -239,7 +240,7 @@ Platform.prototype._processData = function (origin, message) {
 
 Platform.prototype._processBuffer = function (origin) {
   assert(_.has(this._receiveBuffer, origin))
-  assert(_.isBuffer(this._receiveBuffer[origin]))
+  assert(isBuffer(this._receiveBuffer[origin]))
   assert(validation.validKeyString(origin))
   var self = this
   if (this._receiveBuffer[origin].length === 0) {
@@ -257,7 +258,7 @@ Platform.prototype._processBuffer = function (origin) {
 }
 
 Platform.prototype._processMessage = function (origin, data) {
-  assert(_.isBuffer(data))
+  assert(isBuffer(data))
   assert(validation.validKeyString(origin))
   var self = this
   try {

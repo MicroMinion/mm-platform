@@ -30,14 +30,15 @@
     "node": ">=4.x.x"
   },
   "dependencies": {
-    "1tp": "^0.10.3",
+    "1tp": "0.10.3",
     "ak-eventemitter": "0.0.6",
     "async.util.setimmediate": "0.5.2",
     "curvecp": "1.2.0",
     "ed2curve": "0.1.4",
     "extend.js": "0.0.2",
     "inherits": "2.0.3",
-    "int64-buffer": "^0.1.9",
+    "int64-buffer": "0.1.9",
+    "is-buffer": "1.1.4",
     "kad-memstore-thomas": "0.2.1",
     "lodash": "4.15.0",
     "node-uuid": "1.4.7",
