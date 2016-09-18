@@ -12,6 +12,7 @@ nacl.util = require('tweetnacl-util')
 var _ = require('lodash')
 var assert = require('assert')
 var validation = require('./validation.js')
+var isBuffer = require('is-buffer')
 
 var MAX_ONGOING_CONNECTIONS = 2
 
@@ -41,7 +42,7 @@ var TransportManager = function (options) {
   this._transportServer.on('connection', function (socket) {
     socket.setLogger(self._log)
     socket.on('data', function (data) {
-      assert(_.isBuffer(data))
+      assert(isBuffer(data))
       self._curveCPServer.process(data, socket)
     })
   })
@@ -59,7 +60,7 @@ var TransportManager = function (options) {
     logger: this._log
   })
   this._curveCPServer.on('connection', function (socket) {
-    self._log.info('NEW SERVER CONNECTION')
+    self._log.info('new server connection ' + socket.remoteAddress)
     self._addConnection(socket, true)
   })
 }
@@ -185,7 +186,7 @@ TransportManager.prototype.connect = function (destination, connectionInfo) {
   }
   client.once('error', error)
   client.once('connect', function () {
-    self._log.info('NEW CLIENT CONNECTION')
+    self._log.info('new client connection ' + client.remoteAddress)
     self._addConnection(client)
     client.removeListener('error', error)
     self._removeInProgress(destination)

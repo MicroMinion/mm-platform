@@ -7,6 +7,8 @@ var extend = require('extend.js')
 var winston = require('winston')
 var winstonWrapper = require('winston-meta-wrapper')
 var nacl = require('tweetnacl')
+var isBuffer = require('is-buffer')
+var assert = require('assert')
 nacl.util = require('tweetnacl-util')
 
 var CurveCPServerStream = function (options) {
@@ -75,6 +77,7 @@ CurveCPServerStream.prototype._onClientMessage = function (message) {
     return
   }
   var buffer = new Buffer(boxData)
+  assert(isBuffer(buffer))
   this.emit('data', buffer)
 }
 

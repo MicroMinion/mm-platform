@@ -13,6 +13,7 @@ var winston = require('winston')
 var winstonWrapper = require('winston-meta-wrapper')
 var Message = require('curvecp').Message
 var assert = require('assert')
+var isBuffer = require('is-buffer')
 
 var HELLO_WAIT = [1000000000, 1500000000, 2250000000, 3375000000, 5062500000, 7593750000, 11390625000, 17085937500]
 var INITIATE_WAIT = 1000 * 10
@@ -274,6 +275,7 @@ CurveCPClient.prototype._onServerMessage = function (message) {
     return
   }
   var buffer = new Buffer(boxData)
+  assert(isBuffer(buffer))
   this.emit('data', buffer)
 }
 
