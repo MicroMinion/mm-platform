@@ -173,8 +173,8 @@ Platform.prototype._setupTransport = function (connectionInfo) {
     self._processData(origin, new Buffer(message))
   })
   this._transport.on('listening', function () {
-    self._log.info('transport opened')
     var connectionInfo = self._transport.address()
+    self._log.info('transport opened, connection-info = ' + JSON.stringify(connectionInfo))
     self.storage.put('myConnectionInfo', JSON.stringify(connectionInfo))
     self.directory.setMyConnectionInfo(connectionInfo)
     self._transportReady = true
