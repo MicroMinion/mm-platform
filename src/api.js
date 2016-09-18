@@ -45,7 +45,7 @@ inherits(API, EventEmitter)
 
 API.prototype.send = function (topic, destination, payload, options) {
   assert(validation.validString(topic))
-  assert(validation.validLocalKeyString(destination))
+  assert(validation.validLocalKeyString(destination), 'invalid destination')
   assert.doesNotThrow(this.serialize.bind(payload))
   assert(_.isString(this.serialize(payload)))
   assert(validation.validOptions(options))
