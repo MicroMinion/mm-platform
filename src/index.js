@@ -145,7 +145,7 @@ Platform.prototype._setupTransport = function (connectionInfo) {
   })
   this._transport.on('connected', function (destination) {
     assert(validation.validKeyString(destination))
-    self._log.info('CONNECTION RECEIVED IN PLATFORM ' + destination)
+    self._log.debug('connected event received for ' + destination)
     self.messaging.send('transports.online', 'local', destination)
     self._connectionAttempts[destination] = 0
     self._flushQueue(destination)

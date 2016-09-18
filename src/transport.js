@@ -60,7 +60,7 @@ var TransportManager = function (options) {
     logger: this._log
   })
   this._curveCPServer.on('connection', function (socket) {
-    self._log.info('NEW SERVER CONNECTION')
+    self._log.info('new server connection ' + socket.remoteAddress)
     self._addConnection(socket, true)
   })
 }
@@ -186,7 +186,7 @@ TransportManager.prototype.connect = function (destination, connectionInfo) {
   }
   client.once('error', error)
   client.once('connect', function () {
-    self._log.info('NEW CLIENT CONNECTION')
+    self._log.info('new client connection ' + client.remoteAddress)
     self._addConnection(client)
     client.removeListener('error', error)
     self._removeInProgress(destination)
