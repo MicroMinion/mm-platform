@@ -46,6 +46,10 @@ var Message = builder.build('Message')
 var CONNECT_RANDOMIZATION = 100
 var MAX_CONNECTION_ATTEMPTS = 5
 
+var NETSTRING_DELIMITER = ','
+var NETSTRING_SEPARATOR = ':'
+var NETSTRING_SEPARATOR_CODE = 58
+
 var getRandomInt = function (min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
@@ -243,18 +247,28 @@ Platform.prototype._processBuffer = function (origin) {
   assert(isBuffer(this._receiveBuffer[origin]))
   assert(validation.validKeyString(origin))
   var self = this
-  if (this._receiveBuffer[origin].length === 0) {
-    return
+  var netstring = this._receiveBuffer[origin]
+  var result = []
+  for (var i = 0; i < netstring.length; i++) {
+    if (NETSTRING_SEPARATOR_CODE === netstring[i]) {
+      var len = netstring.toString('utf-8', 0, i)
+      len = Number.parseInt(len)
+      assert(_.isNumber(len), 'length is not a number')
+      var stringStart = i + 1
+      if (netstring.length >= stringStart + len + 1) {
+        var string = netstring.slice(stringStart, stringStart + len)
+        result.push(string)
+        netstring = netstring.slice(stringStart + len + 1)
+        i = 0
+      } else {
+        i = netstring.length
+      }
+    }
   }
-  var messageLength = ns.nsLength(this._receiveBuffer[origin])
-  if (messageLength > 0 && this._receiveBuffer[origin].length >= messageLength) {
-    var payload = ns.nsPayload(this._receiveBuffer[origin])
-    this._receiveBuffer[origin] = this._receiveBuffer[origin].slice(messageLength)
-    this._processMessage(origin, payload)
-    process.nextTick(function () {
-      self._processBuffer(origin)
-    })
-  }
+  this._receiveBuffer[origin] = netstring
+  _.forEach(result, function (message) {
+    self._processMessage(origin, message)
+  })
 }
 
 Platform.prototype._processMessage = function (origin, data) {
