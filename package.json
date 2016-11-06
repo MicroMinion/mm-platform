@@ -49,6 +49,7 @@
     "winston-meta-wrapper": "1.2.0"
   },
   "devDependencies": {
+    "mm-platform-stub": "0.0.3",
     "mocha": "3.0.2",
     "publish": "0.6.0",
     "run-parallel": "1.1.6"

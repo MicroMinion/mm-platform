@@ -8,7 +8,7 @@ var winston = require('winston')
 var winstonWrapper = require('winston-meta-wrapper')
 
 var Platform = require('../src/index.js')
-var Directory = require('../stub/directory.js')
+var Directory = require('mm-platform-stub').Directory
 
 var createLogger = function() {
         var logger = new winston.Logger({

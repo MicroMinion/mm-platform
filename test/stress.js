@@ -5,7 +5,7 @@ var parallel = require('run-parallel')
 var _ = require('lodash')
 
 var Platform = require('../src/index.js')
-var Directory = require('../stub/directory.js')
+var Directory = require('mm-platform-stub').Directory
 
 var Logger = function () {
   this.debug = this.log.bind(this, 'debug')
