@@ -41,10 +41,10 @@
     "is-buffer": "1.1.4",
     "kad-memstore-thomas": "0.2.1",
     "lodash": "4.15.0",
-    "node-uuid": "1.4.7",
     "protobufjs": "5.0.1",
     "tweetnacl": "0.14.3",
     "tweetnacl-util": "0.13.3",
+    "uuid": "^3.0.0",
     "winston": "2.2.0",
     "winston-meta-wrapper": "1.2.0"
   },

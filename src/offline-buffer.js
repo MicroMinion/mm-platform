@@ -3,7 +3,7 @@
 var EventEmitter = require('events').EventEmitter
 var inherits = require('inherits')
 var _ = require('lodash')
-var uuid = require('node-uuid')
+var uuid = require('uuid')
 var assert = require('assert')
 var validation = require('./validation.js')
 
