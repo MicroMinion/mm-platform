@@ -25,8 +25,7 @@ var CurveCPClient = function (options) {
   this.clientConnectionPublicKey = keyPair.publicKey
   this.clientConnectionPrivateKey = keyPair.secretKey
   this._connected = false
-  this._errors = 0
-  this._maxErrors = 0
+  this._in_progress = false
   EventEmitter.call(this)
   if (!options) {
     options = {}
@@ -52,20 +51,15 @@ var CurveCPClient = function (options) {
 inherits(CurveCPClient, EventEmitter)
 
 CurveCPClient.prototype.connect = function (destination, connectionInfo) {
-  assert(this._maxErrors === 0, 'connect can only be executed once on CurveCPClient')
+  assert(!this._in_progress, 'connect can only be executed once on CurveCPClient')
+  this._in_progress = true
   this._log.info('connect ' + destination)
-  var self = this
   this.serverPublicKey = nacl.util.decodeBase64(destination)
   if (connectionInfo.length === 0) {
     this.emit('error', new Error('No connectionInfo specified'))
     return
   }
-  this._maxErrors = connectionInfo.length
-  _.forEach(connectionInfo, function (connectionInfoItem) {
-    setImmediate(function () {
-      self._connectSocket(connectionInfoItem)
-    })
-  })
+  this._connectSocket(connectionInfo)
 }
 
 CurveCPClient.prototype.destroy = function () {
@@ -78,29 +72,27 @@ CurveCPClient.prototype.destroy = function () {
   }
 }
 
-CurveCPClient.prototype._connectSocket = function (connectionInfoItem) {
+CurveCPClient.prototype._connectSocket = function (connectionInfo) {
   var self = this
-  var socket = new transport.Socket()
+  var socket = new transport.Socket({
+    parallelConnectionSetup: true
+  })
   socket.setLogger(self._log)
   socket.once('error', function (err) {
-    self._errors += 1
     self._log.debug(err)
-    if (self._errors === self._maxErrors && !self._connected) {
-      self.emit('error', new Error('All connections failed'))
-    }
+    self.emit('error', new Error('Connection failed'))
   })
   socket.once('connect', function () {
-    self._log.info('connected', connectionInfoItem)
+    self._log.info('connected', connectionInfo)
     self._sendHello(socket, 0)
   })
   socket.once('data', function (data) {
     if (!self._connected) {
       self._connected = true
-      self._errors = 0
       self._onMessage(data, socket)
     }
   })
-  socket.connect([connectionInfoItem])
+  socket.connect(connectionInfo)
 }
 
 CurveCPClient.prototype._onMessage = function (message, socket) {
