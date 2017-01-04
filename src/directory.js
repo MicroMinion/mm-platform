@@ -19,9 +19,11 @@ var Directory = function () {
    * @type {Object.<string, Object>}
    */
   this.directoryLookup = {}
+  this._cache = {}
   events.EventEmitter.call(this)
   setInterval(function () {
     self._sendMyNodeInfo()
+    self._clearCache()
   }, CACHE_REFRESH_INTERVAL)
 }
 
@@ -70,6 +72,13 @@ Directory.prototype.getNodeInfo = function (boxId, callback) {
   })
   assert(_.isFunction(callback))
   assert(validation.validKeyString(boxId))
+  var self = this
+  if(_.has(this._cache, boxId)) {
+    setTimeout(function() {
+      callback(null, self._cache[boxId].result)
+    }, 0)
+    return
+  }
   if (_.has(this.directoryLookup, boxId)) {
     this.directoryLookup[boxId].push(callback)
   } else {
@@ -111,6 +120,19 @@ Directory.prototype._processNodeInfo = function (topic, local, data) {
     })
     delete this.directoryLookup[data.boxId]
   }
+  this._cache[data.boxId]  = {
+    result: data,
+    time: Date.now()
+  }
+}
+
+Directory.prototype._clearCache = function() {
+  var self = this
+  _.forEach(_.keys(this._cache), function(boxId) {
+    if(self._cache[boxId].time < Date.now() + CACHE_REFRESH_INTERVAL) {
+      delete self._cache[boxId]
+    }
+  })
 }
 
 module.exports = Directory
