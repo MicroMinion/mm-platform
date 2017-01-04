@@ -178,6 +178,7 @@ Platform.prototype._setupTransport = function (connectionInfo) {
   })
   this._transport.on('listening', function () {
     var connectionInfo = self._transport.address()
+    console.log('CONNECTION INFO RETURNED BY 1TP ' + JSON.stringify(connectionInfo))
     self._log.info('transport opened, connection-info = ' + JSON.stringify(connectionInfo))
     self.storage.put('myConnectionInfo', JSON.stringify(connectionInfo))
     self.directory.setMyConnectionInfo(connectionInfo)
@@ -199,9 +200,11 @@ Platform.prototype._listen = function (connectionInfo) {
   }
   var success = function (value) {
     assert(_.isString(value) || value === null || value === undefined)
+    console.log('VALUE RETRIEVED FOR CONNECTION INFO ' + value)
     if (value === null || value === undefined || value.length === 0) {
       self._transport.listen()
     } else {
+      console.log('PARSED VALUE FOR CONNECTION INFO')
       value = JSON.parse(value)
       assert(_.isArray(value))
       self._transport.listen(value)
@@ -371,6 +374,10 @@ Platform.prototype._connect = function (destination) {
   })
 }
 
+Platform.prototype._hasConnection = function(destination) {
+  return this._transport._hasConnection(destination)
+}
+
 Platform.prototype._queueMessage = function (message, callback) {
   assert(validation.validSendMessage(message))
   assert(_.isNil(callback) || _.isFunction(callback))
@@ -387,7 +394,7 @@ Platform.prototype._flushQueue = function (destination) {
   assert(validation.validKeyString(destination))
   var canSend = true
   if (_.has(this._sendQueue, destination)) {
-    while (canSend && this._sendQueue[destination].length > 0) {
+    while (canSend && this._sendQueue[destination].length > 0 && this._hasConnection(destination)) {
       var queueItem = this._sendQueue[destination].shift()
       canSend = this._send(queueItem.message, queueItem.callback)
     }
