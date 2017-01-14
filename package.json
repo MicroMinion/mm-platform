@@ -30,7 +30,7 @@
     "node": ">=4.x.x"
   },
   "dependencies": {
-    "1tp": "git://github.com/MicroMinion/1tp.git#mm-platform-fixes",
+    "1tp": "0.21.0",
     "ak-eventemitter": "0.0.6",
     "async.util.setimmediate": "0.5.2",
     "curvecp": "1.2.1",
