@@ -178,7 +178,6 @@ Platform.prototype._setupTransport = function (connectionInfo) {
   })
   this._transport.on('listening', function () {
     var connectionInfo = self._transport.address()
-    console.log('CONNECTION INFO RETURNED BY 1TP ' + JSON.stringify(connectionInfo))
     self._log.info('transport opened, connection-info = ' + JSON.stringify(connectionInfo))
     self.storage.put('myConnectionInfo', JSON.stringify(connectionInfo))
     self.directory.setMyConnectionInfo(connectionInfo)
@@ -200,11 +199,9 @@ Platform.prototype._listen = function (connectionInfo) {
   }
   var success = function (value) {
     assert(_.isString(value) || value === null || value === undefined)
-    console.log('VALUE RETRIEVED FOR CONNECTION INFO ' + value)
     if (value === null || value === undefined || value.length === 0) {
       self._transport.listen()
     } else {
-      console.log('PARSED VALUE FOR CONNECTION INFO')
       value = JSON.parse(value)
       assert(_.isArray(value))
       self._transport.listen(value)
