@@ -34,7 +34,7 @@ var TransportManager = function (options) {
   this._clientConnectionsInProgress = {}
   this._clientConnectQueue = {}
   // TRANSPORT-SERVER
-  this._transportServer = new transport.Server()
+  this._transportServer = new transport.Server({handshake: true})
   this._transportServer.setLogger(this._log)
   this._transportServer.on('close', function () {
     self.emit('close')
